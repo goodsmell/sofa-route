@@ -298,7 +298,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const digits=s=>String(s||'').replace(/[^0-9+]/g,'');
 const uid=()=>Math.random().toString(36).slice(2,9);
 
-function tomorrow(){const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10)}
+function tomorrow(){const d=new Date();d.setDate(d.getDate()+1);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
 function sample(){return {example:true,date:tomorrow(),depart:'08:00',start:'안산 그레이박스',end:'상록수역',endTravel:25,list:[
  {id:uid(),name:'예시고객 가',addr:'강원 원주시 예시로 12, 101동 1001호',phone:'010-0000-0001',phone2:'',slot:'am',noelev:false,bs:true,single:false,call:true,sorry:false,prod:'4인 가죽 소파',memo:'전날 해피콜 요청',travel:95,work:''},
  {id:uid(),name:'예시고객 나',addr:'경기 성남시 분당구 예시길 34',phone:'010-0000-0002',phone2:'010-0000-0012',slot:'any',noelev:false,bs:false,single:false,call:false,sorry:false,prod:'3인 패브릭 소파 + 스툴',memo:'경비실에 차량 등록 필요',travel:80,work:''},
@@ -569,7 +569,7 @@ function parseTableOCR(data,w,h,file){
   const groups=[];for(const word of words){const y=(word.bbox.y0+word.bbox.y1)/2;let g=groups.find(r=>Math.abs(r.y-y)<h*.022);if(!g){g={y,words:[]};groups.push(g)}g.words.push(word);g.y=(g.y*(g.words.length-1)+y)/g.words.length}
   return groups.map(g=>{const col=(a,b)=>g.words.filter(q=>{const x=(q.bbox.x0+q.bbox.x1)/2/w;return x>=a&&x<b}).sort((a,b)=>a.bbox.x0-b.bbox.x0).map(q=>q.text).join(' ').trim();const name=col(0,.31).replace(/[^가-힣\s]/g,'').trim(),phone=normalizePhone(col(.31,.62)),addr=col(.62,1);return {...baseCustomer({name,phone,addr}),file}}).filter(c=>c.name.length>=2&&c.addr.length>=5&&/^(0\d{9,11})$/.test(c.phone.replace(/\D/g,'')));
 }
-async function imageCanvas(file){const bmp=await createImageBitmap(file);const scale=Math.min(2,1800/bmp.width),form=bmp.height>bmp.width*1.2;const c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.fullHeight=Math.round(bmp.height*scale);c.height=Math.round(bmp.height*scale*(form?.7:1));c.isForm=form;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(bmp,0,0,c.width,c.fullHeight);bmp.close();return c}
+async function imageCanvas(file){const bmp=await createImageBitmap(file);const scale=Math.min(6,1800/bmp.width),form=bmp.height>bmp.width*1.2;const c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.fullHeight=Math.round(bmp.height*scale);c.height=Math.round(bmp.height*scale*(form?.7:1));c.isForm=form;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(bmp,0,0,c.width,c.fullHeight);bmp.close();return c}
 $('import-images').addEventListener('change',async e=>{
   const files=[...e.target.files];if(!files.length)return;
   const status=$('import-status');status.textContent='글자 읽기 도구 준비 중…';
