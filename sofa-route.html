@@ -1,0 +1,608 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1b5a8c">
+<meta name="description" content="한샘 소파 배송 순서를 만들고 현장에서 조정하는 도구">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>소파 배송 동선표</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 한 번에 한 화면만. 아래 고정 탭 3개(고객 넣기 / 순서·시간 / 보내기), 큰 글씨·큰 버튼, 휴대폰 우선 */
+:root{
+  --bg:#f2f4f6; --panel:#ffffff; --ink:#141c24; --muted:#56636f; --line:#cfd7df;
+  --accent:#1b5a8c; --accent-ink:#ffffff; --accent-soft:#dfeaf5;
+  --ok:#1d7546; --ok-soft:#e1f3e8; --warn:#9a5400; --warn-soft:#fff0d6; --bad:#b0261d; --bad-soft:#fde5e2;
+  --call:#6a3c9f; --call-soft:#efe6fa; --tag-soft:#e8ecf0;
+  --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10151b; --panel:#1a2129; --ink:#eef2f6; --muted:#a3b0bd; --line:#334050;
+  --accent:#74b4ea; --accent-ink:#0b1824; --accent-soft:#1c3349;
+  --ok:#62c98f; --ok-soft:#163323; --warn:#f2ad52; --warn-soft:#3a2a12; --bad:#ff8f85; --bad-soft:#401d1a;
+  --call:#cba8f4; --call-soft:#2e2242; --tag-soft:#242e39; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10151b; --panel:#1a2129; --ink:#eef2f6; --muted:#a3b0bd; --line:#334050;
+  --accent:#74b4ea; --accent-ink:#0b1824; --accent-soft:#1c3349;
+  --ok:#62c98f; --ok-soft:#163323; --warn:#f2ad52; --warn-soft:#3a2a12; --bad:#ff8f85; --bad-soft:#401d1a;
+  --call:#cba8f4; --call-soft:#2e2242; --tag-soft:#242e39; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:18px;line-height:1.5;
+  padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px));
+  padding-block:14px calc(100px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1{font-size:24px;margin:0;letter-spacing:-.01em}
+h2{font-size:21px;margin:0}
+.lead{color:var(--muted);margin:2px 0 0;font-size:16px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.field{display:flex;flex-direction:column;gap:6px;min-width:0}
+.field>span{font-size:16px;font-weight:600;color:var(--muted)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+input[type=text],input[type=tel],input[type=time],input[type=date],input[type=number],textarea{
+  font:inherit;font-size:19px;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;min-width:0;min-height:56px}
+textarea{resize:vertical;min-height:90px}
+select,input[type=file]{font:inherit;font-size:17px;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:10px;width:100%;min-height:52px}
+input:focus,textarea:focus{border-color:var(--accent);outline:none}
+button:focus-visible,a:focus-visible,label:focus-within{outline:3px solid var(--accent);outline-offset:2px}
+
+/* big segmented choice + toggle chips */
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.seg label,.chip{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;gap:8px;min-height:58px;padding:8px 10px;border:2px solid var(--line);border-radius:12px;background:var(--bg);font-weight:600;font-size:17px;cursor:pointer;line-height:1.25}
+.seg input,.chip input{position:absolute;opacity:0;pointer-events:none}
+.seg small{display:block;font-weight:400;font-size:14px;color:var(--muted)}
+.seg label:has(input:checked){border-color:var(--accent);background:var(--accent);color:var(--accent-ink)}
+.seg label:has(input:checked) small{color:var(--accent-ink)}
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chip::before{content:"";flex:none;width:22px;height:22px;border-radius:6px;border:2px solid var(--muted)}
+.chip:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.chip:has(input:checked)::before{background:var(--accent);border-color:var(--accent);box-shadow:inset 0 0 0 3px var(--accent-soft)}
+
+button,.btn{font:inherit;font-size:18px;font-weight:700;border-radius:12px;border:2px solid var(--line);background:var(--panel);color:var(--ink);padding:10px 16px;min-height:56px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+button:disabled{opacity:.35;cursor:default}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.big{width:100%;min-height:64px;font-size:20px}
+button.danger{color:var(--bad);border-color:var(--bad-soft)}
+button.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
+.row{display:flex;flex-wrap:wrap;gap:10px}
+.row>button{flex:1 1 140px}
+.hint{font-size:16px;color:var(--muted);margin:0}
+.example{font-size:16px;background:var(--warn-soft);color:var(--warn);border-radius:12px;padding:12px 14px;margin:0}
+details summary{cursor:pointer;font-weight:700;font-size:18px;min-height:44px;display:flex;align-items:center}
+details ol{margin:6px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:6px;color:var(--muted);font-size:17px}
+
+/* settings line */
+.setline{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;font-size:17px}
+.setline b{font-variant-numeric:tabular-nums}
+
+/* summary */
+.summary{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sbox{background:var(--bg);border-radius:12px;padding:10px 14px}
+.sbox span{display:block;font-size:15px;color:var(--muted)}
+.sbox strong{font-size:26px;font-variant-numeric:tabular-nums}
+.sbox.home{grid-column:1/-1;background:var(--accent-soft)}
+.sbox.home strong{color:var(--accent);font-size:32px}
+
+/* precall */
+.precall{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.precall li{background:var(--call-soft);border-radius:12px;padding:10px 14px}
+.precall b{font-size:19px}
+.precall .ph{font-variant-numeric:tabular-nums;font-weight:600}
+.precall .why{display:block;color:var(--call);font-size:16px}
+.precall .none{background:var(--ok-soft);color:var(--ok)}
+
+/* stop list */
+ol.stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.leg{display:flex;align-items:center;gap:8px;padding:8px 0 8px 22px;margin-left:24px;border-left:3px dashed var(--line);flex-wrap:wrap}
+.leg .lbl{font-size:16px;color:var(--muted);min-width:44px}
+.leg .min{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;min-width:66px;text-align:center}
+.leg button{min-height:48px;min-width:58px;padding:6px 10px;font-size:17px}
+.leg a{color:var(--accent);font-size:16px;font-weight:600;padding:10px 4px}
+.stop{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.stop.endpt{background:transparent;border-style:dashed;padding:10px 14px;flex-direction:row;align-items:center;gap:12px}
+.head{display:flex;gap:12px;align-items:center}
+.num{flex:none;width:48px;height:48px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
+.endpt .num{background:var(--tag-soft);color:var(--muted);font-size:14px}
+.who{min-width:0;display:flex;flex-direction:column}
+.who b{font-size:21px;line-height:1.3}
+.time{font-variant-numeric:tabular-nums;font-weight:700;color:var(--accent);font-size:20px}
+.addr{font-size:17px;color:var(--muted);overflow-wrap:anywhere;margin:0}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:15px;font-weight:700;padding:3px 10px;border-radius:999px;background:var(--tag-soft);color:var(--muted)}
+.tag.bad{background:var(--bad-soft);color:var(--bad)}
+.tag.warn{background:var(--warn-soft);color:var(--warn)}
+.tag.call{background:var(--call-soft);color:var(--call)}
+.tag.slot{background:var(--accent-soft);color:var(--accent)}
+.ctl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ctl button{min-height:52px;padding:6px;font-size:16px}
+
+/* send tab */
+.frame{width:100%;height:620px;border:2px solid var(--line);border-radius:14px;background:var(--bg)}
+.msg{font-size:17px;font-weight:600;color:var(--ok);min-height:1.4em;margin:0}
+
+/* bottom tab bar */
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);
+  padding:8px max(10px,env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px))}
+nav.tabs .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+nav.tabs button{min-height:64px;flex-direction:column;gap:0;font-size:17px;border:none;background:var(--bg);color:var(--muted)}
+nav.tabs button small{font-size:13px;font-weight:600}
+nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accent-ink)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:30;background:var(--ink);color:var(--bg);font-weight:700;padding:12px 18px;border-radius:12px;font-size:17px;max-width:calc(100% - 32px);text-align:center}
+.edit-banner{background:var(--accent-soft);color:var(--accent);font-weight:700;border-radius:12px;padding:10px 14px;margin:0}
+.import-status{font-size:16px;color:var(--muted);margin:0;white-space:pre-line}
+.review{display:flex;flex-direction:column;gap:8px}
+.review-item{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--bg)}
+.review-item strong{display:block}.review-item small{display:block;color:var(--muted);font-size:14px}
+.review-item.bad{border-color:var(--warn);background:var(--warn-soft)}
+.action-links{display:flex;flex-wrap:wrap;gap:8px}.action-links a,.action-links button{flex:1 1 130px;text-decoration:none;font-size:16px;min-height:48px;padding:7px}
+@media (max-width:380px){.seg label{font-size:15px}.chips{grid-template-columns:1fr}.ctl{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>소파 배송 동선표</h1>
+    <p class="lead" id="head-line"></p>
+  </header>
+
+  <!-- ===== 탭 1: 고객 넣기 ===== -->
+  <section id="tab-add" class="view" aria-labelledby="t-add">
+    <div class="wrap" style="gap:14px">
+      <div class="panel">
+        <h2>출발 정보</h2>
+        <div class="two">
+          <label class="field"><span>배송 날짜</span><input type="date" id="s-date"></label>
+          <label class="field"><span>출발 시간</span><input type="time" id="s-depart"></label>
+        </div>
+        <div class="two">
+          <label class="field"><span>출발하는 곳</span><input type="text" id="s-start"></label>
+          <label class="field"><span>마지막 귀가</span><input type="text" id="s-end"></label>
+        </div>
+      </div>
+
+      <div class="panel" id="add-panel">
+        <h2 id="form-title">고객 넣기</h2>
+        <p class="edit-banner" id="edit-banner" hidden></p>
+        <label class="field"><span>고객 이름</span><input type="text" id="c-name" placeholder="예: 홍길동" autocomplete="off"></label>
+        <label class="field"><span>전화번호 (010)</span><input type="tel" id="c-phone" placeholder="010-1234-5678" inputmode="tel"></label>
+        <label class="field"><span>주소</span><input type="text" id="c-addr" placeholder="예: 경기 수원시 영통구 ..." autocomplete="off"></label>
+        <div class="field"><span>고객이 원하는 시간</span>
+          <div class="seg" role="radiogroup" aria-label="고객이 원하는 시간">
+            <label><input type="radio" name="slot" value="am">오전<small>9~13시</small></label>
+            <label><input type="radio" name="slot" value="pm">오후<small>13~17시</small></label>
+            <label><input type="radio" name="slot" value="any" checked>상관없음<small>9~17시</small></label>
+          </div>
+        </div>
+        <div class="field"><span>해당되는 것 누르기</span>
+          <div class="chips">
+            <label class="chip"><input type="checkbox" id="c-noelev">엘리베이터 없음</label>
+            <label class="chip"><input type="checkbox" id="c-bs">기존 소파 수거</label>
+            <label class="chip"><input type="checkbox" id="c-single">단품 (암체어 등)</label>
+            <label class="chip"><input type="checkbox" id="c-call">전날 전화 요청</label>
+          </div>
+        </div>
+        <details id="more">
+          <summary>더 적을 것 (제품, 특이사항, 2차 번호)</summary>
+          <div style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
+            <label class="field"><span>제품</span><input type="text" id="c-prod" placeholder="예: 4인 소파 + 스툴"></label>
+            <label class="field"><span>특이사항</span><textarea id="c-memo" placeholder="예: 가능하면 늦게, 경비실 차량 등록"></textarea></label>
+            <label class="field"><span>2차 연락처 (해피콜 번호)</span><input type="tel" id="c-phone2" placeholder="없으면 비워두기" inputmode="tel"></label>
+            <label class="field"><span>설치 시간 (분) · 비우면 자동</span><input type="number" id="c-work" min="5" step="5" inputmode="numeric" placeholder="자동 (기본 35분)"></label>
+            <label class="chip"><input type="checkbox" id="c-sorry">원하는 시간 못 맞춤 (미리 양해 전화)</label>
+          </div>
+        </details>
+        <button class="primary big" id="btn-save" type="button">＋ 이 고객 추가</button>
+        <button class="big" id="btn-cancel" type="button" hidden>수정 그만두기</button>
+      </div>
+
+      <div class="panel">
+        <h2>출고의뢰서 사진 가져오기</h2>
+        <p class="hint">사진 여러 장을 한 번에 선택하세요. 글자는 이 휴대폰에서 읽고, 읽힌 고객은 아래에서 확인한 뒤 추가합니다. 첫 사용에는 OCR 파일을 내려받기 위해 인터넷이 필요합니다.</p>
+        <label class="field"><span>사진 선택</span><input type="file" id="import-images" accept="image/*" multiple></label>
+        <p class="import-status" id="import-status" role="status">선택한 사진이 없습니다.</p>
+        <div class="review" id="import-review"></div>
+        <button class="primary big" id="import-commit" type="button" hidden>확인한 고객 추가</button>
+        <p class="hint">사진의 작은 글씨나 흐린 번호는 틀릴 수 있습니다. 특히 주소·전화번호·방문 시간을 꼭 확인하세요.</p>
+      </div>
+
+      <details class="panel">
+        <summary>고객 목록 CSV·TSV 가져오기</summary>
+        <p class="hint">엑셀에서 CSV로 저장한 파일 또는 탭으로 구분된 표를 선택하세요. 열 이름: 고객명, 고객연락처, 설치주소.</p>
+        <input type="file" id="import-table" accept=".csv,.tsv,text/csv,text/tab-separated-values">
+      </details>
+
+      <details class="panel">
+        <summary>여러 명 한꺼번에 붙여넣기</summary>
+        <p class="hint">한 줄에 한 명씩 <b>이름 | 주소 | 전화 | 시간 | 메모</b>. 시간은 오전·오후·상관없음.</p>
+        <textarea id="bulk" rows="5" placeholder="홍길동 | 경기 안산시 상록구 ... | 010-1111-2222 | 오전 | 전날 해피콜"></textarea>
+        <button type="button" id="btn-bulk" class="big">붙여넣은 고객 모두 추가</button>
+      </details>
+    </div>
+  </section>
+
+  <!-- ===== 탭 2: 순서·시간 ===== -->
+  <section id="tab-order" class="view" hidden>
+    <div class="wrap" style="gap:14px">
+      <p class="example" id="example-note">지금 있는 고객은 <b>연습용 예시</b>예요. 맨 아래 "전부 지우기"를 누르고 진짜 고객을 넣으세요.</p>
+      <div class="summary" id="summary"></div>
+      <div class="panel">
+        <h2>전날 미리 전화할 곳</h2>
+        <ul class="precall" id="precall"></ul>
+      </div>
+      <div class="panel">
+        <h2>배송 순서</h2>
+        <p class="hint">위로·아래로로 순서를 바꾸고, 집 사이 이동 시간은 내비에서 보고 −5 / +5로 맞추세요.</p>
+        <ol class="stops" id="stops"></ol>
+      </div>
+      <div class="row">
+        <button type="button" id="btn-sort">지역·시간으로 순서 추천</button>
+        <button type="button" class="danger" id="btn-clear">전부 지우기</button>
+      </div>
+      <details class="panel">
+        <summary>순서 정하는 요령</summary>
+        <ol>
+          <li>시간 정한 고객부터: 오전은 13시 전, 오후는 13~17시.</li>
+          <li>가장 먼 곳은 아침에 (외곽 방향은 덜 막힘).</li>
+          <li>분당·판교 같은 시내는 10시 이후에.</li>
+          <li>마지막 집은 상록수역에서 가까운 곳으로.</li>
+          <li>17시 이후엔 고속도로보다 동네 길로.</li>
+          <li>"가능하면 늦게" 같은 부탁을 못 맞추면 미리 양해 전화.</li>
+          <li>이동 시간은 내비에서 <b>출발 시간 설정</b>으로 확인.</li>
+        </ol>
+      </details>
+    </div>
+  </section>
+
+  <!-- ===== 탭 3: 보내기 ===== -->
+  <section id="tab-send" class="view" hidden>
+    <div class="wrap" style="gap:14px">
+      <div class="panel">
+        <h2>기사님께 보낼 파일</h2>
+        <p class="hint">HTML 파일을 카톡으로 보내면 휴대폰에서 <b>전화 버튼</b>, <b>지도 버튼</b>이 바로 됩니다. 번호를 누르면 "완료" 표시가 돼요.</p>
+        <button class="primary big" type="button" id="btn-html">📄 HTML 파일 저장</button>
+        <button class="big" type="button" id="btn-copy">📋 글자로 복사 (카톡·메모에 붙여넣기)</button>
+        <button class="big" type="button" id="btn-txt">TXT 파일 저장</button>
+        <p class="msg" id="out-msg" role="status"></p>
+        <textarea id="txt-out" rows="8" readonly hidden></textarea>
+        <p class="hint">⚠ 파일에는 고객 이름·전화·주소가 들어 있어요. 담당자에게만 보내고, 배송 끝나면 지워 주세요.</p>
+      </div>
+      <div class="panel">
+        <h2>기사님 휴대폰 화면 미리보기</h2>
+        <iframe class="frame" id="preview" title="기사님용 배송 순서 미리보기"></iframe>
+      </div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="화면 바꾸기">
+  <div class="in" role="tablist">
+    <button type="button" role="tab" data-tab="add" id="t-add">① 고객 넣기<small id="cnt-add"></small></button>
+    <button type="button" role="tab" data-tab="order" id="t-order">② 순서·시간<small id="cnt-order"></small></button>
+    <button type="button" role="tab" data-tab="send" id="t-send">③ 보내기<small>파일 만들기</small></button>
+  </div>
+</nav>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+(function(){
+const KEY='sofa-route-v1', TABKEY='sofa-route-tab';
+const SLOT={am:{label:'오전',s:540,e:780},pm:{label:'오후',s:780,e:1020},any:{label:'시간 상관없음',s:540,e:1020}};
+const $=id=>document.getElementById(id);
+const toMin=s=>{const m=/^(\d{1,2}):(\d{2})/.exec(s||'');return m?(+m[1])*60+(+m[2]):480};
+const fmt=m=>{m=Math.round(m);return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const digits=s=>String(s||'').replace(/[^0-9+]/g,'');
+const uid=()=>Math.random().toString(36).slice(2,9);
+
+function tomorrow(){const d=new Date();d.setDate(d.getDate()+1);return d.toISOString().slice(0,10)}
+function sample(){return {example:true,date:tomorrow(),depart:'08:00',start:'안산 그레이박스',end:'상록수역',endTravel:25,list:[
+ {id:uid(),name:'예시고객 가',addr:'강원 원주시 예시로 12, 101동 1001호',phone:'010-0000-0001',phone2:'',slot:'am',noelev:false,bs:true,single:false,call:true,sorry:false,prod:'4인 가죽 소파',memo:'전날 해피콜 요청',travel:95,work:''},
+ {id:uid(),name:'예시고객 나',addr:'경기 성남시 분당구 예시길 34',phone:'010-0000-0002',phone2:'010-0000-0012',slot:'any',noelev:false,bs:false,single:false,call:false,sorry:false,prod:'3인 패브릭 소파 + 스툴',memo:'경비실에 차량 등록 필요',travel:80,work:''},
+ {id:uid(),name:'예시고객 다',addr:'경기 용인시 수지구 예시로 56',phone:'010-0000-0003',phone2:'',slot:'pm',noelev:true,bs:false,single:true,call:false,sorry:false,prod:'암체어 1',memo:'3층 계단',travel:25,work:''},
+ {id:uid(),name:'예시고객 라',addr:'경기 수원시 영통구 예시대로 78',phone:'010-0000-0004',phone2:'',slot:'any',noelev:false,bs:false,single:false,call:false,sorry:true,prod:'모듈 소파 5유닛',memo:'가능하면 가장 늦게',travel:30,work:''}
+]}}
+
+let S;
+try{S=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){S=null}
+if(!S||!Array.isArray(S.list))S={example:false,date:tomorrow(),depart:'08:00',start:'',end:'',endTravel:30,list:[]};
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+let toastT;
+function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},2600)}
+
+/* ---------- tabs ---------- */
+let tab='add';
+try{tab=localStorage.getItem(TABKEY)||(S.list.length?'order':'add')}catch(e){}
+function showTab(t){tab=t;
+  ['add','order','send'].forEach(k=>{$('tab-'+k).hidden=k!==t;$('t-'+k).setAttribute('aria-selected',k===t?'true':'false')});
+  try{localStorage.setItem(TABKEY,t)}catch(e){}
+  if(t==='send')$('preview').srcdoc=buildHTML();
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+
+/* ---------- calc ---------- */
+function workMin(c){if(c.work)return +c.work;let w=c.single?20:35;if(c.noelev)w+=15;if(c.bs)w+=15;return w}
+function compute(){
+  let t=toMin(S.depart);const rows=[];
+  S.list.forEach(c=>{
+    const sl=SLOT[c.slot]||SLOT.any;const reach=t+(+c.travel||0);
+    const start=Math.max(reach,sl.s);const wait=start-reach;const end=start+workMin(c);
+    const flags=[];
+    if(start>sl.e)flags.push(['bad',sl.label+' 시간 넘김']);
+    else if(start>=1020)flags.push(['warn','17시 넘어 도착']);
+    if(wait>0)flags.push(['warn',wait+'분 기다림']);
+    if(c.noelev)flags.push(['','엘리베이터 없음']);
+    if(c.bs)flags.push(['','기존 소파 수거']);
+    if(c.call)flags.push(['call','전날 전화']);
+    if(c.sorry)flags.push(['call','양해 전화']);
+    rows.push({c,start,end,wait,flags,sl});t=end;
+  });
+  return {rows,home:t+(+S.endTravel||0),last:t};
+}
+function precallList(rows){
+  const out=[];
+  rows.forEach((r,i)=>{const why=[];const c=r.c;
+    if(c.call)why.push('전날 전화 요청');
+    if(r.start>r.sl.e)why.push(r.sl.label+' 약속인데 '+fmt(r.start)+' 도착 예상 → 시간 조율');
+    else if(r.start>=1020)why.push(fmt(r.start)+' 도착 예상 → 늦는다고 안내');
+    if(c.sorry)why.push('원하는 시간 못 맞춤 → 양해 구하기');
+    if(why.length)out.push({i,c,why,start:r.start});
+  });
+  return out;
+}
+
+/* ---------- render ---------- */
+function dateLabel(){if(!S.date)return'';const d=new Date(S.date+'T00:00');return (d.getMonth()+1)+'월 '+d.getDate()+'일('+'일월화수목금토'[d.getDay()]+')'}
+function render(){
+  $('s-date').value=S.date||'';$('s-depart').value=S.depart||'08:00';$('s-start').value=S.start||'';$('s-end').value=S.end||'';
+  $('example-note').hidden=!S.example;
+  const {rows,home,last}=compute();
+  $('head-line').textContent=[dateLabel(),S.depart+' 출발',rows.length+'곳'].filter(Boolean).join(' · ');
+  $('cnt-add').textContent=rows.length+'명 넣음';
+  const bad=rows.filter(r=>r.start>r.sl.e).length,late=rows.filter(r=>r.start>=1020).length;
+  $('cnt-order').textContent=bad?('⚠ '+bad+'곳 시간 넘김'):(rows.length?'귀가 '+fmt(home):'');
+  $('summary').innerHTML=
+    `<div class="sbox home"><span>${esc(S.end)} 귀가 예상</span><strong>${rows.length?fmt(home):'-'}</strong></div>`+
+    `<div class="sbox"><span>배송</span><strong>${rows.length}곳</strong></div>`+
+    `<div class="sbox"><span>시간 넘김</span><strong style="color:${bad?'var(--bad)':'var(--ok)'}">${bad?bad+'곳':'없음'}</strong></div>`;
+  let h=`<li class="stop endpt"><div class="num">출발</div><div class="who"><b>${esc(S.start)}</b><span class="time">${esc(S.depart)}</span></div></li>`;
+  rows.forEach((r,i)=>{const c=r.c;
+    h+=`<li class="leg"><span class="lbl">이동</span><button type="button" data-tv="${i}" data-d="-5" aria-label="${esc(c.name)} 이동시간 5분 줄이기">−5</button>`+
+       `<span class="min">${+c.travel||0}분</span><button type="button" data-tv="${i}" data-d="5" aria-label="${esc(c.name)} 이동시간 5분 늘리기">+5</button>`+
+       `<a href="tmap://search?name=${encodeURIComponent(c.addr)}">T맵</a></li>`;
+    h+=`<li class="stop"><div class="head"><div class="num">${i+1}</div><div class="who"><b>${esc(c.name)}</b><span class="time">${fmt(r.start)} 도착 · ${fmt(r.end)} 끝</span></div></div>`+
+       `<div class="tags"><span class="tag slot">${r.sl.label}</span>${r.flags.map(f=>`<span class="tag ${f[0]}">${esc(f[1])}</span>`).join('')}</div>`+
+       `<p class="addr">${esc(c.addr)}</p>`+
+       (c.prod||c.memo?`<p class="addr">${esc(c.prod)}${c.prod&&c.memo?' · ':''}${esc(c.memo)}</p>`:'')+
+       `<div class="action-links">${c.phone?`<a class="btn" href="tel:${digits(c.phone)}">☎ 전화</a>`:''}<a class="btn" href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵 열기</a><button type="button" data-copyaddr="${i}">주소 복사</button></div>`+
+       `<div class="ctl"><button type="button" data-up="${i}" ${i?'':'disabled'}>▲ 위로</button><button type="button" data-down="${i}" ${i<rows.length-1?'':'disabled'}>▼ 아래로</button>`+
+       `<button type="button" data-edit="${i}">고치기</button><button type="button" class="danger" data-del="${i}">지우기</button></div></li>`;
+  });
+  h+=`<li class="leg"><span class="lbl">귀가</span><button type="button" data-tv="end" data-d="-5" aria-label="귀가 이동시간 5분 줄이기">−5</button><span class="min">${+S.endTravel||0}분</span><button type="button" data-tv="end" data-d="5" aria-label="귀가 이동시간 5분 늘리기">+5</button></li>`;
+  h+=`<li class="stop endpt"><div class="num">도착</div><div class="who"><b>${esc(S.end)}</b><span class="time">${rows.length?fmt(home):''}</span></div></li>`;
+  $('stops').innerHTML=rows.length?h:'<li class="hint">아직 고객이 없어요. ① 고객 넣기에서 추가하세요.</li>';
+  const pc=precallList(rows);
+  $('precall').innerHTML=pc.length?pc.map(p=>`<li><b>${p.i+1}번 ${esc(p.c.name)}</b> <span class="ph">${esc(p.c.phone)}</span>${p.c.phone2?` <span class="ph">/ 2차 ${esc(p.c.phone2)}</span>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join(''):'<li class="none">미리 전화할 곳이 없어요.</li>';
+  if(tab==='send')$('preview').srcdoc=buildHTML();
+  persist();
+}
+
+/* ---------- form ---------- */
+let editing=null;
+const F=['name','phone','phone2','addr','prod','work','memo'],B=['noelev','bs','single','call','sorry'];
+function getSlot(){const r=document.querySelector('input[name=slot]:checked');return r?r.value:'any'}
+function setSlot(v){document.querySelectorAll('input[name=slot]').forEach(r=>r.checked=r.value===(v||'any'))}
+function readForm(){const c={slot:getSlot()};F.forEach(k=>c[k]=$('c-'+k).value.trim());B.forEach(k=>c[k]=$('c-'+k).checked);return c}
+function fillForm(c){F.forEach(k=>$('c-'+k).value=c?(c[k]||''):'');B.forEach(k=>$('c-'+k).checked=c?!!c[k]:false);setSlot(c&&c.slot);$('more').open=!!(c&&(c.prod||c.memo||c.phone2||c.work||c.sorry))}
+function setEditing(i){
+  editing=i;
+  if(i==null){fillForm(null);$('form-title').textContent='고객 넣기';$('btn-save').textContent='＋ 이 고객 추가';$('btn-cancel').hidden=true;$('edit-banner').hidden=true;return}
+  fillForm(S.list[i]);$('form-title').textContent='고객 고치기';$('btn-save').textContent='✓ 고친 내용 저장';$('btn-cancel').hidden=false;
+  $('edit-banner').hidden=false;$('edit-banner').textContent=(i+1)+'번 '+(S.list[i].name||'')+' 님을 고치는 중';
+  showTab('add');
+}
+function dropExample(){if(S.example){S.example=false;S.list=[]}}
+$('btn-save').onclick=()=>{
+  const c=readForm();if(!c.name&&!c.addr){toast('이름이나 주소를 넣어 주세요');$('c-name').focus();return}
+  if(editing!=null){Object.assign(S.list[editing],c);toast('고쳤어요');setEditing(null);render();showTab('order');return}
+  dropExample();S.list.push(Object.assign({id:uid(),travel:30},c));
+  setEditing(null);render();toast((c.name||'고객')+' 님 추가 · 지금 '+S.list.length+'명');
+  window.scrollTo({top:$('add-panel').offsetTop-10});
+};
+$('btn-cancel').onclick=()=>{setEditing(null);showTab('order')};
+$('btn-bulk').onclick=()=>{
+  const lines=$('bulk').value.split(/\n/).map(l=>l.trim()).filter(Boolean);if(!lines.length){toast('붙여넣은 내용이 없어요');return}
+  dropExample();
+  lines.forEach(l=>{const p=l.split(/\s*[|\t]\s*/);const memo=p[4]||'';const tm=p[3]||'';
+    S.list.push({id:uid(),name:p[0]||'',addr:p[1]||'',phone:p[2]||'',phone2:'',slot:/오전/.test(tm)?'am':/오후/.test(tm)?'pm':'any',
+      noelev:/엘(리)?베(이터)?\s*(없|X|N)|계단/i.test(memo),bs:/BS|수거/i.test(memo),single:/암체어|단품/.test(memo),call:/해피콜|전날/.test(memo),sorry:false,prod:'',memo,travel:30,work:''});
+  });
+  $('bulk').value='';render();toast(lines.length+'명 추가했어요');showTab('order');
+};
+
+/* ---------- list actions ---------- */
+let armedDel=null,armT;
+$('stops').addEventListener('click',e=>{
+  const b=e.target.closest('button');if(!b)return;const d=b.dataset,L=S.list;
+  if(d.copyaddr!=null){navigator.clipboard.writeText(L[+d.copyaddr].addr).then(()=>toast('주소를 복사했어요'),()=>toast('주소 복사가 안 됐어요'));return}
+  if(d.tv!=null){const v=x=>Math.max(0,(+x||0)+(+d.d));if(d.tv==='end')S.endTravel=v(S.endTravel);else L[+d.tv].travel=v(L[+d.tv].travel);render();return}
+  if(d.up){const i=+d.up;[L[i-1],L[i]]=[L[i],L[i-1]]}
+  else if(d.down){const i=+d.down;[L[i+1],L[i]]=[L[i],L[i+1]]}
+  else if(d.del){const i=+d.del;
+    if(armedDel!==i){render();armedDel=i;const nb=$('stops').querySelector(`[data-del="${i}"]`);nb.textContent='정말 지우기';nb.classList.add('armed');clearTimeout(armT);armT=setTimeout(()=>{armedDel=null;render()},4000);return}
+    const nm=L[i].name;L.splice(i,1);armedDel=null;if(editing!=null)setEditing(null);toast(nm+' 님 지웠어요')}
+  else if(d.edit){setEditing(+d.edit);return}
+  else return;
+  armedDel=null;render();
+});
+function areaKey(addr){const m=String(addr||'').match(/(?:특별시|광역시|특별자치시|도)?\s*([가-힣]+시)\s*([가-힣]+구|[가-힣]+군)?/);return m?(m[1]+' '+(m[2]||'')).trim():String(addr||'').split(/\s+/).slice(0,2).join(' ')}
+$('btn-sort').onclick=()=>{const o={am:0,any:1,pm:2};S.list=S.list.map((c,i)=>[c,i]).sort((a,b)=>(o[a[0].slot]-o[b[0].slot])||areaKey(a[0].addr).localeCompare(areaKey(b[0].addr),'ko')||(a[1]-b[1])).map(x=>x[0]);render();toast('약속 시간과 가까운 지역끼리 묶었어요. 실제 길은 T맵에서 확인하세요.')};
+let clearArmed=false,clearT;
+$('btn-clear').onclick=e=>{const b=e.currentTarget;
+  if(!clearArmed){clearArmed=true;b.textContent='한 번 더 누르면 전부 지워요';b.classList.add('armed');clearTimeout(clearT);clearT=setTimeout(()=>{clearArmed=false;b.textContent='전부 지우기';b.classList.remove('armed')},4000);return}
+  clearArmed=false;b.textContent='전부 지우기';b.classList.remove('armed');S.list=[];S.example=false;setEditing(null);render();toast('전부 지웠어요');showTab('add')};
+['date','depart','start','end'].forEach(k=>$('s-'+k).addEventListener('change',e=>{S[k]=e.target.value;render()}));
+
+/* ---------- outputs ---------- */
+function shortDate(){if(!S.date)return'';const d=new Date(S.date+'T00:00');return (d.getMonth()+1)+'/'+d.getDate()+'('+'일월화수목금토'[d.getDay()]+')'}
+function section(m){return m<720?'오전':m<780?'점심 무렵':m<1020?'오후':'17시 이후'}
+function buildHTML(){
+  const {rows,home}=compute();const pc=precallList(rows);const title=(shortDate()+' 소파 배송 순서').trim();
+  const css=`:root{--bg:#f4f6f8;--card:#fff;--ink:#17202a;--mu:#5b6876;--ln:#d9dfe6;--ac:#1b5a8c;--aci:#fff;--bad:#b0261d;--badbg:#fde5e2;--wr:#9a5400;--wrbg:#fff0d6;--cl:#6a3c9f;--clbg:#efe6fa;--tg:#e8ecf0;--ok:#1d7546}
+@media (prefers-color-scheme:dark){:root{--bg:#10151b;--card:#1a2129;--ink:#eef2f6;--mu:#a3b0bd;--ln:#334050;--ac:#74b4ea;--aci:#0b1824;--bad:#ff8f85;--badbg:#401d1a;--wr:#f2ad52;--wrbg:#3a2a12;--cl:#cba8f4;--clbg:#2e2242;--tg:#242e39;--ok:#62c98f;color-scheme:dark}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 "Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;padding:16px}
+.w{max-width:640px;margin:0 auto}h1{font-size:23px;margin:0 0 4px}.sub{color:var(--mu);margin:0 0 16px;font-size:15px}
+.pre{background:var(--clbg);border-radius:12px;padding:12px 14px;margin-bottom:16px}.pre h2{font-size:17px;margin:0 0 8px;color:var(--cl)}
+.pre li{margin-bottom:8px}.pre .why{display:block;color:var(--mu);font-size:15px}.pre ul{margin:0;padding-left:18px}.pre a{color:var(--ink);font-weight:700}
+ol{list-style:none;margin:0;padding:0}.sep{font-weight:700;color:var(--mu);font-size:15px;margin:18px 0 8px;border-bottom:1px solid var(--ln);padding-bottom:4px}
+.card{position:relative;background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;margin-bottom:12px}
+.card>input{position:absolute;opacity:0;pointer-events:none}
+.top{display:flex;gap:12px;align-items:center}.no{flex:none;width:46px;height:46px;border-radius:50%;background:var(--ac);color:var(--aci);display:grid;place-items:center;font-weight:700;font-size:20px;cursor:pointer}
+.who b{font-size:20px;display:block}.eta{color:var(--ac);font-weight:700;font-size:17px}
+.tags{margin:8px 0 4px;display:flex;flex-wrap:wrap;gap:4px}.t{font-size:14px;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--tg);color:var(--mu)}
+.t.bad{background:var(--badbg);color:var(--bad)}.t.warn{background:var(--wrbg);color:var(--wr)}.t.call{background:var(--clbg);color:var(--cl)}
+.addr{margin:6px 0 2px;font-weight:600}.prod,.memo{margin:2px 0;color:var(--mu);font-size:16px}.memo{color:var(--wr)}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.btns a{flex:1 1 auto;text-align:center;text-decoration:none;font-weight:700;font-size:17px;padding:13px 12px;border-radius:12px;border:1px solid var(--ln);color:var(--ink);background:var(--bg)}
+.btns a.tel{background:var(--ac);color:var(--aci);border-color:var(--ac)}
+.card>input:checked~*{opacity:.45}.card>input:checked~.top .who b{text-decoration:line-through}.card>input:checked~.top .no{background:var(--ok);opacity:1}
+.end{background:var(--card);border:1px dashed var(--ln);border-radius:12px;padding:12px;margin-top:8px;color:var(--mu)}.end b{color:var(--ink)}
+.foot{color:var(--mu);font-size:14px;margin-top:16px}`;
+  let b=`<div class="w"><h1>${esc(title)}</h1><p class="sub">출발 ${esc(S.depart)} ${esc(S.start)} · ${rows.length}곳 · 동그라미 번호를 누르면 완료 표시</p>`;
+  if(pc.length)b+=`<div class="pre"><h2>전날 미리 전화할 곳</h2><ul>${pc.map(p=>`<li><b>${p.i+1}. ${esc(p.c.name)}</b> <a href="tel:${digits(p.c.phone)}">${esc(p.c.phone)}</a>${p.c.phone2?` · 2차 <a href="tel:${digits(p.c.phone2)}">${esc(p.c.phone2)}</a>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join('')}</ul></div>`;
+  b+='<ol>';let prev='';
+  rows.forEach((r,i)=>{const c=r.c;const s=section(r.start);if(s!==prev){b+=`<li class="sep">${s}</li>`;prev=s}
+    const tags=[`<span class="t">${r.sl.label}</span>`].concat(r.flags.map(f=>`<span class="t ${f[0]}">${esc(f[1])}</span>`)).join('');
+    b+=`<li class="card"><input type="checkbox" id="d${i}"><div class="top"><label class="no" for="d${i}">${i+1}</label><div class="who"><b>${esc(c.name)}</b><span class="eta">${fmt(r.start)} 도착 예상</span></div></div>`+
+      `<div class="tags">${tags}</div><p class="addr">${esc(c.addr)}</p>${c.prod?`<p class="prod">${esc(c.prod)}</p>`:''}${c.memo?`<p class="memo">${esc(c.memo)}</p>`:''}`+
+      `<div class="btns">${c.phone?`<a class="tel" href="tel:${digits(c.phone)}">📞 ${esc(c.phone)}</a>`:''}${c.phone2?`<a href="tel:${digits(c.phone2)}">2차 ${esc(c.phone2)}</a>`:''}<a href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵</a></div></li>`;
+  });
+  b+=`</ol><div class="end">마지막 → <b>${esc(S.end)}</b> 귀가 예상 <b>${rows.length?fmt(home):'-'}</b></div>`;
+  b+=`<p class="foot">도착 시간은 평일 교통 기준 추정입니다. 출발 전 내비에서 한 번 더 확인하세요.</p></div>`;
+  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${css}</style></head><body>${b}</body></html>`;
+}
+function buildTXT(){
+  const {rows,home}=compute();const pc=precallList(rows);const L=[];
+  L.push((shortDate()+' 소파 배송 순서').trim());L.push('출발 '+S.depart+' '+S.start);L.push('');
+  if(pc.length){L.push('[전날 미리 전화]');pc.forEach(p=>L.push('- '+(p.i+1)+'. '+p.c.name+' '+p.c.phone+(p.c.phone2?' / 2차 '+p.c.phone2:'')+' ('+p.why.join(', ')+')'));L.push('')}
+  let prev='';
+  rows.forEach((r,i)=>{const c=r.c;const s=section(r.start);if(s!==prev){L.push('── '+s+' ──');prev=s}
+    L.push((i+1)+'. '+fmt(r.start)+' '+c.name+' ['+[r.sl.label].concat(r.flags.map(f=>f[1])).join(', ')+']');
+    L.push('   '+c.addr);
+    if(c.phone)L.push('   ☎ '+c.phone+(c.phone2?' / 2차 '+c.phone2:''));
+    if(c.prod)L.push('   제품: '+c.prod);
+    if(c.memo)L.push('   메모: '+c.memo);
+  });
+  L.push('');L.push('귀가 '+S.end+' 예상 '+(rows.length?fmt(home):'-'));
+  return L.join('\n');
+}
+function fname(ext){return (S.date||'배송')+'_소파배송순서.'+ext}
+function msg(t){$('out-msg').textContent=t}
+async function save(ext,data){
+  let dl=null;try{dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null}catch(e){dl=null}
+  if(dl){try{await dl.save({filename:fname(ext),data});msg('✓ '+fname(ext)+' 저장했어요.')}catch(e){msg(e&&e.code==='declined'?'저장을 취소했어요.':'여기서는 저장이 안 돼요. "글자로 복사"를 써 주세요.')}return}
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:ext==='html'?'text/html':'text/plain'}));a.download=fname(ext);document.body.appendChild(a);a.click();a.remove();msg('✓ '+fname(ext)+' 저장을 시작했어요.')}catch(e){msg('저장이 안 돼요. "글자로 복사"를 써 주세요.')}
+}
+$('btn-html').onclick=()=>save('html',buildHTML());
+$('btn-txt').onclick=()=>save('txt',buildTXT());
+$('btn-copy').onclick=()=>{const t=buildTXT();const ta=$('txt-out');
+  const fallback=()=>{ta.hidden=false;ta.value=t;ta.focus();ta.select();msg('자동 복사가 안 돼요. 아래 글을 길게 눌러 복사하세요.')};
+  try{navigator.clipboard.writeText(t).then(()=>{ta.hidden=true;msg('✓ 복사했어요. 카톡이나 메모에 붙여 넣으세요.');toast('복사했어요')},fallback)}catch(e){fallback()}};
+
+/* ---------- client-side import ---------- */
+let pending=[];
+function baseCustomer(x={}){return {id:uid(),name:x.name||'',addr:x.addr||'',phone:x.phone||'',phone2:x.phone2||'',slot:x.slot||'any',noelev:!!x.noelev,bs:!!x.bs,single:!!x.single,call:!!x.call,sorry:false,prod:x.prod||'',memo:x.memo||'',travel:30,work:x.work||''}}
+function normalizePhone(s){const d=String(s||'').replace(/\D/g,'');return d.length===11?d.replace(/^(\d{3})(\d{4})(\d{4})$/,'$1-$2-$3'):d.length===12?d.replace(/^(\d{4})(\d{4})(\d{4})$/,'$1-$2-$3'):d}
+function renderPending(){
+  $('import-review').innerHTML=pending.map((c,i)=>`<div class="review-item ${!c.name||!c.addr?'bad':''}"><strong>${esc(c.file||'사진')} · ${i+1}번</strong><small>읽힌 글자를 확인하고 고쳐 주세요.</small><label class="field"><span>고객명</span><input data-pending="${i}" data-field="name" value="${esc(c.name)}"></label><label class="field"><span>설치주소</span><input data-pending="${i}" data-field="addr" value="${esc(c.addr)}"></label><label class="field"><span>연락처 1</span><input data-pending="${i}" data-field="phone" type="tel" value="${esc(c.phone)}"></label><label class="field"><span>방문 시간</span><select data-pending="${i}" data-field="slot"><option value="any" ${c.slot==='any'?'selected':''}>상관없음</option><option value="am" ${c.slot==='am'?'selected':''}>오전</option><option value="pm" ${c.slot==='pm'?'selected':''}>오후</option></select></label><label class="field"><span>메모</span><textarea data-pending="${i}" data-field="memo">${esc(c.memo)}</textarea></label><button type="button" data-remove="${i}">이 항목 빼기</button></div>`).join('');
+  $('import-commit').hidden=!pending.length;
+}
+const review=$('import-review');
+review.addEventListener('input',e=>{const d=e.target.dataset;if(d.pending!=null&&pending[+d.pending])pending[+d.pending][d.field]=e.target.value});
+review.addEventListener('change',e=>{const d=e.target.dataset;if(d.pending!=null&&pending[+d.pending])pending[+d.pending][d.field]=e.target.value});
+review.addEventListener('click',e=>{const b=e.target.closest('[data-remove]');if(b){pending.splice(+b.dataset.remove,1);renderPending()}});
+$('import-commit').onclick=()=>{
+  const ready=pending.filter(c=>c.name.trim()&&c.addr.trim());
+  if(ready.length!==pending.length){toast('이름과 주소가 빈 항목을 고쳐 주세요');renderPending();return}
+  dropExample();let added=0,duplicates=0;
+  for(const c of ready){if(S.list.some(x=>x.name.trim()===c.name.trim()&&x.addr.trim()===c.addr.trim())){duplicates++;continue}const {file,...fields}=c;S.list.push(baseCustomer(fields));added++}
+  pending=[];renderPending();render();showTab('order');toast(added+'명 추가'+(duplicates?' · 중복 '+duplicates+'명 건너뜀':''));$('import-images').value='';
+};
+function loadOCR(){return new Promise((resolve,reject)=>{if(window.Tesseract){resolve(window.Tesseract);return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=()=>resolve(window.Tesseract);s.onerror=()=>reject(new Error('글자 읽기 도구를 내려받지 못했습니다. 인터넷 연결을 확인해 주세요.'));document.head.appendChild(s)})}
+function wordsIn(words,w,h,x0,y0,x1,y1){return words.filter(q=>{const b=q.bbox||{},x=((b.x0||0)+(b.x1||0))/2/w,y=((b.y0||0)+(b.y1||0))/2/h;return x>=x0&&x<=x1&&y>=y0&&y<=y1}).sort((a,b)=>(a.bbox.y0-b.bbox.y0)>12?(a.bbox.y0-b.bbox.y0):(a.bbox.x0-b.bbox.x0)).map(q=>q.text).join(' ').trim()}
+function parseFormOCR(data,w,h,file){
+  const words=data.words||[],text=data.text||'';
+  const field=(x0,y0,x1,y1)=>wordsIn(words,w,h,x0,y0,x1,y1);
+  const row=field(.11,.17,.98,.25);
+  let name=field(.11,.178,.205,.248).replace(/[^가-힣\s]/g,'').trim();
+  let addr=field(.205,.178,.693,.248).replace(/^주소\s*/,'').trim();
+  let phone=normalizePhone(field(.69,.178,.90,.248));
+  if(!/^0\d{9,11}$/.test(phone.replace(/\D/g,''))){const m=row.match(/0\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4}/);phone=m?normalizePhone(m[0]):''}
+  const slotText=field(.50,.25,.67,.32)+' '+text.match(/(?:오전|오후)\s*\(?\d{1,2}[:시]/)?.[0];
+  const slot=/오전|09[:시]00\s*[-~]/.test(slotText)?'am':/오후|13[:시]00\s*[-~]/.test(slotText)?'pm':'any';
+  const product=field(.16,.32,.56,.39).replace(/^제품명\s*/,'').trim();
+  const notes=field(.02,.51,.96,.66).replace(/현장\s*특이사항/g,'').trim();
+  const order=(text.match(/주문번호\s*([0-9]{8,12})/)||[])[1]||'';
+  if(!name){const m=text.match(/고객명\s*([가-힣]{2,5})/);if(m)name=m[1]}
+  if(!addr){const m=text.match(/(?:경기(?:도)?|서울(?:특별시)?|인천(?:광역시)?|강원(?:도|특별자치도)?)\s*[가-힣\d\s,()\-]{12,100}/);if(m)addr=m[0].split(/\n/)[0].trim()}
+  return {...baseCustomer({name,addr,phone,slot,prod:product,memo:[notes,order?'주문 '+order:''].filter(Boolean).join(' · '),call:/전날|배송 전 연락/.test(notes),bs:/기존\s*소파|BS정보/.test(text)}),file};
+}
+async function readFormFields(worker,canvas,customer){
+  const box=async(x0,y0,x1,y1)=>{
+    const rectangle={left:Math.round(canvas.width*x0),top:Math.round(canvas.fullHeight*y0),width:Math.round(canvas.width*(x1-x0)),height:Math.round(canvas.fullHeight*(y1-y0))};
+    const {data}=await worker.recognize(canvas,{rectangle});return (data.text||'').replace(/\s+/g,' ').trim();
+  };
+  const name=(await box(.113,.201,.203,.244)).replace(/[^가-힣]/g,'');
+  const addr=await box(.207,.201,.69,.246);
+  const phone=normalizePhone(await box(.695,.201,.88,.244));
+  if(name.length>=2)customer.name=name;
+  if(addr.length>=8)customer.addr=addr;
+  if(/^0\d{9,11}$/.test(phone.replace(/\D/g,'')))customer.phone=phone;
+  return customer;
+}
+function parseTableOCR(data,w,h,file){
+  const words=(data.words||[]).filter(q=>q.text&&q.bbox).sort((a,b)=>(a.bbox.y0+a.bbox.y1)-(b.bbox.y0+b.bbox.y1));
+  const groups=[];for(const word of words){const y=(word.bbox.y0+word.bbox.y1)/2;let g=groups.find(r=>Math.abs(r.y-y)<h*.022);if(!g){g={y,words:[]};groups.push(g)}g.words.push(word);g.y=(g.y*(g.words.length-1)+y)/g.words.length}
+  return groups.map(g=>{const col=(a,b)=>g.words.filter(q=>{const x=(q.bbox.x0+q.bbox.x1)/2/w;return x>=a&&x<b}).sort((a,b)=>a.bbox.x0-b.bbox.x0).map(q=>q.text).join(' ').trim();const name=col(0,.31).replace(/[^가-힣\s]/g,'').trim(),phone=normalizePhone(col(.31,.62)),addr=col(.62,1);return {...baseCustomer({name,phone,addr}),file}}).filter(c=>c.name.length>=2&&c.addr.length>=5&&/^(0\d{9,11})$/.test(c.phone.replace(/\D/g,'')));
+}
+async function imageCanvas(file){const bmp=await createImageBitmap(file);const scale=Math.min(2,1800/bmp.width),form=bmp.height>bmp.width*1.2;const c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.fullHeight=Math.round(bmp.height*scale);c.height=Math.round(bmp.height*scale*(form?.7:1));c.isForm=form;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(bmp,0,0,c.width,c.fullHeight);bmp.close();return c}
+$('import-images').addEventListener('change',async e=>{
+  const files=[...e.target.files];if(!files.length)return;
+  const status=$('import-status');status.textContent='글자 읽기 도구 준비 중…';
+  let worker;
+  try{
+    const OCR=await loadOCR();worker=await OCR.createWorker(['kor','eng'],1,{logger:m=>{if(m.status==='recognizing text')status.textContent='사진 글자 읽는 중… '+Math.round((m.progress||0)*100)+'%'}});
+    for(let i=0;i<files.length;i++){
+      status.textContent=`사진 ${i+1}/${files.length} 읽는 중…`;
+      const canvas=await imageCanvas(files[i]);const {data}=await worker.recognize(canvas);
+      if(canvas.isForm){let customer=parseFormOCR(data,canvas.width,canvas.fullHeight,files[i].name);status.textContent=`사진 ${i+1}/${files.length} 고객 정보 확인 중…`;customer=await readFormFields(worker,canvas,customer);pending.push(customer)}
+      else pending.push(...parseTableOCR(data,canvas.width,canvas.fullHeight,files[i].name));
+      renderPending();
+    }
+    status.textContent=files.length+'장 읽었습니다. 아래 내용을 확인한 뒤 추가하세요.';
+  }catch(err){status.textContent='읽기 실패: '+(err.message||err)+'\n사진을 다시 찍거나 직접 입력해 주세요.'}
+  finally{if(worker)await worker.terminate()}
+});
+function parseDelimited(text,delimiter){const rows=[],row=[];let value='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){value+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(value);value=''}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(value);if(row.some(v=>v.trim()))rows.push([...row]);row.length=0;value=''}else value+=ch}row.push(value);if(row.some(v=>v.trim()))rows.push(row);return rows}
+$('import-table').addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;const bytes=await file.arrayBuffer();let txt=new TextDecoder('utf-8').decode(bytes);if((txt.match(/�/g)||[]).length>3)txt=new TextDecoder('euc-kr').decode(bytes);
+  const rows=parseDelimited(txt,txt.includes('\t')?'\t':',');if(!rows.length){toast('표에서 고객을 찾지 못했어요');return}
+  const head=rows[0].map(s=>s.trim().replace(/^\uFEFF/,''));const col=(names)=>head.findIndex(x=>names.some(n=>x.includes(n)));
+  const ni=col(['고객명','이름']),ai=col(['설치주소','주소']),pi=col(['고객연락처','연락처','전화번호']);
+  if(ni<0||ai<0){toast('고객명·설치주소 열이 필요해요');return}
+  const items=rows.slice(1).filter(r=>r[ni]||r[ai]).map(r=>({...baseCustomer({name:(r[ni]||'').trim(),addr:(r[ai]||'').trim(),phone:normalizePhone(r[pi]||'')}),file:file.name}));
+  pending.push(...items);renderPending();$('import-status').textContent=items.length+'명 읽었습니다. 아래 내용을 확인한 뒤 추가하세요.';e.target.value='';
+});
+
+if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+
+render();
+showTab(tab);
+})();
+</script>
+</body>
+</html>
