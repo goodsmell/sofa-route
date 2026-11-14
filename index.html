@@ -154,6 +154,7 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
     <div class="wrap" style="gap:14px">
       <div class="panel">
         <h2>출발 정보</h2>
+        <p class="hint">차량: 3.5톤 화물차 · 높이 3.40m. T맵에서 차량 높이·중량 설정을 확인하고, 높이 제한 구간은 내비 안내와 현장 표지판을 다시 확인하세요.</p>
         <div class="two">
           <label class="field"><span>배송 날짜</span><input type="date" id="s-date"></label>
           <label class="field"><span>출발 시간</span><input type="time" id="s-depart"></label>
@@ -191,7 +192,7 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
             <label class="field"><span>제품</span><input type="text" id="c-prod" placeholder="예: 4인 소파 + 스툴"></label>
             <label class="field"><span>특이사항</span><textarea id="c-memo" placeholder="예: 가능하면 늦게, 경비실 차량 등록"></textarea></label>
             <label class="field"><span>2차 연락처 (해피콜 번호)</span><input type="tel" id="c-phone2" placeholder="없으면 비워두기" inputmode="tel"></label>
-            <label class="field"><span>설치 시간 (분) · 비우면 자동</span><input type="number" id="c-work" min="5" step="5" inputmode="numeric" placeholder="자동 (기본 35분)"></label>
+            <label class="field"><span>설치 시간 (분) · 비우면 자동</span><input type="number" id="c-work" min="5" step="5" inputmode="numeric" placeholder="일반 15분 · 전동 리클라이너 30분"></label>
             <label class="chip"><input type="checkbox" id="c-sorry">원하는 시간 못 맞춤 (미리 양해 전화)</label>
           </div>
         </details>
@@ -235,7 +236,7 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
       </div>
       <div class="panel">
         <h2>배송 순서</h2>
-        <p class="hint">위로·아래로로 순서를 바꾸고, 집 사이 이동 시간은 내비에서 보고 −5 / +5로 맞추세요.</p>
+        <p class="hint">위로·아래로로 순서를 바꾸고, 집 사이 이동 시간은 3.5톤 화물차 설정을 적용한 내비에서 보고 −5 / +5로 맞추세요. 처음 입력된 30분은 임시값입니다.</p>
         <ol class="stops" id="stops"></ol>
       </div>
       <div class="row">
@@ -246,10 +247,10 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
         <summary>순서 정하는 요령</summary>
         <ol>
           <li>시간 정한 고객부터: 오전은 13시 전, 오후는 13~17시.</li>
-          <li>가장 먼 곳은 아침에 (외곽 방향은 덜 막힘).</li>
-          <li>분당·판교 같은 시내는 10시 이후에.</li>
-          <li>마지막 집은 상록수역에서 가까운 곳으로.</li>
-          <li>17시 이후엔 고속도로보다 동네 길로.</li>
+          <li>출발: 그레이박스(안산시 단원구 해봉로 232) 06:40.</li>
+          <li>마지막 배송 후 팔곡화물차고지(안산시 팔곡산단1길 13)로 복귀.</li>
+          <li>전동 리클라이너 설치 30분, 일반 소파 설치 15분. 제품이 없거나 특수 작업이면 직접 고치기.</li>
+          <li>차량 높이 3.40m와 3.5톤 제한을 내비에 설정하고 현장 표지판 확인.</li>
           <li>"가능하면 늦게" 같은 부탁을 못 맞추면 미리 양해 전화.</li>
           <li>이동 시간은 내비에서 <b>출발 시간 설정</b>으로 확인.</li>
         </ol>
@@ -299,16 +300,12 @@ const digits=s=>String(s||'').replace(/[^0-9+]/g,'');
 const uid=()=>Math.random().toString(36).slice(2,9);
 
 function tomorrow(){const d=new Date();d.setDate(d.getDate()+1);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
-function sample(){return {example:true,date:tomorrow(),depart:'08:00',start:'안산 그레이박스',end:'상록수역',endTravel:25,list:[
- {id:uid(),name:'예시고객 가',addr:'강원 원주시 예시로 12, 101동 1001호',phone:'010-0000-0001',phone2:'',slot:'am',noelev:false,bs:true,single:false,call:true,sorry:false,prod:'4인 가죽 소파',memo:'전날 해피콜 요청',travel:95,work:''},
- {id:uid(),name:'예시고객 나',addr:'경기 성남시 분당구 예시길 34',phone:'010-0000-0002',phone2:'010-0000-0012',slot:'any',noelev:false,bs:false,single:false,call:false,sorry:false,prod:'3인 패브릭 소파 + 스툴',memo:'경비실에 차량 등록 필요',travel:80,work:''},
- {id:uid(),name:'예시고객 다',addr:'경기 용인시 수지구 예시로 56',phone:'010-0000-0003',phone2:'',slot:'pm',noelev:true,bs:false,single:true,call:false,sorry:false,prod:'암체어 1',memo:'3층 계단',travel:25,work:''},
- {id:uid(),name:'예시고객 라',addr:'경기 수원시 영통구 예시대로 78',phone:'010-0000-0004',phone2:'',slot:'any',noelev:false,bs:false,single:false,call:false,sorry:true,prod:'모듈 소파 5유닛',memo:'가능하면 가장 늦게',travel:30,work:''}
-]}}
-
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){S=null}
-if(!S||!Array.isArray(S.list))S={example:false,date:tomorrow(),depart:'08:00',start:'',end:'',endTravel:30,list:[]};
+if(!S||!Array.isArray(S.list))S={example:false,date:tomorrow(),depart:'06:40',start:'그레이박스 (경기 안산시 단원구 해봉로 232)',end:'팔곡화물차고지 (경기 안산시 팔곡산단1길 13)',endTravel:30,list:[]};
+if(!S.start||S.start==='안산 그레이박스')S.start='그레이박스 (경기 안산시 단원구 해봉로 232)';
+if(!S.end||S.end==='상록수역')S.end='팔곡화물차고지 (경기 안산시 팔곡산단1길 13)';
+if(!S.depart||S.depart==='08:00')S.depart='06:40';
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 
 let toastT;
@@ -326,7 +323,7 @@ function showTab(t){tab=t;
 document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 
 /* ---------- calc ---------- */
-function workMin(c){if(c.work)return +c.work;let w=c.single?20:35;if(c.noelev)w+=15;if(c.bs)w+=15;return w}
+function workMin(c){if(+c.work>0)return +c.work;return /리클라이너|전동/.test(c.prod||'')?30:15}
 function compute(){
   let t=toMin(S.depart);const rows=[];
   S.list.forEach(c=>{
@@ -340,6 +337,7 @@ function compute(){
     if(c.bs)flags.push(['','기존 소파 수거']);
     if(c.call)flags.push(['call','전날 전화']);
     if(c.sorry)flags.push(['call','양해 전화']);
+    if(!c.prod&&!c.work)flags.push(['warn','제품 확인 · 설치 15분 임시']);
     rows.push({c,start,end,wait,flags,sl});t=end;
   });
   return {rows,home:t+(+S.endTravel||0),last:t};
@@ -359,7 +357,7 @@ function precallList(rows){
 /* ---------- render ---------- */
 function dateLabel(){if(!S.date)return'';const d=new Date(S.date+'T00:00');return (d.getMonth()+1)+'월 '+d.getDate()+'일('+'일월화수목금토'[d.getDay()]+')'}
 function render(){
-  $('s-date').value=S.date||'';$('s-depart').value=S.depart||'08:00';$('s-start').value=S.start||'';$('s-end').value=S.end||'';
+  $('s-date').value=S.date||'';$('s-depart').value=S.depart||'06:40';$('s-start').value=S.start||'';$('s-end').value=S.end||'';
   $('example-note').hidden=!S.example;
   const {rows,home,last}=compute();
   $('head-line').textContent=[dateLabel(),S.depart+' 출발',rows.length+'곳'].filter(Boolean).join(' · ');
@@ -482,7 +480,7 @@ ol{list-style:none;margin:0;padding:0}.sep{font-weight:700;color:var(--mu);font-
       `<div class="btns">${c.phone?`<a class="tel" href="tel:${digits(c.phone)}">📞 ${esc(c.phone)}</a>`:''}${c.phone2?`<a href="tel:${digits(c.phone2)}">2차 ${esc(c.phone2)}</a>`:''}<a href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵</a></div></li>`;
   });
   b+=`</ol><div class="end">마지막 → <b>${esc(S.end)}</b> 귀가 예상 <b>${rows.length?fmt(home):'-'}</b></div>`;
-  b+=`<p class="foot">도착 시간은 평일 교통 기준 추정입니다. 출발 전 내비에서 한 번 더 확인하세요.</p></div>`;
+  b+=`<p class="foot">3.5톤 화물차 · 높이 3.40m. 이동시간은 임시값이며 화물차 도로 제한과 실시간 교통을 반영하지 않습니다. T맵 차량 설정과 현장 표지판을 확인하세요.</p></div>`;
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${css}</style></head><body>${b}</body></html>`;
 }
 function buildTXT(){
@@ -518,7 +516,7 @@ let pending=[];
 function baseCustomer(x={}){return {id:uid(),name:x.name||'',addr:x.addr||'',phone:x.phone||'',phone2:x.phone2||'',slot:x.slot||'any',noelev:!!x.noelev,bs:!!x.bs,single:!!x.single,call:!!x.call,sorry:false,prod:x.prod||'',memo:x.memo||'',travel:30,work:x.work||''}}
 function normalizePhone(s){const d=String(s||'').replace(/\D/g,'');return d.length===11?d.replace(/^(\d{3})(\d{4})(\d{4})$/,'$1-$2-$3'):d.length===12?d.replace(/^(\d{4})(\d{4})(\d{4})$/,'$1-$2-$3'):d}
 function renderPending(){
-  $('import-review').innerHTML=pending.map((c,i)=>`<div class="review-item ${!c.name||!c.addr?'bad':''}"><strong>${esc(c.file||'사진')} · ${i+1}번</strong><small>읽힌 글자를 확인하고 고쳐 주세요.</small><label class="field"><span>고객명</span><input data-pending="${i}" data-field="name" value="${esc(c.name)}"></label><label class="field"><span>설치주소</span><input data-pending="${i}" data-field="addr" value="${esc(c.addr)}"></label><label class="field"><span>연락처 1</span><input data-pending="${i}" data-field="phone" type="tel" value="${esc(c.phone)}"></label><label class="field"><span>방문 시간</span><select data-pending="${i}" data-field="slot"><option value="any" ${c.slot==='any'?'selected':''}>상관없음</option><option value="am" ${c.slot==='am'?'selected':''}>오전</option><option value="pm" ${c.slot==='pm'?'selected':''}>오후</option></select></label><label class="field"><span>메모</span><textarea data-pending="${i}" data-field="memo">${esc(c.memo)}</textarea></label><button type="button" data-remove="${i}">이 항목 빼기</button></div>`).join('');
+  $('import-review').innerHTML=pending.map((c,i)=>`<div class="review-item ${!c.name||!c.addr?'bad':''}"><strong>${esc(c.file||'사진')} · ${i+1}번</strong><small>읽힌 글자를 확인하고 고쳐 주세요.</small><label class="field"><span>고객명</span><input data-pending="${i}" data-field="name" value="${esc(c.name)}"></label><label class="field"><span>설치주소</span><input data-pending="${i}" data-field="addr" value="${esc(c.addr)}"></label><label class="field"><span>연락처 1</span><input data-pending="${i}" data-field="phone" type="tel" value="${esc(c.phone)}"></label><label class="field"><span>제품명 (설치 시간 판별)</span><input data-pending="${i}" data-field="prod" value="${esc(c.prod)}" placeholder="예: 전동 리클라이너"></label><label class="field"><span>방문 시간</span><select data-pending="${i}" data-field="slot"><option value="any" ${c.slot==='any'?'selected':''}>상관없음</option><option value="am" ${c.slot==='am'?'selected':''}>오전</option><option value="pm" ${c.slot==='pm'?'selected':''}>오후</option></select></label><label class="field"><span>메모</span><textarea data-pending="${i}" data-field="memo">${esc(c.memo)}</textarea></label><button type="button" data-remove="${i}">이 항목 빼기</button></div>`).join('');
   $('import-commit').hidden=!pending.length;
 }
 const review=$('import-review');
