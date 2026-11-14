@@ -31,6 +31,7 @@
   --ok:#62c98f; --ok-soft:#163323; --warn:#f2ad52; --warn-soft:#3a2a12; --bad:#ff8f85; --bad-soft:#401d1a;
   --call:#cba8f4; --call-soft:#2e2242; --tag-soft:#242e39; color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:18px;line-height:1.5;
   padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px));
   padding-block:14px calc(100px + env(safe-area-inset-bottom,0px))}
@@ -46,6 +47,8 @@ input[type=text],input[type=tel],input[type=time],input[type=date],input[type=nu
   font:inherit;font-size:19px;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:12px 14px;width:100%;min-width:0;min-height:56px}
 textarea{resize:vertical;min-height:90px}
 select,input[type=file]{font:inherit;font-size:17px;color:var(--ink);background:var(--bg);border:2px solid var(--line);border-radius:12px;padding:10px;width:100%;min-height:52px}
+.upload-label{position:relative;display:flex;align-items:center;justify-content:center;min-height:68px;border-radius:12px;background:var(--accent);color:var(--accent-ink);font-size:21px;font-weight:700;cursor:pointer}
+#import-images{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;padding:0;border:0}
 input:focus,textarea:focus{border-color:var(--accent);outline:none}
 button:focus-visible,a:focus-visible,label:focus-within{outline:3px solid var(--accent);outline-offset:2px}
 
@@ -102,6 +105,8 @@ ol.stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .leg button{min-height:48px;min-width:58px;padding:6px 10px;font-size:17px}
 .leg a{color:var(--accent);font-size:16px;font-weight:600;padding:10px 4px}
 .stop{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.stop.completed{opacity:.62;border-color:var(--ok)}
+.stop.completed .who b{text-decoration:line-through}
 .stop.endpt{background:transparent;border-style:dashed;padding:10px 14px;flex-direction:row;align-items:center;gap:12px}
 .head{display:flex;gap:12px;align-items:center}
 .num{flex:none;width:48px;height:48px;border-radius:50%;background:var(--accent);color:var(--accent-ink);display:grid;place-items:center;font-weight:700;font-size:22px;font-variant-numeric:tabular-nums}
@@ -165,17 +170,17 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
         </div>
       </div>
 
-      <div class="panel" id="add-panel">
-        <h2 id="form-title">고객 넣기</h2>
+      <details class="panel" id="add-panel">
+        <summary id="form-title">직접 고객 추가</summary>
         <p class="edit-banner" id="edit-banner" hidden></p>
         <label class="field"><span>고객 이름</span><input type="text" id="c-name" placeholder="예: 홍길동" autocomplete="off"></label>
-        <label class="field"><span>전화번호 (010)</span><input type="tel" id="c-phone" placeholder="010-1234-5678" inputmode="tel"></label>
+        <label class="field"><span>실제 연락처 (010 · 고객 목록)</span><input type="tel" id="c-phone" placeholder="010-1234-5678" inputmode="tel"></label>
         <label class="field"><span>주소</span><input type="text" id="c-addr" placeholder="예: 경기 수원시 영통구 ..." autocomplete="off"></label>
         <div class="field"><span>고객이 원하는 시간</span>
           <div class="seg" role="radiogroup" aria-label="고객이 원하는 시간">
             <label><input type="radio" name="slot" value="am">오전<small>9~13시</small></label>
             <label><input type="radio" name="slot" value="pm">오후<small>13~17시</small></label>
-            <label><input type="radio" name="slot" value="any" checked>상관없음<small>9~17시</small></label>
+            <label><input type="radio" name="slot" value="any" checked>지정불가<small>9~17시</small></label>
           </div>
         </div>
         <div class="field"><span>해당되는 것 누르기</span>
@@ -190,28 +195,30 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
           <summary>더 적을 것 (제품, 특이사항, 2차 번호)</summary>
           <div style="display:flex;flex-direction:column;gap:14px;margin-top:10px">
             <label class="field"><span>제품</span><input type="text" id="c-prod" placeholder="예: 4인 소파 + 스툴"></label>
+            <label class="field"><span>안심번호 (0508 · 의뢰서)</span><input type="tel" id="c-safePhone" placeholder="0508-0000-0000" inputmode="tel"></label>
             <label class="field"><span>특이사항</span><textarea id="c-memo" placeholder="예: 가능하면 늦게, 경비실 차량 등록"></textarea></label>
             <label class="field"><span>2차 연락처 (해피콜 번호)</span><input type="tel" id="c-phone2" placeholder="없으면 비워두기" inputmode="tel"></label>
+            <label class="field"><span>엘리베이터 인승</span><input type="text" id="c-elevSize" placeholder="예: 11인승"></label>
             <label class="field"><span>설치 시간 (분) · 비우면 자동</span><input type="number" id="c-work" min="5" step="5" inputmode="numeric" placeholder="일반 15분 · 전동 리클라이너 30분"></label>
             <label class="chip"><input type="checkbox" id="c-sorry">원하는 시간 못 맞춤 (미리 양해 전화)</label>
           </div>
         </details>
         <button class="primary big" id="btn-save" type="button">＋ 이 고객 추가</button>
         <button class="big" id="btn-cancel" type="button" hidden>수정 그만두기</button>
-      </div>
+      </details>
 
-      <div class="panel">
-        <h2>출고의뢰서 사진 가져오기</h2>
-        <p class="hint">사진 여러 장을 한 번에 선택하세요. 글자는 이 휴대폰에서 읽고, 읽힌 고객은 아래에서 확인한 뒤 추가합니다. 첫 사용에는 OCR 파일을 내려받기 위해 인터넷이 필요합니다.</p>
-        <label class="field"><span>사진 선택</span><input type="file" id="import-images" accept="image/*" multiple></label>
+      <div class="panel" id="photo-panel">
+        <h2>① 의뢰서 사진 넣기</h2>
+        <p class="hint">담당자가 보낸 출고의뢰서와 고객 연락처 목록 사진을 모두 선택하세요. 읽힌 고객으로 코스를 바로 만듭니다.</p>
+        <label class="upload-label">📷 오늘 받은 사진 선택<input type="file" id="import-images" accept="image/*" multiple></label>
         <p class="import-status" id="import-status" role="status">선택한 사진이 없습니다.</p>
         <div class="review" id="import-review"></div>
-        <button class="primary big" id="import-commit" type="button" hidden>확인한 고객 추가</button>
-        <p class="hint">사진의 작은 글씨나 흐린 번호는 틀릴 수 있습니다. 특히 주소·전화번호·방문 시간을 꼭 확인하세요.</p>
+        <button class="primary big" id="import-commit" type="button" hidden>고친 고객 코스에 추가</button>
+        <p class="hint">글자가 흐려 못 읽은 항목만 아래에 남습니다. 코스가 나온 뒤에도 주소·전화·시간을 고칠 수 있어요. 첫 사진 인식에는 인터넷이 필요합니다.</p>
       </div>
 
       <details class="panel">
-        <summary>고객 목록 CSV·TSV 가져오기</summary>
+        <summary>② 고객 목록 CSV·TSV 넣기 (010 번호)</summary>
         <p class="hint">엑셀에서 CSV로 저장한 파일 또는 탭으로 구분된 표를 선택하세요. 열 이름: 고객명, 고객연락처, 설치주소.</p>
         <input type="file" id="import-table" accept=".csv,.tsv,text/csv,text/tab-separated-values">
       </details>
@@ -229,6 +236,7 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
   <section id="tab-order" class="view" hidden>
     <div class="wrap" style="gap:14px">
       <p class="example" id="example-note">지금 있는 고객은 <b>연습용 예시</b>예요. 맨 아래 "전부 지우기"를 누르고 진짜 고객을 넣으세요.</p>
+      <p class="example" id="review-alert" hidden></p>
       <div class="summary" id="summary"></div>
       <div class="panel">
         <h2>전날 미리 전화할 곳</h2>
@@ -240,19 +248,21 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
         <ol class="stops" id="stops"></ol>
       </div>
       <div class="row">
-        <button type="button" id="btn-sort">지역·시간으로 순서 추천</button>
+        <button type="button" id="btn-sort">시간 약속 우선으로 순서 추천</button>
         <button type="button" class="danger" id="btn-clear">전부 지우기</button>
       </div>
       <details class="panel">
         <summary>순서 정하는 요령</summary>
         <ol>
-          <li>시간 정한 고객부터: 오전은 13시 전, 오후는 13~17시.</li>
+          <li>시간 약속 우선: 오전은 13시 전, 오후는 13~17시 안에 도착.</li>
           <li>출발: 그레이박스(안산시 단원구 해봉로 232) 06:40.</li>
-          <li>마지막 배송 후 팔곡화물차고지(안산시 팔곡산단1길 13)로 복귀.</li>
+          <li>먼 지역을 오전 후보로, 분당·판교는 10시 이후 후보로 추천.</li>
+          <li>마지막은 상록수역·팔곡화물차고지 방면으로 복귀하기 쉬운 곳인지 내비에서 확인.</li>
           <li>전동 리클라이너 설치 30분, 일반 소파 설치 15분. 제품이 없거나 특수 작업이면 직접 고치기.</li>
           <li>차량 높이 3.40m와 3.5톤 제한을 내비에 설정하고 현장 표지판 확인.</li>
-          <li>"가능하면 늦게" 같은 부탁을 못 맞추면 미리 양해 전화.</li>
-          <li>이동 시간은 내비에서 <b>출발 시간 설정</b>으로 확인.</li>
+          <li>"가능하면 늦게/이르게"는 약속 시간보다 낮은 우선순위. 못 맞추면 전날 양해 전화.</li>
+          <li>17~19시 귀가 길은 정체 가능성이 높습니다. 내비에서 <b>출발 시간 설정</b>으로 고속도로와 일반도로를 비교하세요.</li>
+          <li>19시 30분 이후 귀가가 나을 수 있지만, 실제 교통 상황으로 결정하세요.</li>
         </ol>
       </details>
     </div>
@@ -282,8 +292,8 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
 <nav class="tabs" aria-label="화면 바꾸기">
   <div class="in" role="tablist">
     <button type="button" role="tab" data-tab="add" id="t-add">① 고객 넣기<small id="cnt-add"></small></button>
-    <button type="button" role="tab" data-tab="order" id="t-order">② 순서·시간<small id="cnt-order"></small></button>
-    <button type="button" role="tab" data-tab="send" id="t-send">③ 보내기<small>파일 만들기</small></button>
+    <button type="button" role="tab" data-tab="order" id="t-order">② 배송 순서<small id="cnt-order"></small></button>
+    <button type="button" role="tab" data-tab="send" id="t-send">③ 공유하기<small>파일 만들기</small></button>
   </div>
 </nav>
 <div class="toast" id="toast" role="status" hidden></div>
@@ -291,8 +301,10 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
 <script>
 (function(){
 const KEY='sofa-route-v1', TABKEY='sofa-route-tab';
-const SLOT={am:{label:'오전',s:540,e:780},pm:{label:'오후',s:780,e:1020},any:{label:'시간 상관없음',s:540,e:1020}};
+const SLOT={am:{label:'오전',s:540,e:780},pm:{label:'오후',s:780,e:1020},any:{label:'시간 지정 없음',s:540,e:1020}};
 const $=id=>document.getElementById(id);
+document.querySelector('#tab-add > .wrap').prepend($('photo-panel'));
+$('review-alert').before($('precall').closest('.panel'));
 const toMin=s=>{const m=/^(\d{1,2}):(\d{2})/.exec(s||'');return m?(+m[1])*60+(+m[2]):480};
 const fmt=m=>{m=Math.round(m);return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -306,6 +318,8 @@ if(!S||!Array.isArray(S.list))S={example:false,date:tomorrow(),depart:'06:40',st
 if(!S.start||S.start==='안산 그레이박스')S.start='그레이박스 (경기 안산시 단원구 해봉로 232)';
 if(!S.end||S.end==='상록수역')S.end='팔곡화물차고지 (경기 안산시 팔곡산단1길 13)';
 if(!S.depart||S.depart==='08:00')S.depart='06:40';
+if(!Array.isArray(S.contacts))S.contacts=[];
+S.list.forEach(c=>{if(/^0508/.test(digits(c.phone))){c.safePhone=c.phone;c.phone=''}if(c.verified==null)c.verified=true});
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 
 let toastT;
@@ -323,21 +337,25 @@ function showTab(t){tab=t;
 document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
 
 /* ---------- calc ---------- */
-function workMin(c){if(+c.work>0)return +c.work;return /리클라이너|전동/.test(c.prod||'')?30:15}
+function workMin(c){if(+c.work>0)return +c.work;let n=/리클라이너|전동/.test(c.prod||'')?30:15;if(c.noelev)n+=15;if(c.bs)n+=15;if(/스툴/.test(c.prod||''))n+=5;if(/멀티|모듈|유닛/.test(c.prod||''))n+=10;return n}
+function softUnmet(c,start){const memo=c.memo||'';return /가능하면\s*늦게|가장\s*늦게|늦은\s*시간/.test(memo)&&start<900?'늦은 방문 요청 확인':/가능하면\s*이르게|가장\s*이르게|이른\s*시간/.test(memo)&&start>660?'이른 방문 요청 확인':''}
 function compute(){
   let t=toMin(S.depart);const rows=[];
   S.list.forEach(c=>{
     const sl=SLOT[c.slot]||SLOT.any;const reach=t+(+c.travel||0);
     const start=Math.max(reach,sl.s);const wait=start-reach;const end=start+workMin(c);
     const flags=[];
-    if(start>sl.e)flags.push(['bad',sl.label+' 시간 넘김']);
+    if(start>=sl.e)flags.push(['bad',sl.label+' 시간 넘김']);
     else if(start>=1020)flags.push(['warn','17시 넘어 도착']);
     if(wait>0)flags.push(['warn',wait+'분 기다림']);
     if(c.noelev)flags.push(['','엘리베이터 없음']);
     if(c.bs)flags.push(['','기존 소파 수거']);
+    if(c.elevSize)flags.push(['','엘리베이터 '+c.elevSize]);
     if(c.call)flags.push(['call','전날 전화']);
     if(c.sorry)flags.push(['call','양해 전화']);
-    if(!c.prod&&!c.work)flags.push(['warn','제품 확인 · 설치 15분 임시']);
+    if(softUnmet(c,start))flags.push(['call','방문 순서 요청 확인']);
+    if(c.verified===false)flags.push(['warn','사진 글자 확인']);
+    if(!c.prod&&!c.work)flags.push(['warn','제품 확인 · 기본 15분 적용']);
     rows.push({c,start,end,wait,flags,sl});t=end;
   });
   return {rows,home:t+(+S.endTravel||0),last:t};
@@ -345,10 +363,11 @@ function compute(){
 function precallList(rows){
   const out=[];
   rows.forEach((r,i)=>{const why=[];const c=r.c;
-    if(c.call)why.push('전날 전화 요청');
-    if(r.start>r.sl.e)why.push(r.sl.label+' 약속인데 '+fmt(r.start)+' 도착 예상 → 시간 조율');
-    else if(r.start>=1020)why.push(fmt(r.start)+' 도착 예상 → 늦는다고 안내');
+    if(c.call||/전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(c.memo||''))why.push('전날 연락 요청');
+    if(r.start>=r.sl.e)why.push(r.sl.label+' 약속인데 '+fmt(r.start)+' 도착 예상 → 시간 조율');
+    if(r.start>=1020)why.push(fmt(r.start)+' 도착 예상 → 늦은 도착 안내');
     if(c.sorry)why.push('원하는 시간 못 맞춤 → 양해 구하기');
+    if(softUnmet(c,r.start))why.push(softUnmet(c,r.start)+' → 조율');
     if(why.length)out.push({i,c,why,start:r.start});
   });
   return out;
@@ -360,24 +379,27 @@ function render(){
   $('s-date').value=S.date||'';$('s-depart').value=S.depart||'06:40';$('s-start').value=S.start||'';$('s-end').value=S.end||'';
   $('example-note').hidden=!S.example;
   const {rows,home,last}=compute();
+  const reviewCount=rows.filter(r=>r.c.verified===false).length;
+  $('review-alert').hidden=!reviewCount&&!pending?.length&&!S.contacts.length;
+  $('review-alert').textContent=(reviewCount?`사진에서 읽은 ${reviewCount}곳은 주소·시간·번호를 카드의 ‘고치기’에서 확인하세요. `:'')+(S.contacts.length?`010 목록 ${S.contacts.length}명은 의뢰서와 이름이 맞지 않아 아직 연결되지 않았습니다. `:'')+(pending?.length?`이름·주소를 못 읽은 ${pending.length}건은 ① 고객 넣기에서 수정하세요.`:'');
   $('head-line').textContent=[dateLabel(),S.depart+' 출발',rows.length+'곳'].filter(Boolean).join(' · ');
   $('cnt-add').textContent=rows.length+'명 넣음';
-  const bad=rows.filter(r=>r.start>r.sl.e).length,late=rows.filter(r=>r.start>=1020).length;
+  const bad=rows.filter(r=>r.start>=r.sl.e).length,late=rows.filter(r=>r.start>=1020).length;
   $('cnt-order').textContent=bad?('⚠ '+bad+'곳 시간 넘김'):(rows.length?'귀가 '+fmt(home):'');
   $('summary').innerHTML=
     `<div class="sbox home"><span>${esc(S.end)} 귀가 예상</span><strong>${rows.length?fmt(home):'-'}</strong></div>`+
-    `<div class="sbox"><span>배송</span><strong>${rows.length}곳</strong></div>`+
+    `<div class="sbox"><span>배송 완료</span><strong>${rows.filter(r=>r.c.done).length}/${rows.length}곳</strong></div>`+
     `<div class="sbox"><span>시간 넘김</span><strong style="color:${bad?'var(--bad)':'var(--ok)'}">${bad?bad+'곳':'없음'}</strong></div>`;
   let h=`<li class="stop endpt"><div class="num">출발</div><div class="who"><b>${esc(S.start)}</b><span class="time">${esc(S.depart)}</span></div></li>`;
   rows.forEach((r,i)=>{const c=r.c;
     h+=`<li class="leg"><span class="lbl">이동</span><button type="button" data-tv="${i}" data-d="-5" aria-label="${esc(c.name)} 이동시간 5분 줄이기">−5</button>`+
        `<span class="min">${+c.travel||0}분</span><button type="button" data-tv="${i}" data-d="5" aria-label="${esc(c.name)} 이동시간 5분 늘리기">+5</button>`+
        `<a href="tmap://search?name=${encodeURIComponent(c.addr)}">T맵</a></li>`;
-    h+=`<li class="stop"><div class="head"><div class="num">${i+1}</div><div class="who"><b>${esc(c.name)}</b><span class="time">${fmt(r.start)} 도착 · ${fmt(r.end)} 끝</span></div></div>`+
+    h+=`<li class="stop ${c.done?'completed':''}"><div class="head"><div class="num">${i+1}</div><div class="who"><b>${esc(c.name)}</b><span class="time">${fmt(r.start)} 도착 · ${fmt(r.end)} 끝 · 설치 ${workMin(c)}분</span></div></div>`+
        `<div class="tags"><span class="tag slot">${r.sl.label}</span>${r.flags.map(f=>`<span class="tag ${f[0]}">${esc(f[1])}</span>`).join('')}</div>`+
        `<p class="addr">${esc(c.addr)}</p>`+
        (c.prod||c.memo?`<p class="addr">${esc(c.prod)}${c.prod&&c.memo?' · ':''}${esc(c.memo)}</p>`:'')+
-       `<div class="action-links">${c.phone?`<a class="btn" href="tel:${digits(c.phone)}">☎ 전화</a>`:''}<a class="btn" href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵 열기</a><button type="button" data-copyaddr="${i}">주소 복사</button></div>`+
+       `<div class="action-links">${c.phone?`<a class="btn" href="tel:${digits(c.phone)}">☎ 010 전화</a>`:''}${c.safePhone?`<a class="btn" href="tel:${digits(c.safePhone)}">☎ 0508 전화</a>`:''}${c.phone2?`<a class="btn" href="tel:${digits(c.phone2)}">☎ 2차 전화</a>`:''}<a class="btn" href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵 검색</a><button type="button" data-done="${i}">${c.done?'완료 취소':'✓ 배송 완료'}</button></div>`+
        `<div class="ctl"><button type="button" data-up="${i}" ${i?'':'disabled'}>▲ 위로</button><button type="button" data-down="${i}" ${i<rows.length-1?'':'disabled'}>▼ 아래로</button>`+
        `<button type="button" data-edit="${i}">고치기</button><button type="button" class="danger" data-del="${i}">지우기</button></div></li>`;
   });
@@ -385,30 +407,30 @@ function render(){
   h+=`<li class="stop endpt"><div class="num">도착</div><div class="who"><b>${esc(S.end)}</b><span class="time">${rows.length?fmt(home):''}</span></div></li>`;
   $('stops').innerHTML=rows.length?h:'<li class="hint">아직 고객이 없어요. ① 고객 넣기에서 추가하세요.</li>';
   const pc=precallList(rows);
-  $('precall').innerHTML=pc.length?pc.map(p=>`<li><b>${p.i+1}번 ${esc(p.c.name)}</b> <span class="ph">${esc(p.c.phone)}</span>${p.c.phone2?` <span class="ph">/ 2차 ${esc(p.c.phone2)}</span>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join(''):'<li class="none">미리 전화할 곳이 없어요.</li>';
+  $('precall').innerHTML=pc.length?pc.map(p=>`<li><b>${p.i+1}번 ${esc(p.c.name)}</b> ${p.c.phone?`<a href="tel:${digits(p.c.phone)}">실제 ${esc(p.c.phone)}</a>`:''}${p.c.safePhone?` <a href="tel:${digits(p.c.safePhone)}">안심 ${esc(p.c.safePhone)}</a>`:''}${p.c.phone2?` <a href="tel:${digits(p.c.phone2)}">2차 ${esc(p.c.phone2)}</a>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join(''):'<li class="none">미리 전화할 곳이 없어요.</li>';
   if(tab==='send')$('preview').srcdoc=buildHTML();
   persist();
 }
 
 /* ---------- form ---------- */
 let editing=null;
-const F=['name','phone','phone2','addr','prod','work','memo'],B=['noelev','bs','single','call','sorry'];
+const F=['name','phone','safePhone','phone2','addr','prod','elevSize','work','memo'],B=['noelev','bs','single','call','sorry'];
 function getSlot(){const r=document.querySelector('input[name=slot]:checked');return r?r.value:'any'}
 function setSlot(v){document.querySelectorAll('input[name=slot]').forEach(r=>r.checked=r.value===(v||'any'))}
 function readForm(){const c={slot:getSlot()};F.forEach(k=>c[k]=$('c-'+k).value.trim());B.forEach(k=>c[k]=$('c-'+k).checked);return c}
-function fillForm(c){F.forEach(k=>$('c-'+k).value=c?(c[k]||''):'');B.forEach(k=>$('c-'+k).checked=c?!!c[k]:false);setSlot(c&&c.slot);$('more').open=!!(c&&(c.prod||c.memo||c.phone2||c.work||c.sorry))}
+function fillForm(c){F.forEach(k=>$('c-'+k).value=c?(c[k]||''):'');B.forEach(k=>$('c-'+k).checked=c?!!c[k]:false);setSlot(c&&c.slot);$('more').open=!!(c&&(c.prod||c.memo||c.phone2||c.safePhone||c.elevSize||c.work||c.sorry))}
 function setEditing(i){
   editing=i;
   if(i==null){fillForm(null);$('form-title').textContent='고객 넣기';$('btn-save').textContent='＋ 이 고객 추가';$('btn-cancel').hidden=true;$('edit-banner').hidden=true;return}
-  fillForm(S.list[i]);$('form-title').textContent='고객 고치기';$('btn-save').textContent='✓ 고친 내용 저장';$('btn-cancel').hidden=false;
+  fillForm(S.list[i]);$('add-panel').open=true;$('form-title').textContent='고객 고치기';$('btn-save').textContent='✓ 고친 내용 저장';$('btn-cancel').hidden=false;
   $('edit-banner').hidden=false;$('edit-banner').textContent=(i+1)+'번 '+(S.list[i].name||'')+' 님을 고치는 중';
   showTab('add');
 }
 function dropExample(){if(S.example){S.example=false;S.list=[]}}
 $('btn-save').onclick=()=>{
   const c=readForm();if(!c.name&&!c.addr){toast('이름이나 주소를 넣어 주세요');$('c-name').focus();return}
-  if(editing!=null){Object.assign(S.list[editing],c);toast('고쳤어요');setEditing(null);render();showTab('order');return}
-  dropExample();S.list.push(Object.assign({id:uid(),travel:30},c));
+  if(editing!=null){Object.assign(S.list[editing],c,{verified:true});toast('고쳤어요');setEditing(null);render();showTab('order');return}
+  dropExample();S.list.push(Object.assign({id:uid(),travel:30,verified:true},c));
   setEditing(null);render();toast((c.name||'고객')+' 님 추가 · 지금 '+S.list.length+'명');
   window.scrollTo({top:$('add-panel').offsetTop-10});
 };
@@ -427,6 +449,7 @@ $('btn-bulk').onclick=()=>{
 let armedDel=null,armT;
 $('stops').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const d=b.dataset,L=S.list;
+  if(d.done!=null){L[+d.done].done=!L[+d.done].done;render();toast(L[+d.done].done?'배송 완료로 표시했어요':'완료 표시를 취소했어요');return}
   if(d.copyaddr!=null){navigator.clipboard.writeText(L[+d.copyaddr].addr).then(()=>toast('주소를 복사했어요'),()=>toast('주소 복사가 안 됐어요'));return}
   if(d.tv!=null){const v=x=>Math.max(0,(+x||0)+(+d.d));if(d.tv==='end')S.endTravel=v(S.endTravel);else L[+d.tv].travel=v(L[+d.tv].travel);render();return}
   if(d.up){const i=+d.up;[L[i-1],L[i]]=[L[i],L[i-1]]}
@@ -439,11 +462,37 @@ $('stops').addEventListener('click',e=>{
   armedDel=null;render();
 });
 function areaKey(addr){const m=String(addr||'').match(/(?:특별시|광역시|특별자치시|도)?\s*([가-힣]+시)\s*([가-힣]+구|[가-힣]+군)?/);return m?(m[1]+' '+(m[2]||'')).trim():String(addr||'').split(/\s+/).slice(0,2).join(' ')}
-$('btn-sort').onclick=()=>{const o={am:0,any:1,pm:2};S.list=S.list.map((c,i)=>[c,i]).sort((a,b)=>(o[a[0].slot]-o[b[0].slot])||areaKey(a[0].addr).localeCompare(areaKey(b[0].addr),'ko')||(a[1]-b[1])).map(x=>x[0]);render();toast('약속 시간과 가까운 지역끼리 묶었어요. 실제 길은 T맵에서 확인하세요.')};
+function routeScore(list){
+  let t=toMin(S.depart),score=0,previous=areaKey(S.start);
+  for(const c of list){const area=areaKey(c.addr),sl=SLOT[c.slot]||SLOT.any,reach=t+(+c.travel||30),start=Math.max(reach,sl.s);
+    if(start>=sl.e)score+=10000+(start-sl.e+1)*100;
+    score+=Math.max(0,start-reach)*.3;
+    if(area!==previous)score+=area.split(' ')[0]===previous.split(' ')[0]?12:30;
+    if(/성남시|판교|분당/.test(c.addr)&&start<600)score+=250;
+    if(/이천시|여주시|원주시|강원/.test(c.addr)&&start>=720)score+=120;
+    if(softUnmet(c,start))score+=40;
+    previous=area;t=start+workMin(c);
+  }
+  if(list.length){const last=list[list.length-1].addr||'';score+=/안산시/.test(last)?0:/화성시|수원시/.test(last)?35:90}
+  return score;
+}
+function recommendOrder(){
+  const fixed=S.list.filter(c=>c.done),rest=S.list.filter(c=>!c.done);if(rest.length<2)return;
+  const slotOrder={am:0,any:1,pm:2};
+  let best=rest.slice().sort((a,b)=>(slotOrder[a.slot]-slotOrder[b.slot])||areaKey(a.addr).localeCompare(areaKey(b.addr),'ko'));
+  if(routeScore([...fixed,...rest])<routeScore([...fixed,...best]))best=rest.slice();
+  for(let pass=0;pass<12;pass++){
+    let candidate=best,candidateScore=routeScore([...fixed,...best]);
+    for(let i=0;i<best.length;i++)for(let j=0;j<best.length;j++){if(i===j)continue;const next=best.slice(),[item]=next.splice(i,1);next.splice(j,0,item);const value=routeScore([...fixed,...next]);if(value<candidateScore){candidate=next;candidateScore=value}}
+    if(candidate===best)break;best=candidate;
+  }
+  S.list=[...fixed,...best];
+}
+$('btn-sort').onclick=()=>{recommendOrder();render();toast('시간 약속을 먼저 맞추고 지역을 묶었어요. 이동 시간은 내비로 확인하세요.')};
 let clearArmed=false,clearT;
 $('btn-clear').onclick=e=>{const b=e.currentTarget;
   if(!clearArmed){clearArmed=true;b.textContent='한 번 더 누르면 전부 지워요';b.classList.add('armed');clearTimeout(clearT);clearT=setTimeout(()=>{clearArmed=false;b.textContent='전부 지우기';b.classList.remove('armed')},4000);return}
-  clearArmed=false;b.textContent='전부 지우기';b.classList.remove('armed');S.list=[];S.example=false;setEditing(null);render();toast('전부 지웠어요');showTab('add')};
+  clearArmed=false;b.textContent='전부 지우기';b.classList.remove('armed');S.list=[];S.contacts=[];S.example=false;setEditing(null);render();toast('전부 지웠어요');showTab('add')};
 ['date','depart','start','end'].forEach(k=>$('s-'+k).addEventListener('change',e=>{S[k]=e.target.value;render()}));
 
 /* ---------- outputs ---------- */
@@ -471,13 +520,13 @@ ol{list-style:none;margin:0;padding:0}.sep{font-weight:700;color:var(--mu);font-
 .end{background:var(--card);border:1px dashed var(--ln);border-radius:12px;padding:12px;margin-top:8px;color:var(--mu)}.end b{color:var(--ink)}
 .foot{color:var(--mu);font-size:14px;margin-top:16px}`;
   let b=`<div class="w"><h1>${esc(title)}</h1><p class="sub">출발 ${esc(S.depart)} ${esc(S.start)} · ${rows.length}곳 · 동그라미 번호를 누르면 완료 표시</p>`;
-  if(pc.length)b+=`<div class="pre"><h2>전날 미리 전화할 곳</h2><ul>${pc.map(p=>`<li><b>${p.i+1}. ${esc(p.c.name)}</b> <a href="tel:${digits(p.c.phone)}">${esc(p.c.phone)}</a>${p.c.phone2?` · 2차 <a href="tel:${digits(p.c.phone2)}">${esc(p.c.phone2)}</a>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join('')}</ul></div>`;
+  if(pc.length)b+=`<div class="pre"><h2>전날 미리 전화할 곳</h2><ul>${pc.map(p=>`<li><b>${p.i+1}. ${esc(p.c.name)}</b> ${p.c.phone?`<a href="tel:${digits(p.c.phone)}">실제 ${esc(p.c.phone)}</a>`:''}${p.c.safePhone?` <a href="tel:${digits(p.c.safePhone)}">안심 ${esc(p.c.safePhone)}</a>`:''}${p.c.phone2?` · 2차 <a href="tel:${digits(p.c.phone2)}">${esc(p.c.phone2)}</a>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join('')}</ul></div>`;
   b+='<ol>';let prev='';
   rows.forEach((r,i)=>{const c=r.c;const s=section(r.start);if(s!==prev){b+=`<li class="sep">${s}</li>`;prev=s}
     const tags=[`<span class="t">${r.sl.label}</span>`].concat(r.flags.map(f=>`<span class="t ${f[0]}">${esc(f[1])}</span>`)).join('');
-    b+=`<li class="card"><input type="checkbox" id="d${i}"><div class="top"><label class="no" for="d${i}">${i+1}</label><div class="who"><b>${esc(c.name)}</b><span class="eta">${fmt(r.start)} 도착 예상</span></div></div>`+
+    b+=`<li class="card"><input type="checkbox" id="d${i}" ${c.done?'checked':''}><div class="top"><label class="no" for="d${i}">${i+1}</label><div class="who"><b>${esc(c.name)}</b><span class="eta">${fmt(r.start)} 도착 예상 · 설치 ${workMin(c)}분</span></div></div>`+
       `<div class="tags">${tags}</div><p class="addr">${esc(c.addr)}</p>${c.prod?`<p class="prod">${esc(c.prod)}</p>`:''}${c.memo?`<p class="memo">${esc(c.memo)}</p>`:''}`+
-      `<div class="btns">${c.phone?`<a class="tel" href="tel:${digits(c.phone)}">📞 ${esc(c.phone)}</a>`:''}${c.phone2?`<a href="tel:${digits(c.phone2)}">2차 ${esc(c.phone2)}</a>`:''}<a href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵</a></div></li>`;
+      `<div class="btns">${c.phone?`<a class="tel" href="tel:${digits(c.phone)}">📞 실제 ${esc(c.phone)}</a>`:''}${c.safePhone?`<a href="tel:${digits(c.safePhone)}">안심 ${esc(c.safePhone)}</a>`:''}${c.phone2?`<a href="tel:${digits(c.phone2)}">2차 ${esc(c.phone2)}</a>`:''}<a href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵 검색</a></div></li>`;
   });
   b+=`</ol><div class="end">마지막 → <b>${esc(S.end)}</b> 귀가 예상 <b>${rows.length?fmt(home):'-'}</b></div>`;
   b+=`<p class="foot">3.5톤 화물차 · 높이 3.40m. 이동시간은 임시값이며 화물차 도로 제한과 실시간 교통을 반영하지 않습니다. T맵 차량 설정과 현장 표지판을 확인하세요.</p></div>`;
@@ -486,12 +535,12 @@ ol{list-style:none;margin:0;padding:0}.sep{font-weight:700;color:var(--mu);font-
 function buildTXT(){
   const {rows,home}=compute();const pc=precallList(rows);const L=[];
   L.push((shortDate()+' 소파 배송 순서').trim());L.push('출발 '+S.depart+' '+S.start);L.push('');
-  if(pc.length){L.push('[전날 미리 전화]');pc.forEach(p=>L.push('- '+(p.i+1)+'. '+p.c.name+' '+p.c.phone+(p.c.phone2?' / 2차 '+p.c.phone2:'')+' ('+p.why.join(', ')+')'));L.push('')}
+  if(pc.length){L.push('[전날 미리 전화]');pc.forEach(p=>L.push('- '+(p.i+1)+'. '+p.c.name+(p.c.phone?' / 010 '+p.c.phone:'')+(p.c.safePhone?' / 0508 '+p.c.safePhone:'')+(p.c.phone2?' / 2차 '+p.c.phone2:'')+' ('+p.why.join(', ')+')'));L.push('')}
   let prev='';
   rows.forEach((r,i)=>{const c=r.c;const s=section(r.start);if(s!==prev){L.push('── '+s+' ──');prev=s}
     L.push((i+1)+'. '+fmt(r.start)+' '+c.name+' ['+[r.sl.label].concat(r.flags.map(f=>f[1])).join(', ')+']');
     L.push('   '+c.addr);
-    if(c.phone)L.push('   ☎ '+c.phone+(c.phone2?' / 2차 '+c.phone2:''));
+    if(c.phone||c.safePhone||c.phone2)L.push('   ☎ '+[c.phone?'010 '+c.phone:'',c.safePhone?'0508 '+c.safePhone:'',c.phone2?'2차 '+c.phone2:''].filter(Boolean).join(' / '));
     if(c.prod)L.push('   제품: '+c.prod);
     if(c.memo)L.push('   메모: '+c.memo);
   });
@@ -513,41 +562,63 @@ $('btn-copy').onclick=()=>{const t=buildTXT();const ta=$('txt-out');
 
 /* ---------- client-side import ---------- */
 let pending=[];
-function baseCustomer(x={}){return {id:uid(),name:x.name||'',addr:x.addr||'',phone:x.phone||'',phone2:x.phone2||'',slot:x.slot||'any',noelev:!!x.noelev,bs:!!x.bs,single:!!x.single,call:!!x.call,sorry:false,prod:x.prod||'',memo:x.memo||'',travel:30,work:x.work||''}}
+function baseCustomer(x={}){return {id:uid(),source:x.source||'manual',name:x.name||'',addr:x.addr||'',phone:x.phone||'',safePhone:x.safePhone||'',phone2:x.phone2||'',slot:x.slot||'any',noelev:!!x.noelev,elevSize:x.elevSize||'',bs:!!x.bs,single:!!x.single,call:!!x.call,sorry:false,prod:x.prod||'',memo:x.memo||'',travel:30,work:x.work||'',verified:x.verified!==false,done:false}}
 function normalizePhone(s){const d=String(s||'').replace(/\D/g,'');return d.length===11?d.replace(/^(\d{3})(\d{4})(\d{4})$/,'$1-$2-$3'):d.length===12?d.replace(/^(\d{4})(\d{4})(\d{4})$/,'$1-$2-$3'):d}
 function renderPending(){
-  $('import-review').innerHTML=pending.map((c,i)=>`<div class="review-item ${!c.name||!c.addr?'bad':''}"><strong>${esc(c.file||'사진')} · ${i+1}번</strong><small>읽힌 글자를 확인하고 고쳐 주세요.</small><label class="field"><span>고객명</span><input data-pending="${i}" data-field="name" value="${esc(c.name)}"></label><label class="field"><span>설치주소</span><input data-pending="${i}" data-field="addr" value="${esc(c.addr)}"></label><label class="field"><span>연락처 1</span><input data-pending="${i}" data-field="phone" type="tel" value="${esc(c.phone)}"></label><label class="field"><span>제품명 (설치 시간 판별)</span><input data-pending="${i}" data-field="prod" value="${esc(c.prod)}" placeholder="예: 전동 리클라이너"></label><label class="field"><span>방문 시간</span><select data-pending="${i}" data-field="slot"><option value="any" ${c.slot==='any'?'selected':''}>상관없음</option><option value="am" ${c.slot==='am'?'selected':''}>오전</option><option value="pm" ${c.slot==='pm'?'selected':''}>오후</option></select></label><label class="field"><span>메모</span><textarea data-pending="${i}" data-field="memo">${esc(c.memo)}</textarea></label><button type="button" data-remove="${i}">이 항목 빼기</button></div>`).join('');
+  $('import-review').innerHTML=pending.map((c,i)=>`<div class="review-item ${!c.name||!c.addr?'bad':''}"><strong>${esc(c.file||'사진')} · ${i+1}번</strong><small>못 읽은 칸을 고친 뒤 추가하세요.</small><label class="field"><span>고객명</span><input data-pending="${i}" data-field="name" value="${esc(c.name)}"></label><label class="field"><span>설치주소</span><input data-pending="${i}" data-field="addr" value="${esc(c.addr)}"></label><label class="field"><span>실제 010 번호</span><input data-pending="${i}" data-field="phone" type="tel" value="${esc(c.phone)}"></label><label class="field"><span>안심 0508 번호</span><input data-pending="${i}" data-field="safePhone" type="tel" value="${esc(c.safePhone)}"></label><label class="field"><span>제품명</span><input data-pending="${i}" data-field="prod" value="${esc(c.prod)}"></label><label class="field"><span>방문 시간</span><select data-pending="${i}" data-field="slot"><option value="any" ${c.slot==='any'?'selected':''}>지정불가·시간 무관</option><option value="am" ${c.slot==='am'?'selected':''}>오전</option><option value="pm" ${c.slot==='pm'?'selected':''}>오후</option></select></label><label class="field"><span>메모</span><textarea data-pending="${i}" data-field="memo">${esc(c.memo)}</textarea></label><button type="button" data-remove="${i}">이 항목 빼기</button></div>`).join('');
   $('import-commit').hidden=!pending.length;
 }
 const review=$('import-review');
 review.addEventListener('input',e=>{const d=e.target.dataset;if(d.pending!=null&&pending[+d.pending])pending[+d.pending][d.field]=e.target.value});
 review.addEventListener('change',e=>{const d=e.target.dataset;if(d.pending!=null&&pending[+d.pending])pending[+d.pending][d.field]=e.target.value});
 review.addEventListener('click',e=>{const b=e.target.closest('[data-remove]');if(b){pending.splice(+b.dataset.remove,1);renderPending()}});
-$('import-commit').onclick=()=>{
-  const ready=pending.filter(c=>c.name.trim()&&c.addr.trim());
-  if(ready.length!==pending.length){toast('이름과 주소가 빈 항목을 고쳐 주세요');renderPending();return}
-  dropExample();let added=0,duplicates=0;
-  for(const c of ready){if(S.list.some(x=>x.name.trim()===c.name.trim()&&x.addr.trim()===c.addr.trim())){duplicates++;continue}const {file,...fields}=c;S.list.push(baseCustomer(fields));added++}
-  pending=[];renderPending();render();showTab('order');toast(added+'명 추가'+(duplicates?' · 중복 '+duplicates+'명 건너뜀':''));$('import-images').value='';
-};
+function sameCustomer(a,b){const clean=x=>String(x||'').replace(/[^가-힣0-9]/g,'');return clean(a.name)&&clean(a.name)===clean(b.name)&&(clean(a.addr)===clean(b.addr)||a.source!==b.source)}
+function mergeCustomer(c){
+  const matches=S.list.filter(x=>sameCustomer(x,c)),found=matches.length===1?matches[0]:null;
+  if(!found&&c.source==='list'){if(!S.contacts.some(x=>x.name.replace(/\s/g,'')===c.name.replace(/\s/g,'')&&digits(x.phone)===digits(c.phone)))S.contacts.push(baseCustomer(c));return 'contact'}
+  if(!found){const person=baseCustomer(c);const contactMatches=S.contacts.filter(x=>sameCustomer(x,person));if(contactMatches.length===1){person.phone=contactMatches[0].phone||person.phone;S.contacts=S.contacts.filter(x=>x!==contactMatches[0])}S.list.push(person);return 'added'}
+  for(const field of ['phone','safePhone','phone2','prod','elevSize'])if(c[field]&&!found[field])found[field]=c[field];
+  if(c.addr&&c.addr.length>(found.addr||'').length)found.addr=c.addr;
+  if(c.slot&&(c.source==='form'||c.slot!=='any'))found.slot=c.slot;
+  if(c.memo&&!found.memo?.includes(c.memo))found.memo=[found.memo,c.memo].filter(Boolean).join(' · ');
+  for(const flag of ['noelev','bs','single','call'])found[flag]=!!(found[flag]||c[flag]);
+  found.verified=found.verified&&c.verified!==false;
+  return 'merged';
+}
+function commitPending(show=true){
+  const ready=pending.filter(c=>c.name.trim()&&(c.source==='list'||c.addr.trim()));pending=pending.filter(c=>!c.name.trim()||(c.source!=='list'&&!c.addr.trim()));
+  ready.sort((a,b)=>(a.source==='list')-(b.source==='list'));
+  let added=0,merged=0,contacts=0;for(const c of ready){const result=mergeCustomer(c);if(result==='added')added++;else if(result==='merged')merged++;else contacts++}
+  renderPending();if(added||merged){recommendOrder();render();if(show)showTab('order')}else render();
+  return {added,merged,contacts,missing:pending.length};
+}
+$('import-commit').onclick=()=>{const result=commitPending(true);toast(result.added+'명 추가 · '+result.merged+'명 정보 합침'+(result.missing?' · 못 읽은 '+result.missing+'건 남음':''))};
 function loadOCR(){return new Promise((resolve,reject)=>{if(window.Tesseract){resolve(window.Tesseract);return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=()=>resolve(window.Tesseract);s.onerror=()=>reject(new Error('글자 읽기 도구를 내려받지 못했습니다. 인터넷 연결을 확인해 주세요.'));document.head.appendChild(s)})}
 function wordsIn(words,w,h,x0,y0,x1,y1){return words.filter(q=>{const b=q.bbox||{},x=((b.x0||0)+(b.x1||0))/2/w,y=((b.y0||0)+(b.y1||0))/2/h;return x>=x0&&x<=x1&&y>=y0&&y<=y1}).sort((a,b)=>(a.bbox.y0-b.bbox.y0)>12?(a.bbox.y0-b.bbox.y0):(a.bbox.x0-b.bbox.x0)).map(q=>q.text).join(' ').trim()}
+function decodeSlot(value){const s=String(value||'').replace(/\s/g,'');if(/지정불가|시간무관|09[:시]?00[-~]17[:시]?00/.test(s))return'any';if(/오전|09[:시]?00[-~]13[:시]?00/.test(s))return'am';if(/오후|13[:시]?00[-~]17[:시]?00/.test(s))return'pm';return'any'}
 function parseFormOCR(data,w,h,file){
   const words=data.words||[],text=data.text||'';
   const field=(x0,y0,x1,y1)=>wordsIn(words,w,h,x0,y0,x1,y1);
   const row=field(.11,.17,.98,.25);
   let name=field(.11,.178,.205,.248).replace(/[^가-힣\s]/g,'').trim();
   let addr=field(.205,.178,.693,.248).replace(/^주소\s*/,'').trim();
-  let phone=normalizePhone(field(.69,.178,.90,.248));
-  if(!/^0\d{9,11}$/.test(phone.replace(/\D/g,''))){const m=row.match(/0\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4}/);phone=m?normalizePhone(m[0]):''}
+  let safePhone=normalizePhone(field(.69,.178,.90,.248));
+  if(!/^0\d{9,11}$/.test(safePhone.replace(/\D/g,''))){const m=row.match(/0\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4}/);safePhone=m?normalizePhone(m[0]):''}
   const slotText=field(.50,.25,.67,.32)+' '+text.match(/(?:오전|오후)\s*\(?\d{1,2}[:시]/)?.[0];
-  const slot=/오전|09[:시]00\s*[-~]/.test(slotText)?'am':/오후|13[:시]00\s*[-~]/.test(slotText)?'pm':'any';
-  const product=field(.16,.32,.56,.39).replace(/^제품명\s*/,'').trim();
-  const notes=field(.02,.51,.96,.66).replace(/현장\s*특이사항/g,'').trim();
+  const slot=decodeSlot(slotText);
+  const rawProduct=field(.16,.32,.56,.39).replace(/^제품명\s*/,'').trim();
+  const product=/소파|리클라이너|스툴|암체어|유닛|모듈/.test(rawProduct)?rawProduct:'';
+  const rawNotes=field(.02,.51,.96,.66).replace(/현장\s*특이사항/g,'').trim();
+  const noteKeywords=/전날|연락|해피콜|진입시간|늦게|이르게|직접\s*수령|사다리차|기존\s*소파/;
+  const koreanRatio=(rawNotes.match(/[가-힣]/g)||[]).length/Math.max(1,rawNotes.length);
+  const notes=rawNotes.length<160&&(noteKeywords.test(rawNotes)||koreanRatio>.48)&&!/중\s*형\s*완\s*제\s*품|테\s*이\s*블.*서\s*랍/.test(rawNotes)?rawNotes:'';
+  const elevText=field(.73,.27,.82,.32),rawElevSize=field(.81,.27,.92,.32).replace(/[^0-9인승\s]/g,'').trim();
+  const elevSize=/\d+\s*인승/.test(rawElevSize)&&parseInt(rawElevSize,10)>=6?rawElevSize:'';
+  const second=(rawNotes.match(/0(?:10|11|16|17|18|19)[-\s]?\d{3,4}[-\s]?\d{4}/)||[])[0]||'';
   const order=(text.match(/주문번호\s*([0-9]{8,12})/)||[])[1]||'';
   if(!name){const m=text.match(/고객명\s*([가-힣]{2,5})/);if(m)name=m[1]}
   if(!addr){const m=text.match(/(?:경기(?:도)?|서울(?:특별시)?|인천(?:광역시)?|강원(?:도|특별자치도)?)\s*[가-힣\d\s,()\-]{12,100}/);if(m)addr=m[0].split(/\n/)[0].trim()}
-  return {...baseCustomer({name,addr,phone,slot,prod:product,memo:[notes,order?'주문 '+order:''].filter(Boolean).join(' · '),call:/전날|배송 전 연락/.test(notes),bs:/기존\s*소파|BS정보/.test(text)}),file};
+  return {...baseCustomer({source:'form',verified:false,name,addr,safePhone,phone2:normalizePhone(second),slot,prod:product,elevSize,noelev:/^N$|^X$|없음|계단/i.test(elevText),memo:[notes,order?'주문 '+order:''].filter(Boolean).join(' · '),call:/전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(rawNotes),bs:/기존\s*소파\s*BS|(?:BS|8S|85)\s*정\s*보|완\s*제\s*품/.test(text)}),file};
 }
 async function readFormFields(worker,canvas,customer){
   const box=async(x0,y0,x1,y1)=>{
@@ -557,15 +628,22 @@ async function readFormFields(worker,canvas,customer){
   const name=(await box(.113,.201,.203,.244)).replace(/[^가-힣]/g,'');
   const addr=await box(.207,.201,.69,.246);
   const phone=normalizePhone(await box(.695,.201,.88,.244));
+  const slot=await box(.515,.282,.65,.309);
+  const elevator=await box(.735,.282,.80,.308);
+  const capacity=await box(.81,.282,.9,.308);
+  if(!customer.prod){const product=await box(.17,.335,.56,.381);if(/소파|리클라이너|스툴|암체어|유닛|모듈/.test(product))customer.prod=product}
   if(name.length>=2)customer.name=name;
   if(addr.length>=8)customer.addr=addr;
-  if(/^0\d{9,11}$/.test(phone.replace(/\D/g,'')))customer.phone=phone;
+  if(/^0\d{9,11}$/.test(phone.replace(/\D/g,'')))customer.safePhone=phone;
+  if(slot)customer.slot=decodeSlot(slot);
+  if(/^N$|^X$|없음|계단/i.test(elevator))customer.noelev=true;
+  if(/\d+\s*인승/.test(capacity)&&parseInt(capacity,10)>=6)customer.elevSize=capacity.match(/\d+\s*인승/)[0];
   return customer;
 }
 function parseTableOCR(data,w,h,file){
   const words=(data.words||[]).filter(q=>q.text&&q.bbox).sort((a,b)=>(a.bbox.y0+a.bbox.y1)-(b.bbox.y0+b.bbox.y1));
   const groups=[];for(const word of words){const y=(word.bbox.y0+word.bbox.y1)/2;let g=groups.find(r=>Math.abs(r.y-y)<h*.022);if(!g){g={y,words:[]};groups.push(g)}g.words.push(word);g.y=(g.y*(g.words.length-1)+y)/g.words.length}
-  return groups.map(g=>{const col=(a,b)=>g.words.filter(q=>{const x=(q.bbox.x0+q.bbox.x1)/2/w;return x>=a&&x<b}).sort((a,b)=>a.bbox.x0-b.bbox.x0).map(q=>q.text).join(' ').trim();const name=col(0,.31).replace(/[^가-힣\s]/g,'').trim(),phone=normalizePhone(col(.31,.62)),addr=col(.62,1);return {...baseCustomer({name,phone,addr}),file}}).filter(c=>c.name.length>=2&&c.addr.length>=5&&/^(0\d{9,11})$/.test(c.phone.replace(/\D/g,'')));
+  return groups.map(g=>{const col=(a,b)=>g.words.filter(q=>{const x=(q.bbox.x0+q.bbox.x1)/2/w;return x>=a&&x<b}).sort((a,b)=>a.bbox.x0-b.bbox.x0).map(q=>q.text).join(' ').trim();const name=col(0,.31).replace(/[^가-힣\s]/g,'').trim(),phone=normalizePhone(col(.31,.62)),addr=col(.62,1);return {...baseCustomer({source:'list',verified:false,name,phone,addr}),file}}).filter(c=>c.name.length>=2&&/^(0\d{9,11})$/.test(c.phone.replace(/\D/g,'')));
 }
 async function imageCanvas(file){const bmp=await createImageBitmap(file);const scale=Math.min(6,1800/bmp.width),form=bmp.height>bmp.width*1.2;const c=document.createElement('canvas');c.width=Math.round(bmp.width*scale);c.fullHeight=Math.round(bmp.height*scale);c.height=Math.round(bmp.height*scale*(form?.7:1));c.isForm=form;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(bmp,0,0,c.width,c.fullHeight);bmp.close();return c}
 $('import-images').addEventListener('change',async e=>{
@@ -581,7 +659,10 @@ $('import-images').addEventListener('change',async e=>{
       else pending.push(...parseTableOCR(data,canvas.width,canvas.fullHeight,files[i].name));
       renderPending();
     }
-    status.textContent=files.length+'장 읽었습니다. 아래 내용을 확인한 뒤 추가하세요.';
+    const result=commitPending(true);
+    status.textContent=files.length+'장 읽었습니다. '+(result.added?result.added+'명 코스 생성':'의뢰서 사진을 함께 넣으면 코스 생성')+(result.merged?' · '+result.merged+'건 연락처·의뢰서 합침':'')+(S.contacts.length?' · 010 번호 '+S.contacts.length+'명 연결 대기':'')+(result.missing?' · 못 읽은 '+result.missing+'건은 사진 넣기에서 수정':'');
+    if(result.added||result.merged)toast('코스를 만들었어요. 주소와 번호를 확인하세요.');
+    e.target.value='';
   }catch(err){status.textContent='읽기 실패: '+(err.message||err)+'\n사진을 다시 찍거나 직접 입력해 주세요.'}
   finally{if(worker)await worker.terminate()}
 });
@@ -592,8 +673,8 @@ $('import-table').addEventListener('change',async e=>{
   const head=rows[0].map(s=>s.trim().replace(/^\uFEFF/,''));const col=(names)=>head.findIndex(x=>names.some(n=>x.includes(n)));
   const ni=col(['고객명','이름']),ai=col(['설치주소','주소']),pi=col(['고객연락처','연락처','전화번호']);
   if(ni<0||ai<0){toast('고객명·설치주소 열이 필요해요');return}
-  const items=rows.slice(1).filter(r=>r[ni]||r[ai]).map(r=>({...baseCustomer({name:(r[ni]||'').trim(),addr:(r[ai]||'').trim(),phone:normalizePhone(r[pi]||'')}),file:file.name}));
-  pending.push(...items);renderPending();$('import-status').textContent=items.length+'명 읽었습니다. 아래 내용을 확인한 뒤 추가하세요.';e.target.value='';
+  const items=rows.slice(1).filter(r=>r[ni]||r[ai]).map(r=>({...baseCustomer({source:'list',verified:false,name:(r[ni]||'').trim(),addr:(r[ai]||'').trim(),phone:normalizePhone(r[pi]||'')}),file:file.name}));
+  pending.push(...items);const result=commitPending(true);$('import-status').textContent=items.length+'명 읽고 '+result.added+'명 코스에 반영했습니다.';e.target.value='';
 });
 
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
