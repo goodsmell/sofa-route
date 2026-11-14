@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
 <style>
-/* Layout: 한 번에 한 화면만. 아래 고정 탭 3개(고객 넣기 / 순서·시간 / 보내기), 큰 글씨·큰 버튼, 휴대폰 우선 */
+/* Layout: 한 번에 한 화면만. 아래 고정 탭 3개(사진 / 코스 / 기록 달력), 큰 글씨·큰 버튼, 휴대폰 우선 */
 :root{
   --bg:#f2f4f6; --panel:#ffffff; --ink:#141c24; --muted:#56636f; --line:#cfd7df;
   --accent:#1b5a8c; --accent-ink:#ffffff; --accent-soft:#dfeaf5;
@@ -124,9 +124,19 @@ ol.stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .ctl{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
 .ctl button{min-height:52px;padding:6px;font-size:16px}
 
-/* send tab */
-.frame{width:100%;height:620px;border:2px solid var(--line);border-radius:14px;background:var(--bg)}
-.msg{font-size:17px;font-weight:600;color:var(--ok);min-height:1.4em;margin:0}
+/* calendar */
+.calendar-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.calendar-head button{min-width:52px;padding:6px}
+.calendar-head h2{font-variant-numeric:tabular-nums;text-align:center}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}
+.calendar-weekday{text-align:center;color:var(--muted);font-size:14px;font-weight:700}
+.calendar-day{min-width:0;min-height:64px;padding:4px 1px;display:flex;flex-direction:column;gap:0;border-radius:10px;font-size:18px}
+.calendar-day small{font-size:11px;font-weight:700;white-space:nowrap}
+.calendar-day.has-route{border-color:var(--accent);background:var(--accent-soft)}
+.calendar-day.selected{background:var(--accent);color:var(--accent-ink)}
+.calendar-day.today{outline:2px solid var(--ok);outline-offset:1px}
+.calendar-detail{display:flex;flex-direction:column;gap:12px}
+.calendar-detail p{margin:0}
 
 /* bottom tab bar */
 body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
@@ -235,7 +245,7 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
   <!-- ===== 탭 2: 순서·시간 ===== -->
   <section id="tab-order" class="view" hidden>
     <div class="wrap" style="gap:14px">
-      <p class="example" id="example-note">지금 있는 고객은 <b>연습용 예시</b>예요. 맨 아래 "전부 지우기"를 누르고 진짜 고객을 넣으세요.</p>
+      <p class="example" id="example-note">연습용 예시 코스입니다.</p>
       <p class="example" id="review-alert" hidden></p>
       <div class="summary" id="summary"></div>
       <div class="panel">
@@ -243,13 +253,13 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
         <ul class="precall" id="precall"></ul>
       </div>
       <div class="panel">
-        <h2>배송 순서</h2>
-        <p class="hint">위로·아래로로 순서를 바꾸고, 집 사이 이동 시간은 3.5톤 화물차 설정을 적용한 내비에서 보고 −5 / +5로 맞추세요. 처음 입력된 30분은 임시값입니다.</p>
+        <h2>오늘의 예상 시간표</h2>
+        <p class="hint">도착·설치 종료·귀가 시간을 모두 보여줍니다. 이동 시간은 처음에 구간마다 30분으로 잡으므로 T맵에서 확인한 뒤 −5 / +5로 맞추세요.</p>
         <ol class="stops" id="stops"></ol>
       </div>
       <div class="row">
         <button type="button" id="btn-sort">시간 약속 우선으로 순서 추천</button>
-        <button type="button" class="danger" id="btn-clear">전부 지우기</button>
+        <button type="button" class="danger" id="btn-clear">이 날짜 비우기</button>
       </div>
       <details class="panel">
         <summary>순서 정하는 요령</summary>
@@ -268,22 +278,19 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
     </div>
   </section>
 
-  <!-- ===== 탭 3: 보내기 ===== -->
-  <section id="tab-send" class="view" hidden>
+  <!-- ===== 탭 3: 기록 달력 ===== -->
+  <section id="tab-calendar" class="view" hidden>
     <div class="wrap" style="gap:14px">
       <div class="panel">
-        <h2>기사님께 보낼 파일</h2>
-        <p class="hint">HTML 파일을 카톡으로 보내면 휴대폰에서 <b>전화 버튼</b>, <b>지도 버튼</b>이 바로 됩니다. 번호를 누르면 "완료" 표시가 돼요.</p>
-        <button class="primary big" type="button" id="btn-html">📄 HTML 파일 저장</button>
-        <button class="big" type="button" id="btn-copy">📋 글자로 복사 (카톡·메모에 붙여넣기)</button>
-        <button class="big" type="button" id="btn-txt">TXT 파일 저장</button>
-        <p class="msg" id="out-msg" role="status"></p>
-        <textarea id="txt-out" rows="8" readonly hidden></textarea>
-        <p class="hint">⚠ 파일에는 고객 이름·전화·주소가 들어 있어요. 담당자에게만 보내고, 배송 끝나면 지워 주세요.</p>
+        <div class="calendar-head"><button id="cal-prev" type="button" aria-label="이전 달">‹</button><h2 id="cal-month"></h2><button id="cal-next" type="button" aria-label="다음 달">›</button></div>
+        <div class="calendar-grid" id="calendar-grid"></div>
+        <p class="hint">‘몇 곳’ 표시가 있는 날짜에 배송 코스가 저장돼 있습니다. 날짜를 누르면 그날의 기록이 나옵니다.</p>
       </div>
       <div class="panel">
-        <h2>기사님 휴대폰 화면 미리보기</h2>
-        <iframe class="frame" id="preview" title="기사님용 배송 순서 미리보기"></iframe>
+        <h2 id="cal-title">날짜 선택</h2>
+        <div class="calendar-detail" id="cal-detail"></div>
+        <button class="primary big" id="cal-open" type="button" hidden>이 날짜 코스 열기</button>
+        <button class="big" id="cal-today" type="button">오늘 코스 보기</button>
       </div>
     </div>
   </section>
@@ -291,16 +298,16 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
 
 <nav class="tabs" aria-label="화면 바꾸기">
   <div class="in" role="tablist">
-    <button type="button" role="tab" data-tab="add" id="t-add">① 고객 넣기<small id="cnt-add"></small></button>
-    <button type="button" role="tab" data-tab="order" id="t-order">② 배송 순서<small id="cnt-order"></small></button>
-    <button type="button" role="tab" data-tab="send" id="t-send">③ 공유하기<small>파일 만들기</small></button>
+    <button type="button" role="tab" data-tab="add" id="t-add">📷 사진 넣기<small id="cnt-add"></small></button>
+    <button type="button" role="tab" data-tab="order" id="t-order">🚚 오늘 코스<small id="cnt-order"></small></button>
+    <button type="button" role="tab" data-tab="calendar" id="t-calendar">▦ 기록 달력<small id="cnt-calendar"></small></button>
   </div>
 </nav>
 <div class="toast" id="toast" role="status" hidden></div>
 
 <script>
 (function(){
-const KEY='sofa-route-v1', TABKEY='sofa-route-tab';
+const KEY='sofa-route-v1', HISTORY_KEY='sofa-route-history-v1', TABKEY='sofa-route-tab';
 const SLOT={am:{label:'오전',s:540,e:780},pm:{label:'오후',s:780,e:1020},any:{label:'시간 지정 없음',s:540,e:1020}};
 const $=id=>document.getElementById(id);
 document.querySelector('#tab-add > .wrap').prepend($('photo-panel'));
@@ -311,16 +318,23 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const digits=s=>String(s||'').replace(/[^0-9+]/g,'');
 const uid=()=>Math.random().toString(36).slice(2,9);
 
-function tomorrow(){const d=new Date();d.setDate(d.getDate()+1);return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+function today(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
+function emptyDay(date){return {example:false,date,depart:'06:40',start:'그레이박스 (경기 안산시 단원구 해봉로 232)',end:'팔곡화물차고지 (경기 안산시 팔곡산단1길 13)',endTravel:30,list:[],contacts:[]}}
 let S;
 try{S=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){S=null}
-if(!S||!Array.isArray(S.list))S={example:false,date:tomorrow(),depart:'06:40',start:'그레이박스 (경기 안산시 단원구 해봉로 232)',end:'팔곡화물차고지 (경기 안산시 팔곡산단1길 13)',endTravel:30,list:[]};
+if(!S||!Array.isArray(S.list))S=emptyDay(today());
+if(!S.date)S.date=today();
+let history={};try{history=JSON.parse(localStorage.getItem(HISTORY_KEY)||'{}')||{}}catch(e){}
+if(!history||typeof history!=='object'||Array.isArray(history))history={};
+if(S.date&&/^\d{4}-\d{2}-\d{2}$/.test(S.date))history[S.date]=structuredClone(S);
+if(S.date!==today())S=history[today()]?structuredClone(history[today()]):emptyDay(today());
 if(!S.start||S.start==='안산 그레이박스')S.start='그레이박스 (경기 안산시 단원구 해봉로 232)';
 if(!S.end||S.end==='상록수역')S.end='팔곡화물차고지 (경기 안산시 팔곡산단1길 13)';
 if(!S.depart||S.depart==='08:00')S.depart='06:40';
 if(!Array.isArray(S.contacts))S.contacts=[];
 S.list.forEach(c=>{if(/^0508/.test(digits(c.phone))){c.safePhone=c.phone;c.phone=''}if(c.verified==null)c.verified=true});
-function persist(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function persist(){try{history[S.date]=structuredClone(S);localStorage.setItem(KEY,JSON.stringify(S));localStorage.setItem(HISTORY_KEY,JSON.stringify(history))}catch(e){toast('저장 공간이 부족해 기록을 저장하지 못했어요')}}
+function openDay(date){if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;persist();S=history[date]?structuredClone(history[date]):emptyDay(date);calSelected=date;calYear=+date.slice(0,4);calMonth=+date.slice(5,7)-1;pending=[];renderPending();setEditing(null);render();showTab('order')}
 
 let toastT;
 function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>{el.hidden=true},2600)}
@@ -328,10 +342,11 @@ function toast(t){const el=$('toast');el.textContent=t;el.hidden=false;clearTime
 /* ---------- tabs ---------- */
 let tab='add';
 try{tab=localStorage.getItem(TABKEY)||(S.list.length?'order':'add')}catch(e){}
+if(!['add','order','calendar'].includes(tab))tab=S.list.length?'order':'add';
 function showTab(t){tab=t;
-  ['add','order','send'].forEach(k=>{$('tab-'+k).hidden=k!==t;$('t-'+k).setAttribute('aria-selected',k===t?'true':'false')});
+  ['add','order','calendar'].forEach(k=>{$('tab-'+k).hidden=k!==t;$('t-'+k).setAttribute('aria-selected',k===t?'true':'false')});
   try{localStorage.setItem(TABKEY,t)}catch(e){}
-  if(t==='send')$('preview').srcdoc=buildHTML();
+  if(t==='calendar')renderCalendar();
   window.scrollTo(0,0);
 }
 document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
@@ -339,9 +354,9 @@ document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>showTab(b.
 /* ---------- calc ---------- */
 function workMin(c){if(+c.work>0)return +c.work;let n=/리클라이너|전동/.test(c.prod||'')?30:15;if(c.noelev)n+=15;if(c.bs)n+=15;if(/스툴/.test(c.prod||''))n+=5;if(/멀티|모듈|유닛/.test(c.prod||''))n+=10;return n}
 function softUnmet(c,start){const memo=c.memo||'';return /가능하면\s*늦게|가장\s*늦게|늦은\s*시간/.test(memo)&&start<900?'늦은 방문 요청 확인':/가능하면\s*이르게|가장\s*이르게|이른\s*시간/.test(memo)&&start>660?'이른 방문 요청 확인':''}
-function compute(){
-  let t=toMin(S.depart);const rows=[];
-  S.list.forEach(c=>{
+function compute(day=S){
+  let t=toMin(day.depart);const rows=[];
+  day.list.forEach(c=>{
     const sl=SLOT[c.slot]||SLOT.any;const reach=t+(+c.travel||0);
     const start=Math.max(reach,sl.s);const wait=start-reach;const end=start+workMin(c);
     const flags=[];
@@ -358,7 +373,7 @@ function compute(){
     if(!c.prod&&!c.work)flags.push(['warn','제품 확인 · 기본 15분 적용']);
     rows.push({c,start,end,wait,flags,sl});t=end;
   });
-  return {rows,home:t+(+S.endTravel||0),last:t};
+  return {rows,home:t+(+day.endTravel||0),last:t};
 }
 function precallList(rows){
   const out=[];
@@ -375,6 +390,28 @@ function precallList(rows){
 
 /* ---------- render ---------- */
 function dateLabel(){if(!S.date)return'';const d=new Date(S.date+'T00:00');return (d.getMonth()+1)+'월 '+d.getDate()+'일('+'일월화수목금토'[d.getDay()]+')'}
+let calSelected=S.date,calYear=+(S.date||today()).slice(0,4),calMonth=+(S.date||today()).slice(5,7)-1;
+function renderCalendar(){
+  $('cal-month').textContent=calYear+'년 '+(calMonth+1)+'월';
+  const first=new Date(calYear,calMonth,1).getDay(),days=new Date(calYear,calMonth+1,0).getDate();
+  let grid='일월화수목금토'.split('').map(x=>`<span class="calendar-weekday">${x}</span>`).join('');
+  grid+='<span></span>'.repeat(first);
+  for(let n=1;n<=days;n++){const date=calYear+'-'+String(calMonth+1).padStart(2,'0')+'-'+String(n).padStart(2,'0'),day=history[date],count=day?.list?.length||0;
+    grid+=`<button type="button" class="calendar-day ${count?'has-route':''} ${date===calSelected?'selected':''} ${date===today()?'today':''}" data-cal-date="${date}" aria-label="${date}, ${count}곳">${n}${count?`<small>${count}곳</small>`:''}</button>`}
+  $('calendar-grid').innerHTML=grid;
+  const day=history[calSelected],list=day?.list||[],dateText=calSelected?calSelected.replaceAll('-','.'):'날짜 선택';
+  $('cal-title').textContent=dateText+' 배송 기록';
+  if(list.length){const {rows,home}=compute(day),done=list.filter(c=>c.done).length;
+    $('cal-detail').innerHTML=`<p><b>${list.length}곳 배송 · ${done}곳 완료</b><br>출발 ${esc(day.depart)} · 귀가 예상 ${fmt(home)}</p><ol>${rows.map((r,i)=>`<li>${i+1}. <b>${esc(r.c.name)}</b> · ${fmt(r.start)} 도착 예상${r.c.doneAt?` · ${esc(r.c.doneAt)} 완료`:''}</li>`).join('')}</ol>`;
+    $('cal-open').textContent='이 날짜 코스 열기';$('cal-open').hidden=false;
+  }else{$('cal-detail').innerHTML='<p>저장된 배송 코스가 없습니다.</p>';$('cal-open').hidden=true}
+  $('cnt-calendar').textContent=Object.values(history).filter(d=>d?.list?.length).length+'일 기록';
+}
+$('calendar-grid').addEventListener('click',e=>{const date=e.target.closest('[data-cal-date]')?.dataset.calDate;if(date){calSelected=date;renderCalendar()}});
+$('cal-prev').onclick=()=>{calMonth--;if(calMonth<0){calMonth=11;calYear--}renderCalendar()};
+$('cal-next').onclick=()=>{calMonth++;if(calMonth>11){calMonth=0;calYear++}renderCalendar()};
+$('cal-open').onclick=()=>openDay(calSelected);
+$('cal-today').onclick=()=>openDay(today());
 function render(){
   $('s-date').value=S.date||'';$('s-depart').value=S.depart||'06:40';$('s-start').value=S.start||'';$('s-end').value=S.end||'';
   $('example-note').hidden=!S.example;
@@ -385,17 +422,20 @@ function render(){
   $('head-line').textContent=[dateLabel(),S.depart+' 출발',rows.length+'곳'].filter(Boolean).join(' · ');
   $('cnt-add').textContent=rows.length+'명 넣음';
   const bad=rows.filter(r=>r.start>=r.sl.e).length,late=rows.filter(r=>r.start>=1020).length;
-  $('cnt-order').textContent=bad?('⚠ '+bad+'곳 시간 넘김'):(rows.length?'귀가 '+fmt(home):'');
+  $('cnt-order').textContent=bad?('⚠ '+bad+'곳 시간 넘김'):(rows.length?S.date.slice(5).replace('-','/')+' · 귀가 '+fmt(home):'');
+  const travel=rows.reduce((sum,r)=>sum+(+r.c.travel||0),0)+(+S.endTravel||0),work=rows.reduce((sum,r)=>sum+workMin(r.c),0),wait=rows.reduce((sum,r)=>sum+r.wait,0);
   $('summary').innerHTML=
-    `<div class="sbox home"><span>${esc(S.end)} 귀가 예상</span><strong>${rows.length?fmt(home):'-'}</strong></div>`+
+    `<div class="sbox home"><span>${esc(S.date)} · ${esc(S.end)} 귀가 예상</span><strong>${rows.length?fmt(home):'-'}</strong></div>`+
     `<div class="sbox"><span>배송 완료</span><strong>${rows.filter(r=>r.c.done).length}/${rows.length}곳</strong></div>`+
-    `<div class="sbox"><span>시간 넘김</span><strong style="color:${bad?'var(--bad)':'var(--ok)'}">${bad?bad+'곳':'없음'}</strong></div>`;
+    `<div class="sbox"><span>시간 넘김</span><strong style="color:${bad?'var(--bad)':'var(--ok)'}">${bad?bad+'곳':'없음'}</strong></div>`+
+    `<div class="sbox"><span>이동 예상</span><strong>${rows.length?travel:0}분</strong></div>`+
+    `<div class="sbox"><span>설치·대기 예상</span><strong>${rows.length?work+wait:0}분</strong></div>`;
   let h=`<li class="stop endpt"><div class="num">출발</div><div class="who"><b>${esc(S.start)}</b><span class="time">${esc(S.depart)}</span></div></li>`;
   rows.forEach((r,i)=>{const c=r.c;
     h+=`<li class="leg"><span class="lbl">이동</span><button type="button" data-tv="${i}" data-d="-5" aria-label="${esc(c.name)} 이동시간 5분 줄이기">−5</button>`+
        `<span class="min">${+c.travel||0}분</span><button type="button" data-tv="${i}" data-d="5" aria-label="${esc(c.name)} 이동시간 5분 늘리기">+5</button>`+
        `<a href="tmap://search?name=${encodeURIComponent(c.addr)}">T맵</a></li>`;
-    h+=`<li class="stop ${c.done?'completed':''}"><div class="head"><div class="num">${i+1}</div><div class="who"><b>${esc(c.name)}</b><span class="time">${fmt(r.start)} 도착 · ${fmt(r.end)} 끝 · 설치 ${workMin(c)}분</span></div></div>`+
+    h+=`<li class="stop ${c.done?'completed':''}"><div class="head"><div class="num">${i+1}</div><div class="who"><b>${esc(c.name)}</b><span class="time">${fmt(r.start)} 도착 · ${fmt(r.end)} 끝 · 설치 ${workMin(c)}분</span>${c.doneAt?`<small>실제 완료 ${esc(c.doneAt)}</small>`:''}</div></div>`+
        `<div class="tags"><span class="tag slot">${r.sl.label}</span>${r.flags.map(f=>`<span class="tag ${f[0]}">${esc(f[1])}</span>`).join('')}</div>`+
        `<p class="addr">${esc(c.addr)}</p>`+
        (c.prod||c.memo?`<p class="addr">${esc(c.prod)}${c.prod&&c.memo?' · ':''}${esc(c.memo)}</p>`:'')+
@@ -408,8 +448,8 @@ function render(){
   $('stops').innerHTML=rows.length?h:'<li class="hint">아직 고객이 없어요. ① 고객 넣기에서 추가하세요.</li>';
   const pc=precallList(rows);
   $('precall').innerHTML=pc.length?pc.map(p=>`<li><b>${p.i+1}번 ${esc(p.c.name)}</b> ${p.c.phone?`<a href="tel:${digits(p.c.phone)}">실제 ${esc(p.c.phone)}</a>`:''}${p.c.safePhone?` <a href="tel:${digits(p.c.safePhone)}">안심 ${esc(p.c.safePhone)}</a>`:''}${p.c.phone2?` <a href="tel:${digits(p.c.phone2)}">2차 ${esc(p.c.phone2)}</a>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join(''):'<li class="none">미리 전화할 곳이 없어요.</li>';
-  if(tab==='send')$('preview').srcdoc=buildHTML();
   persist();
+  if(tab==='calendar')renderCalendar();
 }
 
 /* ---------- form ---------- */
@@ -449,7 +489,7 @@ $('btn-bulk').onclick=()=>{
 let armedDel=null,armT;
 $('stops').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const d=b.dataset,L=S.list;
-  if(d.done!=null){L[+d.done].done=!L[+d.done].done;render();toast(L[+d.done].done?'배송 완료로 표시했어요':'완료 표시를 취소했어요');return}
+  if(d.done!=null){const c=L[+d.done];c.done=!c.done;c.doneAt=c.done?new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}):'';render();toast(c.done?'배송 완료로 표시했어요':'완료 표시를 취소했어요');return}
   if(d.copyaddr!=null){navigator.clipboard.writeText(L[+d.copyaddr].addr).then(()=>toast('주소를 복사했어요'),()=>toast('주소 복사가 안 됐어요'));return}
   if(d.tv!=null){const v=x=>Math.max(0,(+x||0)+(+d.d));if(d.tv==='end')S.endTravel=v(S.endTravel);else L[+d.tv].travel=v(L[+d.tv].travel);render();return}
   if(d.up){const i=+d.up;[L[i-1],L[i]]=[L[i],L[i-1]]}
@@ -491,74 +531,10 @@ function recommendOrder(){
 $('btn-sort').onclick=()=>{recommendOrder();render();toast('시간 약속을 먼저 맞추고 지역을 묶었어요. 이동 시간은 내비로 확인하세요.')};
 let clearArmed=false,clearT;
 $('btn-clear').onclick=e=>{const b=e.currentTarget;
-  if(!clearArmed){clearArmed=true;b.textContent='한 번 더 누르면 전부 지워요';b.classList.add('armed');clearTimeout(clearT);clearT=setTimeout(()=>{clearArmed=false;b.textContent='전부 지우기';b.classList.remove('armed')},4000);return}
-  clearArmed=false;b.textContent='전부 지우기';b.classList.remove('armed');S.list=[];S.contacts=[];S.example=false;setEditing(null);render();toast('전부 지웠어요');showTab('add')};
-['date','depart','start','end'].forEach(k=>$('s-'+k).addEventListener('change',e=>{S[k]=e.target.value;render()}));
-
-/* ---------- outputs ---------- */
-function shortDate(){if(!S.date)return'';const d=new Date(S.date+'T00:00');return (d.getMonth()+1)+'/'+d.getDate()+'('+'일월화수목금토'[d.getDay()]+')'}
-function section(m){return m<720?'오전':m<780?'점심 무렵':m<1020?'오후':'17시 이후'}
-function buildHTML(){
-  const {rows,home}=compute();const pc=precallList(rows);const title=(shortDate()+' 소파 배송 순서').trim();
-  const css=`:root{--bg:#f4f6f8;--card:#fff;--ink:#17202a;--mu:#5b6876;--ln:#d9dfe6;--ac:#1b5a8c;--aci:#fff;--bad:#b0261d;--badbg:#fde5e2;--wr:#9a5400;--wrbg:#fff0d6;--cl:#6a3c9f;--clbg:#efe6fa;--tg:#e8ecf0;--ok:#1d7546}
-@media (prefers-color-scheme:dark){:root{--bg:#10151b;--card:#1a2129;--ink:#eef2f6;--mu:#a3b0bd;--ln:#334050;--ac:#74b4ea;--aci:#0b1824;--bad:#ff8f85;--badbg:#401d1a;--wr:#f2ad52;--wrbg:#3a2a12;--cl:#cba8f4;--clbg:#2e2242;--tg:#242e39;--ok:#62c98f;color-scheme:dark}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 "Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;padding:16px}
-.w{max-width:640px;margin:0 auto}h1{font-size:23px;margin:0 0 4px}.sub{color:var(--mu);margin:0 0 16px;font-size:15px}
-.pre{background:var(--clbg);border-radius:12px;padding:12px 14px;margin-bottom:16px}.pre h2{font-size:17px;margin:0 0 8px;color:var(--cl)}
-.pre li{margin-bottom:8px}.pre .why{display:block;color:var(--mu);font-size:15px}.pre ul{margin:0;padding-left:18px}.pre a{color:var(--ink);font-weight:700}
-ol{list-style:none;margin:0;padding:0}.sep{font-weight:700;color:var(--mu);font-size:15px;margin:18px 0 8px;border-bottom:1px solid var(--ln);padding-bottom:4px}
-.card{position:relative;background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;margin-bottom:12px}
-.card>input{position:absolute;opacity:0;pointer-events:none}
-.top{display:flex;gap:12px;align-items:center}.no{flex:none;width:46px;height:46px;border-radius:50%;background:var(--ac);color:var(--aci);display:grid;place-items:center;font-weight:700;font-size:20px;cursor:pointer}
-.who b{font-size:20px;display:block}.eta{color:var(--ac);font-weight:700;font-size:17px}
-.tags{margin:8px 0 4px;display:flex;flex-wrap:wrap;gap:4px}.t{font-size:14px;font-weight:700;padding:2px 9px;border-radius:99px;background:var(--tg);color:var(--mu)}
-.t.bad{background:var(--badbg);color:var(--bad)}.t.warn{background:var(--wrbg);color:var(--wr)}.t.call{background:var(--clbg);color:var(--cl)}
-.addr{margin:6px 0 2px;font-weight:600}.prod,.memo{margin:2px 0;color:var(--mu);font-size:16px}.memo{color:var(--wr)}
-.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.btns a{flex:1 1 auto;text-align:center;text-decoration:none;font-weight:700;font-size:17px;padding:13px 12px;border-radius:12px;border:1px solid var(--ln);color:var(--ink);background:var(--bg)}
-.btns a.tel{background:var(--ac);color:var(--aci);border-color:var(--ac)}
-.card>input:checked~*{opacity:.45}.card>input:checked~.top .who b{text-decoration:line-through}.card>input:checked~.top .no{background:var(--ok);opacity:1}
-.end{background:var(--card);border:1px dashed var(--ln);border-radius:12px;padding:12px;margin-top:8px;color:var(--mu)}.end b{color:var(--ink)}
-.foot{color:var(--mu);font-size:14px;margin-top:16px}`;
-  let b=`<div class="w"><h1>${esc(title)}</h1><p class="sub">출발 ${esc(S.depart)} ${esc(S.start)} · ${rows.length}곳 · 동그라미 번호를 누르면 완료 표시</p>`;
-  if(pc.length)b+=`<div class="pre"><h2>전날 미리 전화할 곳</h2><ul>${pc.map(p=>`<li><b>${p.i+1}. ${esc(p.c.name)}</b> ${p.c.phone?`<a href="tel:${digits(p.c.phone)}">실제 ${esc(p.c.phone)}</a>`:''}${p.c.safePhone?` <a href="tel:${digits(p.c.safePhone)}">안심 ${esc(p.c.safePhone)}</a>`:''}${p.c.phone2?` · 2차 <a href="tel:${digits(p.c.phone2)}">${esc(p.c.phone2)}</a>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join('')}</ul></div>`;
-  b+='<ol>';let prev='';
-  rows.forEach((r,i)=>{const c=r.c;const s=section(r.start);if(s!==prev){b+=`<li class="sep">${s}</li>`;prev=s}
-    const tags=[`<span class="t">${r.sl.label}</span>`].concat(r.flags.map(f=>`<span class="t ${f[0]}">${esc(f[1])}</span>`)).join('');
-    b+=`<li class="card"><input type="checkbox" id="d${i}" ${c.done?'checked':''}><div class="top"><label class="no" for="d${i}">${i+1}</label><div class="who"><b>${esc(c.name)}</b><span class="eta">${fmt(r.start)} 도착 예상 · 설치 ${workMin(c)}분</span></div></div>`+
-      `<div class="tags">${tags}</div><p class="addr">${esc(c.addr)}</p>${c.prod?`<p class="prod">${esc(c.prod)}</p>`:''}${c.memo?`<p class="memo">${esc(c.memo)}</p>`:''}`+
-      `<div class="btns">${c.phone?`<a class="tel" href="tel:${digits(c.phone)}">📞 실제 ${esc(c.phone)}</a>`:''}${c.safePhone?`<a href="tel:${digits(c.safePhone)}">안심 ${esc(c.safePhone)}</a>`:''}${c.phone2?`<a href="tel:${digits(c.phone2)}">2차 ${esc(c.phone2)}</a>`:''}<a href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵 검색</a></div></li>`;
-  });
-  b+=`</ol><div class="end">마지막 → <b>${esc(S.end)}</b> 귀가 예상 <b>${rows.length?fmt(home):'-'}</b></div>`;
-  b+=`<p class="foot">3.5톤 화물차 · 높이 3.40m. 이동시간은 임시값이며 화물차 도로 제한과 실시간 교통을 반영하지 않습니다. T맵 차량 설정과 현장 표지판을 확인하세요.</p></div>`;
-  return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>${css}</style></head><body>${b}</body></html>`;
-}
-function buildTXT(){
-  const {rows,home}=compute();const pc=precallList(rows);const L=[];
-  L.push((shortDate()+' 소파 배송 순서').trim());L.push('출발 '+S.depart+' '+S.start);L.push('');
-  if(pc.length){L.push('[전날 미리 전화]');pc.forEach(p=>L.push('- '+(p.i+1)+'. '+p.c.name+(p.c.phone?' / 010 '+p.c.phone:'')+(p.c.safePhone?' / 0508 '+p.c.safePhone:'')+(p.c.phone2?' / 2차 '+p.c.phone2:'')+' ('+p.why.join(', ')+')'));L.push('')}
-  let prev='';
-  rows.forEach((r,i)=>{const c=r.c;const s=section(r.start);if(s!==prev){L.push('── '+s+' ──');prev=s}
-    L.push((i+1)+'. '+fmt(r.start)+' '+c.name+' ['+[r.sl.label].concat(r.flags.map(f=>f[1])).join(', ')+']');
-    L.push('   '+c.addr);
-    if(c.phone||c.safePhone||c.phone2)L.push('   ☎ '+[c.phone?'010 '+c.phone:'',c.safePhone?'0508 '+c.safePhone:'',c.phone2?'2차 '+c.phone2:''].filter(Boolean).join(' / '));
-    if(c.prod)L.push('   제품: '+c.prod);
-    if(c.memo)L.push('   메모: '+c.memo);
-  });
-  L.push('');L.push('귀가 '+S.end+' 예상 '+(rows.length?fmt(home):'-'));
-  return L.join('\n');
-}
-function fname(ext){return (S.date||'배송')+'_소파배송순서.'+ext}
-function msg(t){$('out-msg').textContent=t}
-async function save(ext,data){
-  let dl=null;try{dl=window.claude&&window.claude.use?await window.claude.use('downloads'):null}catch(e){dl=null}
-  if(dl){try{await dl.save({filename:fname(ext),data});msg('✓ '+fname(ext)+' 저장했어요.')}catch(e){msg(e&&e.code==='declined'?'저장을 취소했어요.':'여기서는 저장이 안 돼요. "글자로 복사"를 써 주세요.')}return}
-  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:ext==='html'?'text/html':'text/plain'}));a.download=fname(ext);document.body.appendChild(a);a.click();a.remove();msg('✓ '+fname(ext)+' 저장을 시작했어요.')}catch(e){msg('저장이 안 돼요. "글자로 복사"를 써 주세요.')}
-}
-$('btn-html').onclick=()=>save('html',buildHTML());
-$('btn-txt').onclick=()=>save('txt',buildTXT());
-$('btn-copy').onclick=()=>{const t=buildTXT();const ta=$('txt-out');
-  const fallback=()=>{ta.hidden=false;ta.value=t;ta.focus();ta.select();msg('자동 복사가 안 돼요. 아래 글을 길게 눌러 복사하세요.')};
-  try{navigator.clipboard.writeText(t).then(()=>{ta.hidden=true;msg('✓ 복사했어요. 카톡이나 메모에 붙여 넣으세요.');toast('복사했어요')},fallback)}catch(e){fallback()}};
+  if(!clearArmed){clearArmed=true;b.textContent='한 번 더 누르면 이 날짜를 비워요';b.classList.add('armed');clearTimeout(clearT);clearT=setTimeout(()=>{clearArmed=false;b.textContent='이 날짜 비우기';b.classList.remove('armed')},4000);return}
+  clearArmed=false;b.textContent='이 날짜 비우기';b.classList.remove('armed');S.list=[];S.contacts=[];S.example=false;setEditing(null);render();toast(S.date+' 코스를 비웠어요');showTab('add')};
+['depart','start','end'].forEach(k=>$('s-'+k).addEventListener('change',e=>{S[k]=e.target.value;render()}));
+$('s-date').addEventListener('change',e=>openDay(e.target.value));
 
 /* ---------- client-side import ---------- */
 let pending=[];
