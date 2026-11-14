@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1b5a8c">
+<meta name="theme-color" content="#176479">
 <meta name="description" content="한샘 소파 배송 순서를 만들고 현장에서 조정하는 도구">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -155,6 +155,78 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
 .review-item.bad{border-color:var(--warn);background:var(--warn-soft)}
 .action-links{display:flex;flex-wrap:wrap;gap:8px}.action-links a,.action-links button{flex:1 1 130px;text-decoration:none;font-size:16px;min-height:48px;padding:7px}
 @media (max-width:380px){.seg label{font-size:15px}.chips{grid-template-columns:1fr}.ctl{grid-template-columns:1fr 1fr}}
+/* Driver view: time, phone, map and call changes stay easy to find. */
+:root{--bg:#f7f9fa;--ink:#17252c;--muted:#53636c;--line:#dce4e8;--accent:#176479;--accent-soft:#e3f0f2;--call:#76522f;--call-soft:#f8efe2;--tag-soft:#eef2f3}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#111a1e;--panel:#1b272c;--ink:#eef4f5;--muted:#afbdc2;--line:#384a50;--accent:#80c8d5;--accent-soft:#1e3c43;--call:#e4bd89;--call-soft:#3d3224;--tag-soft:#29383d}}
+:root[data-theme="dark"]{--bg:#111a1e;--panel:#1b272c;--ink:#eef4f5;--muted:#afbdc2;--line:#384a50;--accent:#80c8d5;--accent-soft:#1e3c43;--call:#e4bd89;--call-soft:#3d3224;--tag-soft:#29383d}
+body{font-size:17px;padding-inline:max(16px,env(safe-area-inset-left,0px));padding-block:18px calc(98px + env(safe-area-inset-bottom,0px))}
+.wrap{gap:18px}
+h1{font-size:25px;letter-spacing:-.035em}
+h2{font-size:20px;letter-spacing:-.025em}
+.panel{border-radius:20px;padding:19px;box-shadow:0 2px 12px rgba(16,36,43,.035)}
+.lead{font-size:15px}
+.route-section{display:flex;flex-direction:column;gap:12px}
+.route-title{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.route-title button{min-height:44px;padding:7px 12px;font-size:15px;border-color:var(--accent);color:var(--accent)}
+.summary{gap:8px}
+.sbox{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px 14px}
+.sbox.home{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.sbox.home span,.sbox.home strong{color:var(--accent-ink)}
+.sbox.home strong{font-size:34px}
+.sbox strong{font-size:23px}
+.summary-foot{grid-column:1/-1;margin:0;padding:0 3px;color:var(--muted);font-size:14px}
+.summary-foot small{display:block;font-size:12px}
+.precall-panel{background:var(--call-soft);border-color:transparent;gap:8px}
+.precall-panel h2{color:var(--call)}
+.precall li{background:var(--panel);padding:10px 12px}
+.precall b{font-size:17px}
+.precall a{color:var(--accent);font-weight:700;text-decoration:none}
+ol.stops{gap:10px}
+.route-endpoint{list-style:none;color:var(--muted);font-size:15px;font-weight:700;padding:3px 4px;display:flex;align-items:center;flex-wrap:wrap;gap:5px}
+.route-endpoint button{min-height:40px;font-size:14px;padding:4px 8px}
+.stop-card{border:1px solid var(--line);border-radius:20px;padding:17px;gap:12px;box-shadow:0 2px 12px rgba(16,36,43,.035)}
+.stop-card.completed{opacity:.78}
+.stop-top{display:flex;gap:13px;align-items:center}
+.stop-card .num{width:44px;height:44px;background:var(--accent-soft);color:var(--accent);font-size:20px}
+.stop-heading{min-width:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.stop-heading h3{margin:0;font-size:22px;line-height:1.2}
+.stop-eta{color:var(--accent);font-size:26px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.stop-eta small{font-size:13px;display:block;font-weight:600;margin-top:5px}
+.stop-card .addr{font-size:16px;line-height:1.45;color:var(--ink)}
+.stop-card .tags{gap:5px}
+.stop-card .tag{font-size:13px;padding:3px 8px}
+.stop-main-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.stop-main-actions a{min-height:58px;padding:8px;font-size:18px;text-decoration:none}
+.stop-main-actions .phone-action{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.stop-main-actions .map-action{background:var(--accent-soft);border-color:var(--accent-soft);color:var(--accent)}
+.stop-main-actions .map-action:only-child{grid-column:1/-1}
+.stop-secondary{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stop-secondary>button,.stop-secondary>details>summary{min-height:48px;border:1px solid var(--line);border-radius:12px;background:var(--bg);font-size:15px;font-weight:700;padding:8px;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer}
+.stop-secondary>details{min-width:0}
+.stop-secondary>details[open]{grid-column:1/-1;order:3}
+.stop-secondary>details[open]>summary{margin-bottom:10px}
+.stop-secondary>.done-action{color:var(--ok)}
+.adjust-fields{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:12px}
+.adjust-fields .field>span{font-size:15px}
+.adjust-fields select{width:100%;min-height:52px}
+.adjust-fields .big{font-size:17px;min-height:58px}
+.more-actions{border-top:1px solid var(--line);padding-top:5px}
+.more-actions>summary{color:var(--muted);font-size:15px;min-height:36px}
+.more-body{display:flex;flex-direction:column;gap:10px;padding-top:10px}
+.more-body p{margin:0;font-size:15px;color:var(--muted)}
+.travel-adjust{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:15px}
+.travel-adjust span{flex:1}
+.travel-adjust button{font-size:14px;min-height:42px;padding:5px 8px}
+.extra-phones{display:flex;gap:10px;flex-wrap:wrap}
+.extra-phones a{color:var(--accent);font-weight:700;font-size:15px}
+.ctl{grid-template-columns:repeat(2,minmax(0,1fr))}
+.ctl button{font-size:15px;min-height:46px}
+nav.tabs{padding:7px max(8px,env(safe-area-inset-right,0px)) calc(7px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));box-shadow:0 -3px 18px rgba(16,36,43,.06)}
+nav.tabs .in{gap:4px}
+nav.tabs button{border-radius:12px;min-height:62px;background:transparent;font-size:15px;letter-spacing:-.02em}
+nav.tabs button small{font-size:11px}
+nav.tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+@media (max-width:380px){.stop-main-actions a{font-size:16px}.route-title button{font-size:14px}.stop-heading h3{font-size:20px}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 </style>
 
@@ -167,8 +239,8 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
   <!-- ===== 탭 1: 고객 넣기 ===== -->
   <section id="tab-add" class="view" aria-labelledby="t-add">
     <div class="wrap" style="gap:14px">
-      <div class="panel">
-        <h2>출발 정보</h2>
+      <details class="panel" id="trip-settings">
+        <summary>출발·귀가 설정</summary>
         <p class="hint">차량: 3.5톤 화물차 · 높이 3.40m. T맵에서 차량 높이·중량 설정을 확인하고, 높이 제한 구간은 내비 안내와 현장 표지판을 다시 확인하세요.</p>
         <div class="two">
           <label class="field"><span>배송 날짜</span><input type="date" id="s-date"></label>
@@ -178,7 +250,7 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
           <label class="field"><span>출발하는 곳</span><input type="text" id="s-start"></label>
           <label class="field"><span>마지막 귀가</span><input type="text" id="s-end"></label>
         </div>
-      </div>
+      </details>
 
       <details class="panel" id="add-panel">
         <summary id="form-title">직접 고객 추가</summary>
@@ -218,27 +290,14 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
       </details>
 
       <div class="panel" id="photo-panel">
-        <h2>① 의뢰서 사진 넣기</h2>
-        <p class="hint">담당자가 보낸 출고의뢰서와 고객 연락처 목록 사진을 모두 선택하세요. 읽힌 고객으로 코스를 바로 만듭니다.</p>
+        <h2>사진 넣으면 코스 완성</h2>
+        <p class="hint">담당자가 보낸 출고의뢰서와 연락처 목록 사진을 한 번에 선택하세요.</p>
         <label class="upload-label">📷 오늘 받은 사진 선택<input type="file" id="import-images" accept="image/*" multiple></label>
         <p class="import-status" id="import-status" role="status">선택한 사진이 없습니다.</p>
         <div class="review" id="import-review"></div>
         <button class="primary big" id="import-commit" type="button" hidden>고친 고객 코스에 추가</button>
-        <p class="hint">글자가 흐려 못 읽은 항목만 아래에 남습니다. 코스가 나온 뒤에도 주소·전화·시간을 고칠 수 있어요. 첫 사진 인식에는 인터넷이 필요합니다.</p>
+        <p class="hint">코스가 나오면 주소·시간·번호만 확인해 주세요. 첫 사진 인식에는 인터넷이 필요합니다.</p>
       </div>
-
-      <details class="panel">
-        <summary>② 고객 목록 CSV·TSV 넣기 (010 번호)</summary>
-        <p class="hint">엑셀에서 CSV로 저장한 파일 또는 탭으로 구분된 표를 선택하세요. 열 이름: 고객명, 고객연락처, 설치주소.</p>
-        <input type="file" id="import-table" accept=".csv,.tsv,text/csv,text/tab-separated-values">
-      </details>
-
-      <details class="panel">
-        <summary>여러 명 한꺼번에 붙여넣기</summary>
-        <p class="hint">한 줄에 한 명씩 <b>이름 | 주소 | 전화 | 시간 | 메모</b>. 시간은 오전·오후·상관없음.</p>
-        <textarea id="bulk" rows="5" placeholder="홍길동 | 경기 안산시 상록구 ... | 010-1111-2222 | 오전 | 전날 해피콜"></textarea>
-        <button type="button" id="btn-bulk" class="big">붙여넣은 고객 모두 추가</button>
-      </details>
     </div>
   </section>
 
@@ -247,22 +306,20 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
     <div class="wrap" style="gap:14px">
       <p class="example" id="example-note">연습용 예시 코스입니다.</p>
       <p class="example" id="review-alert" hidden></p>
-      <div class="summary" id="summary"></div>
-      <div class="panel">
-        <h2>전날 미리 전화할 곳</h2>
+      <div class="panel precall-panel" id="precall-panel" hidden>
+        <h2>먼저 연락할 고객</h2>
         <ul class="precall" id="precall"></ul>
       </div>
-      <div class="panel">
-        <h2>오늘의 예상 시간표</h2>
-        <p class="hint">도착·설치 종료·귀가 시간을 모두 보여줍니다. 이동 시간은 처음에 구간마다 30분으로 잡으므로 T맵에서 확인한 뒤 −5 / +5로 맞추세요.</p>
+      <div class="route-section">
+        <div class="route-title"><h2>방문 순서</h2><button type="button" id="btn-sort">남은 코스 다시 짜기</button></div>
+        <p class="hint">전화 후 약속 시간을 바꾸면 남은 방문 순서를 다시 계산합니다.</p>
         <ol class="stops" id="stops"></ol>
       </div>
-      <div class="row">
-        <button type="button" id="btn-sort">시간 약속 우선으로 순서 추천</button>
-        <button type="button" class="danger" id="btn-clear">이 날짜 비우기</button>
-      </div>
+      <div class="summary" id="summary"></div>
       <details class="panel">
-        <summary>순서 정하는 요령</summary>
+        <summary>시간 계산 기준 · 코스 관리</summary>
+        <p class="hint">이동 시간은 구간마다 30분으로 시작하는 임시값입니다. T맵에서 실제 시간을 확인해 각 고객 카드에서 고쳐 주세요.</p>
+        <button type="button" class="danger" id="btn-clear">이 날짜 비우기</button>
         <ol>
           <li>시간 약속 우선: 오전은 13시 전, 오후는 13~17시 안에 도착.</li>
           <li>출발: 그레이박스(안산시 단원구 해봉로 232) 06:40.</li>
@@ -299,7 +356,7 @@ nav.tabs button[aria-selected="true"]{background:var(--accent);color:var(--accen
 <nav class="tabs" aria-label="화면 바꾸기">
   <div class="in" role="tablist">
     <button type="button" role="tab" data-tab="add" id="t-add">📷 사진 넣기<small id="cnt-add"></small></button>
-    <button type="button" role="tab" data-tab="order" id="t-order">🚚 오늘 코스<small id="cnt-order"></small></button>
+    <button type="button" role="tab" data-tab="order" id="t-order">🚚 배송 코스<small id="cnt-order"></small></button>
     <button type="button" role="tab" data-tab="calendar" id="t-calendar">▦ 기록 달력<small id="cnt-calendar"></small></button>
   </div>
 </nav>
@@ -354,10 +411,11 @@ document.querySelectorAll('nav.tabs button').forEach(b=>b.onclick=()=>showTab(b.
 /* ---------- calc ---------- */
 function workMin(c){if(+c.work>0)return +c.work;let n=/리클라이너|전동/.test(c.prod||'')?30:15;if(c.noelev)n+=15;if(c.bs)n+=15;if(/스툴/.test(c.prod||''))n+=5;if(/멀티|모듈|유닛/.test(c.prod||''))n+=10;return n}
 function softUnmet(c,start){const memo=c.memo||'';return /가능하면\s*늦게|가장\s*늦게|늦은\s*시간/.test(memo)&&start<900?'늦은 방문 요청 확인':/가능하면\s*이르게|가장\s*이르게|이른\s*시간/.test(memo)&&start>660?'이른 방문 요청 확인':''}
+function visitWindow(c){if(/^\d{2}:\d{2}$/.test(c.promiseTime||'')){const s=toMin(c.promiseTime);return {label:c.promiseTime+' 약속',s,e:s+30}}return SLOT[c.slot]||SLOT.any}
 function compute(day=S){
   let t=toMin(day.depart);const rows=[];
   day.list.forEach(c=>{
-    const sl=SLOT[c.slot]||SLOT.any;const reach=t+(+c.travel||0);
+    const sl=visitWindow(c);const reach=t+(+c.travel||0);
     const start=Math.max(reach,sl.s);const wait=start-reach;const end=start+workMin(c);
     const flags=[];
     if(start>=sl.e)flags.push(['bad',sl.label+' 시간 넘김']);
@@ -371,7 +429,8 @@ function compute(day=S){
     if(softUnmet(c,start))flags.push(['call','방문 순서 요청 확인']);
     if(c.verified===false)flags.push(['warn','사진 글자 확인']);
     if(!c.prod&&!c.work)flags.push(['warn','제품 확인 · 기본 15분 적용']);
-    rows.push({c,start,end,wait,flags,sl});t=end;
+    if(c.callMemo)flags.push(['call','통화 내용 반영']);
+    rows.push({c,start,end,wait,flags,sl});t=c.done&&/^\d{2}:\d{2}$/.test(c.doneAt||'')?Math.max(toMin(day.depart),toMin(c.doneAt)):end;
   });
   return {rows,home:t+(+day.endTravel||0),last:t};
 }
@@ -419,34 +478,30 @@ function render(){
   const reviewCount=rows.filter(r=>r.c.verified===false).length;
   $('review-alert').hidden=!reviewCount&&!pending?.length&&!S.contacts.length;
   $('review-alert').textContent=(reviewCount?`사진에서 읽은 ${reviewCount}곳은 주소·시간·번호를 카드의 ‘고치기’에서 확인하세요. `:'')+(S.contacts.length?`010 목록 ${S.contacts.length}명은 의뢰서와 이름이 맞지 않아 아직 연결되지 않았습니다. `:'')+(pending?.length?`이름·주소를 못 읽은 ${pending.length}건은 ① 고객 넣기에서 수정하세요.`:'');
-  $('head-line').textContent=[dateLabel(),S.depart+' 출발',rows.length+'곳'].filter(Boolean).join(' · ');
-  $('cnt-add').textContent=rows.length+'명 넣음';
-  const bad=rows.filter(r=>r.start>=r.sl.e).length,late=rows.filter(r=>r.start>=1020).length;
+  $('head-line').textContent=[dateLabel(),rows.length+'곳 배송',S.depart+' 출발'].filter(Boolean).join(' · ');
+  $('cnt-add').textContent=rows.length+'곳';
+  const bad=rows.filter(r=>r.start>=r.sl.e).length;
   $('cnt-order').textContent=bad?('⚠ '+bad+'곳 시간 넘김'):(rows.length?S.date.slice(5).replace('-','/')+' · 귀가 '+fmt(home):'');
   const travel=rows.reduce((sum,r)=>sum+(+r.c.travel||0),0)+(+S.endTravel||0),work=rows.reduce((sum,r)=>sum+workMin(r.c),0),wait=rows.reduce((sum,r)=>sum+r.wait,0);
   $('summary').innerHTML=
-    `<div class="sbox home"><span>${esc(S.date)} · ${esc(S.end)} 귀가 예상</span><strong>${rows.length?fmt(home):'-'}</strong></div>`+
+    `<div class="sbox home"><span>귀가 예상 · 팔곡화물차고지</span><strong>${rows.length?fmt(home):'-'}</strong></div>`+
     `<div class="sbox"><span>배송 완료</span><strong>${rows.filter(r=>r.c.done).length}/${rows.length}곳</strong></div>`+
-    `<div class="sbox"><span>시간 넘김</span><strong style="color:${bad?'var(--bad)':'var(--ok)'}">${bad?bad+'곳':'없음'}</strong></div>`+
-    `<div class="sbox"><span>이동 예상</span><strong>${rows.length?travel:0}분</strong></div>`+
-    `<div class="sbox"><span>설치·대기 예상</span><strong>${rows.length?work+wait:0}분</strong></div>`;
-  let h=`<li class="stop endpt"><div class="num">출발</div><div class="who"><b>${esc(S.start)}</b><span class="time">${esc(S.depart)}</span></div></li>`;
+    `<div class="sbox"><span>시간 주의</span><strong style="color:${bad?'var(--bad)':'var(--ok)'}">${bad?bad+'곳':'없음'}</strong></div>`+
+    `<p class="summary-foot">이동 ${rows.length?travel:0}분 · 설치 ${rows.length?work:0}분 · 대기 ${rows.length?wait:0}분 <small>※ 이동은 임시 추정</small></p>`;
+  let h=`<li class="route-endpoint">${esc(S.depart)} · 그레이박스에서 출발</li>`;
   rows.forEach((r,i)=>{const c=r.c;
-    h+=`<li class="leg"><span class="lbl">이동</span><button type="button" data-tv="${i}" data-d="-5" aria-label="${esc(c.name)} 이동시간 5분 줄이기">−5</button>`+
-       `<span class="min">${+c.travel||0}분</span><button type="button" data-tv="${i}" data-d="5" aria-label="${esc(c.name)} 이동시간 5분 늘리기">+5</button>`+
-       `<a href="tmap://search?name=${encodeURIComponent(c.addr)}">T맵</a></li>`;
-    h+=`<li class="stop ${c.done?'completed':''}"><div class="head"><div class="num">${i+1}</div><div class="who"><b>${esc(c.name)}</b><span class="time">${fmt(r.start)} 도착 · ${fmt(r.end)} 끝 · 설치 ${workMin(c)}분</span>${c.doneAt?`<small>실제 완료 ${esc(c.doneAt)}</small>`:''}</div></div>`+
-       `<div class="tags"><span class="tag slot">${r.sl.label}</span>${r.flags.map(f=>`<span class="tag ${f[0]}">${esc(f[1])}</span>`).join('')}</div>`+
-       `<p class="addr">${esc(c.addr)}</p>`+
-       (c.prod||c.memo?`<p class="addr">${esc(c.prod)}${c.prod&&c.memo?' · ':''}${esc(c.memo)}</p>`:'')+
-       `<div class="action-links">${c.phone?`<a class="btn" href="tel:${digits(c.phone)}">☎ 010 전화</a>`:''}${c.safePhone?`<a class="btn" href="tel:${digits(c.safePhone)}">☎ 0508 전화</a>`:''}${c.phone2?`<a class="btn" href="tel:${digits(c.phone2)}">☎ 2차 전화</a>`:''}<a class="btn" href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵 검색</a><button type="button" data-done="${i}">${c.done?'완료 취소':'✓ 배송 완료'}</button></div>`+
-       `<div class="ctl"><button type="button" data-up="${i}" ${i?'':'disabled'}>▲ 위로</button><button type="button" data-down="${i}" ${i<rows.length-1?'':'disabled'}>▼ 아래로</button>`+
-       `<button type="button" data-edit="${i}">고치기</button><button type="button" class="danger" data-del="${i}">지우기</button></div></li>`;
+    const phone=c.phone||c.safePhone||c.phone2,phoneName=c.phone?'010 전화':c.safePhone?'안심번호 전화':'2차 번호 전화';
+    const visibleFlags=r.flags.filter(f=>f[0]==='bad'||f[1]==='사진 글자 확인'||f[1]==='전날 전화'||f[1]==='통화 내용 반영');
+    h+=`<li class="stop stop-card ${c.done?'completed':''}" data-index="${i}"><div class="stop-top"><span class="num">${i+1}</span><div class="stop-heading"><span class="stop-eta">${fmt(r.start)} <small>도착 예상</small></span><h3>${esc(c.name)}</h3></div></div>`+
+      `<p class="addr">${esc(c.addr)}</p><div class="tags"><span class="tag slot">${esc(r.sl.label)}</span>${visibleFlags.map(f=>`<span class="tag ${f[0]}">${esc(f[1])}</span>`).join('')}</div>`+
+      `<div class="stop-main-actions">${phone?`<a class="btn phone-action" href="tel:${digits(phone)}">☎ ${phoneName}</a>`:''}<a class="btn map-action" href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵 이동</a></div>`+
+      `<div class="stop-secondary"><details class="call-adjust"><summary>통화 후 변경</summary><div class="adjust-fields"><p class="hint">고객과 다시 약속한 시간을 적으세요. 완료한 배송은 움직이지 않습니다.</p><label class="field"><span>방문 시간대</span><select data-call-slot><option value="any" ${c.slot==='any'?'selected':''}>시간 지정 없음</option><option value="am" ${c.slot==='am'?'selected':''}>오전 9~13시</option><option value="pm" ${c.slot==='pm'?'selected':''}>오후 13~17시</option></select></label><label class="field"><span>정확한 도착 약속 (있을 때만)</span><input type="time" data-call-time value="${esc(c.promiseTime||'')}"><small>입력하면 그 시각부터 30분 안에 도착하도록 계산해요.</small></label><label class="field"><span>통화 메모</span><textarea data-call-memo placeholder="예: 14시 이후, 주차장 진입 전 전화">${esc(c.callMemo||'')}</textarea></label><button class="primary big" type="button" data-call-save="${i}">저장하고 남은 코스 다시 짜기</button></div></details><button type="button" class="done-action" data-done="${i}">${c.done?'✓ 완료됨 · 취소':'✓ 배송 완료'}</button></div>`+
+      `<details class="more-actions"><summary>이동 시간·순서·상세</summary><div class="more-body"><p>이동 ${+c.travel||0}분 · 설치 ${workMin(c)}분 · ${fmt(r.end)} 종료 예상${c.doneAt?' · 실제 완료 '+esc(c.doneAt):''}</p><div class="travel-adjust"><span>이 고객까지 이동</span><button type="button" data-tv="${i}" data-d="-5">−5분</button><button type="button" data-tv="${i}" data-d="5">+5분</button></div>${c.prod?`<p>제품: ${esc(c.prod)}</p>`:''}${c.memo?`<p>현장 메모: ${esc(c.memo)}</p>`:''}${c.callMemo?`<p>통화 메모: ${esc(c.callMemo)}</p>`:''}<div class="extra-phones">${c.phone&&c.safePhone?`<a href="tel:${digits(c.safePhone)}">안심 ${esc(c.safePhone)}</a>`:''}${c.phone2?`<a href="tel:${digits(c.phone2)}">2차 ${esc(c.phone2)}</a>`:''}</div><div class="ctl"><button type="button" data-up="${i}" ${i&&!c.done&&!rows[i-1].c.done?'':'disabled'}>▲ 위로</button><button type="button" data-down="${i}" ${i<rows.length-1&&!c.done&&!rows[i+1].c.done?'':'disabled'}>▼ 아래로</button><button type="button" data-edit="${i}">정보 수정</button><button type="button" class="danger" data-del="${i}">지우기</button></div></div></details></li>`;
   });
-  h+=`<li class="leg"><span class="lbl">귀가</span><button type="button" data-tv="end" data-d="-5" aria-label="귀가 이동시간 5분 줄이기">−5</button><span class="min">${+S.endTravel||0}분</span><button type="button" data-tv="end" data-d="5" aria-label="귀가 이동시간 5분 늘리기">+5</button></li>`;
-  h+=`<li class="stop endpt"><div class="num">도착</div><div class="who"><b>${esc(S.end)}</b><span class="time">${rows.length?fmt(home):''}</span></div></li>`;
+  h+=`<li class="route-endpoint">${rows.length?fmt(home):'--:--'} · 팔곡화물차고지 귀가 예상 <button type="button" data-tv="end" data-d="-5">−5분</button><button type="button" data-tv="end" data-d="5">+5분</button></li>`;
   $('stops').innerHTML=rows.length?h:'<li class="hint">아직 고객이 없어요. ① 고객 넣기에서 추가하세요.</li>';
   const pc=precallList(rows);
+  $('precall-panel').hidden=!pc.length;
   $('precall').innerHTML=pc.length?pc.map(p=>`<li><b>${p.i+1}번 ${esc(p.c.name)}</b> ${p.c.phone?`<a href="tel:${digits(p.c.phone)}">실제 ${esc(p.c.phone)}</a>`:''}${p.c.safePhone?` <a href="tel:${digits(p.c.safePhone)}">안심 ${esc(p.c.safePhone)}</a>`:''}${p.c.phone2?` <a href="tel:${digits(p.c.phone2)}">2차 ${esc(p.c.phone2)}</a>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join(''):'<li class="none">미리 전화할 곳이 없어요.</li>';
   persist();
   if(tab==='calendar')renderCalendar();
@@ -475,43 +530,34 @@ $('btn-save').onclick=()=>{
   window.scrollTo({top:$('add-panel').offsetTop-10});
 };
 $('btn-cancel').onclick=()=>{setEditing(null);showTab('order')};
-$('btn-bulk').onclick=()=>{
-  const lines=$('bulk').value.split(/\n/).map(l=>l.trim()).filter(Boolean);if(!lines.length){toast('붙여넣은 내용이 없어요');return}
-  dropExample();
-  lines.forEach(l=>{const p=l.split(/\s*[|\t]\s*/);const memo=p[4]||'';const tm=p[3]||'';
-    S.list.push({id:uid(),name:p[0]||'',addr:p[1]||'',phone:p[2]||'',phone2:'',slot:/오전/.test(tm)?'am':/오후/.test(tm)?'pm':'any',
-      noelev:/엘(리)?베(이터)?\s*(없|X|N)|계단/i.test(memo),bs:/BS|수거/i.test(memo),single:/암체어|단품/.test(memo),call:/해피콜|전날/.test(memo),sorry:false,prod:'',memo,travel:30,work:''});
-  });
-  $('bulk').value='';render();toast(lines.length+'명 추가했어요');showTab('order');
-};
-
 /* ---------- list actions ---------- */
 let armedDel=null,armT;
 $('stops').addEventListener('click',e=>{
   const b=e.target.closest('button');if(!b)return;const d=b.dataset,L=S.list;
   if(d.done!=null){const c=L[+d.done];c.done=!c.done;c.doneAt=c.done?new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false}):'';render();toast(c.done?'배송 완료로 표시했어요':'완료 표시를 취소했어요');return}
+  if(d.callSave!=null){const i=+d.callSave,c=L[i],card=b.closest('.stop-card');c.slot=card.querySelector('[data-call-slot]').value;c.promiseTime=card.querySelector('[data-call-time]').value;c.callMemo=card.querySelector('[data-call-memo]').value.trim();recommendOrder();render();toast('통화 내용을 저장하고 남은 코스를 다시 짰어요');return}
   if(d.copyaddr!=null){navigator.clipboard.writeText(L[+d.copyaddr].addr).then(()=>toast('주소를 복사했어요'),()=>toast('주소 복사가 안 됐어요'));return}
   if(d.tv!=null){const v=x=>Math.max(0,(+x||0)+(+d.d));if(d.tv==='end')S.endTravel=v(S.endTravel);else L[+d.tv].travel=v(L[+d.tv].travel);render();return}
-  if(d.up){const i=+d.up;[L[i-1],L[i]]=[L[i],L[i-1]]}
-  else if(d.down){const i=+d.down;[L[i+1],L[i]]=[L[i],L[i+1]]}
-  else if(d.del){const i=+d.del;
-    if(armedDel!==i){render();armedDel=i;const nb=$('stops').querySelector(`[data-del="${i}"]`);nb.textContent='정말 지우기';nb.classList.add('armed');clearTimeout(armT);armT=setTimeout(()=>{armedDel=null;render()},4000);return}
+  if(d.up!=null){const i=+d.up;if(i<1||L[i].done||L[i-1].done)return;[L[i-1],L[i]]=[L[i],L[i-1]]}
+  else if(d.down!=null){const i=+d.down;if(i>=L.length-1||L[i].done||L[i+1].done)return;[L[i+1],L[i]]=[L[i],L[i+1]]}
+  else if(d.del!=null){const i=+d.del;
+    if(armedDel!==i){armedDel=i;b.textContent='정말 지우기';b.classList.add('armed');clearTimeout(armT);armT=setTimeout(()=>{armedDel=null;if(b.isConnected){b.textContent='지우기';b.classList.remove('armed')}},4000);return}
     const nm=L[i].name;L.splice(i,1);armedDel=null;if(editing!=null)setEditing(null);toast(nm+' 님 지웠어요')}
-  else if(d.edit){setEditing(+d.edit);return}
+  else if(d.edit!=null){setEditing(+d.edit);return}
   else return;
   armedDel=null;render();
 });
 function areaKey(addr){const m=String(addr||'').match(/(?:특별시|광역시|특별자치시|도)?\s*([가-힣]+시)\s*([가-힣]+구|[가-힣]+군)?/);return m?(m[1]+' '+(m[2]||'')).trim():String(addr||'').split(/\s+/).slice(0,2).join(' ')}
 function routeScore(list){
   let t=toMin(S.depart),score=0,previous=areaKey(S.start);
-  for(const c of list){const area=areaKey(c.addr),sl=SLOT[c.slot]||SLOT.any,reach=t+(+c.travel||30),start=Math.max(reach,sl.s);
+  for(const c of list){const area=areaKey(c.addr),sl=visitWindow(c),reach=t+(+c.travel||30),start=Math.max(reach,sl.s);
     if(start>=sl.e)score+=10000+(start-sl.e+1)*100;
     score+=Math.max(0,start-reach)*.3;
     if(area!==previous)score+=area.split(' ')[0]===previous.split(' ')[0]?12:30;
     if(/성남시|판교|분당/.test(c.addr)&&start<600)score+=250;
     if(/이천시|여주시|원주시|강원/.test(c.addr)&&start>=720)score+=120;
     if(softUnmet(c,start))score+=40;
-    previous=area;t=start+workMin(c);
+    previous=area;t=c.done&&/^\d{2}:\d{2}$/.test(c.doneAt||'')?Math.max(toMin(S.depart),toMin(c.doneAt)):start+workMin(c);
   }
   if(list.length){const last=list[list.length-1].addr||'';score+=/안산시/.test(last)?0:/화성시|수원시/.test(last)?35:90}
   return score;
@@ -519,7 +565,7 @@ function routeScore(list){
 function recommendOrder(){
   const fixed=S.list.filter(c=>c.done),rest=S.list.filter(c=>!c.done);if(rest.length<2)return;
   const slotOrder={am:0,any:1,pm:2};
-  let best=rest.slice().sort((a,b)=>(slotOrder[a.slot]-slotOrder[b.slot])||areaKey(a.addr).localeCompare(areaKey(b.addr),'ko'));
+  let best=rest.slice().sort((a,b)=>(visitWindow(a).s-visitWindow(b).s)||(slotOrder[a.slot]-slotOrder[b.slot])||areaKey(a.addr).localeCompare(areaKey(b.addr),'ko'));
   if(routeScore([...fixed,...rest])<routeScore([...fixed,...best]))best=rest.slice();
   for(let pass=0;pass<12;pass++){
     let candidate=best,candidateScore=routeScore([...fixed,...best]);
@@ -538,7 +584,7 @@ $('s-date').addEventListener('change',e=>openDay(e.target.value));
 
 /* ---------- client-side import ---------- */
 let pending=[];
-function baseCustomer(x={}){return {id:uid(),source:x.source||'manual',name:x.name||'',addr:x.addr||'',phone:x.phone||'',safePhone:x.safePhone||'',phone2:x.phone2||'',slot:x.slot||'any',noelev:!!x.noelev,elevSize:x.elevSize||'',bs:!!x.bs,single:!!x.single,call:!!x.call,sorry:false,prod:x.prod||'',memo:x.memo||'',travel:30,work:x.work||'',verified:x.verified!==false,done:false}}
+function baseCustomer(x={}){return {id:uid(),source:x.source||'manual',name:x.name||'',addr:x.addr||'',phone:x.phone||'',safePhone:x.safePhone||'',phone2:x.phone2||'',slot:x.slot||'any',promiseTime:x.promiseTime||'',callMemo:x.callMemo||'',noelev:!!x.noelev,elevSize:x.elevSize||'',bs:!!x.bs,single:!!x.single,call:!!x.call,sorry:false,prod:x.prod||'',memo:x.memo||'',travel:30,work:x.work||'',verified:x.verified!==false,done:false}}
 function normalizePhone(s){const d=String(s||'').replace(/\D/g,'');return d.length===11?d.replace(/^(\d{3})(\d{4})(\d{4})$/,'$1-$2-$3'):d.length===12?d.replace(/^(\d{4})(\d{4})(\d{4})$/,'$1-$2-$3'):d}
 function renderPending(){
   $('import-review').innerHTML=pending.map((c,i)=>`<div class="review-item ${!c.name||!c.addr?'bad':''}"><strong>${esc(c.file||'사진')} · ${i+1}번</strong><small>못 읽은 칸을 고친 뒤 추가하세요.</small><label class="field"><span>고객명</span><input data-pending="${i}" data-field="name" value="${esc(c.name)}"></label><label class="field"><span>설치주소</span><input data-pending="${i}" data-field="addr" value="${esc(c.addr)}"></label><label class="field"><span>실제 010 번호</span><input data-pending="${i}" data-field="phone" type="tel" value="${esc(c.phone)}"></label><label class="field"><span>안심 0508 번호</span><input data-pending="${i}" data-field="safePhone" type="tel" value="${esc(c.safePhone)}"></label><label class="field"><span>제품명</span><input data-pending="${i}" data-field="prod" value="${esc(c.prod)}"></label><label class="field"><span>방문 시간</span><select data-pending="${i}" data-field="slot"><option value="any" ${c.slot==='any'?'selected':''}>지정불가·시간 무관</option><option value="am" ${c.slot==='am'?'selected':''}>오전</option><option value="pm" ${c.slot==='pm'?'selected':''}>오후</option></select></label><label class="field"><span>메모</span><textarea data-pending="${i}" data-field="memo">${esc(c.memo)}</textarea></label><button type="button" data-remove="${i}">이 항목 빼기</button></div>`).join('');
@@ -642,17 +688,6 @@ $('import-images').addEventListener('change',async e=>{
   }catch(err){status.textContent='읽기 실패: '+(err.message||err)+'\n사진을 다시 찍거나 직접 입력해 주세요.'}
   finally{if(worker)await worker.terminate()}
 });
-function parseDelimited(text,delimiter){const rows=[],row=[];let value='',quoted=false;for(let i=0;i<text.length;i++){const ch=text[i];if(ch==='"'){if(quoted&&text[i+1]==='"'){value+='"';i++}else quoted=!quoted}else if(ch===delimiter&&!quoted){row.push(value);value=''}else if((ch==='\n'||ch==='\r')&&!quoted){if(ch==='\r'&&text[i+1]==='\n')i++;row.push(value);if(row.some(v=>v.trim()))rows.push([...row]);row.length=0;value=''}else value+=ch}row.push(value);if(row.some(v=>v.trim()))rows.push(row);return rows}
-$('import-table').addEventListener('change',async e=>{
-  const file=e.target.files[0];if(!file)return;const bytes=await file.arrayBuffer();let txt=new TextDecoder('utf-8').decode(bytes);if((txt.match(/�/g)||[]).length>3)txt=new TextDecoder('euc-kr').decode(bytes);
-  const rows=parseDelimited(txt,txt.includes('\t')?'\t':',');if(!rows.length){toast('표에서 고객을 찾지 못했어요');return}
-  const head=rows[0].map(s=>s.trim().replace(/^\uFEFF/,''));const col=(names)=>head.findIndex(x=>names.some(n=>x.includes(n)));
-  const ni=col(['고객명','이름']),ai=col(['설치주소','주소']),pi=col(['고객연락처','연락처','전화번호']);
-  if(ni<0||ai<0){toast('고객명·설치주소 열이 필요해요');return}
-  const items=rows.slice(1).filter(r=>r[ni]||r[ai]).map(r=>({...baseCustomer({source:'list',verified:false,name:(r[ni]||'').trim(),addr:(r[ai]||'').trim(),phone:normalizePhone(r[pi]||'')}),file:file.name}));
-  pending.push(...items);const result=commitPending(true);$('import-status').textContent=items.length+'명 읽고 '+result.added+'명 코스에 반영했습니다.';e.target.value='';
-});
-
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
 
 render();
