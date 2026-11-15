@@ -197,3 +197,18 @@ nav.tabs button[aria-selected=true]{border-top-color:var(--accent);color:var(--a
 @media(max-width:700px){.document-dialog{width:100%;height:100%}}
 @media(max-width:380px){.two{grid-template-columns:1fr}.chips{grid-template-columns:1fr}.route-title button{font-size:13px}.stop-heading h3{font-size:19px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+.route-title-actions{display:flex;gap:16px;flex:none}
+.precall-panel{border-left:3px solid var(--warn);padding:4px 0 4px 12px;margin:10px 0 6px}
+.precall-panel h3{margin:0 0 6px;font-size:15px;color:var(--warn)}
+.precall-panel ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.precall-panel li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--rule)}
+.precall-panel li:last-child{border-bottom:0}
+.precall-panel li div{display:flex;flex-direction:column;min-width:0}
+.precall-panel li strong{font-size:15px}
+.precall-panel li span{font-size:13px;color:var(--muted);overflow-wrap:anywhere}
+.precall-panel a{flex:none;color:var(--accent);font-weight:700;font-size:14px;min-height:38px;display:inline-flex;align-items:center}
+.stop-facts{margin:0;display:grid;grid-template-columns:auto 1fr;column-gap:12px;row-gap:3px;font-size:14px;line-height:1.45}
+.stop-facts>div{display:contents}
+.stop-facts dt{color:var(--muted);white-space:nowrap}
+.stop-facts dd{margin:0;min-width:0;overflow-wrap:anywhere;word-break:keep-all}
+.stop-facts .fact-warn dd{color:var(--warn);font-weight:600}

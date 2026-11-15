@@ -34,12 +34,8 @@ const responseFor = async(url,request)=>{
     return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:'{"order":["b","a"]}'}]}}]})};
 };
 
-test('Gemini 응답을 받아 검증된 순서만 적용한다',async()=>{
-  const flexible={...day,list:day.list.map(stop=>({...stop,slot:'any'}))};
-  const next=await planWithGemini(flexible,'test-key',responseFor);
+test('Gemini가 준 순서를 그대로 적용한다',async()=>{
+  const next=await planWithGemini(day,'test-key',responseFor);
   assert.deepEqual(next.list.map(c=>c.id),['b','a']);
-});
-
-test('시간 약속을 어기는 AI 제안은 적용하지 않는다',async()=>{
-  await assert.rejects(planWithGemini(day,'test-key',responseFor),/기존 순서를 유지/);
+  assert.equal(next.aiRecommended,true);
 });

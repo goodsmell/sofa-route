@@ -1,4 +1,4 @@
-import {compute,workMin} from './logic.js';
+import {workMin} from './logic.js';
 
 const MODEL = 'gemini-3.5-flash-lite';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
@@ -78,11 +78,5 @@ export async function planWithGemini(day, key, fetcher = fetch) {
   const content = payload.candidates?.[0]?.content?.parts?.map(part => part.text || '').join('') || '';
   let parsed;
   try { parsed = JSON.parse(content); } catch { throw new Error('AI 답변을 읽지 못했습니다.'); }
-  const suggested = applyAiOrder(day, parsed.order);
-  const before = compute(day), after = compute(suggested);
-  const missed = result => result.rows.filter(row => row.start >= row.sl.e).length;
-  if (missed(after) > missed(before) || (missed(after) === missed(before) && after.home > before.home + 90)) {
-    throw new Error('AI 제안이 시간 약속에 맞지 않아 기존 순서를 유지했습니다.');
-  }
-  return suggested;
+  return applyAiOrder(day, parsed.order);
 }
