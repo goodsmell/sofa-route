@@ -31,3 +31,16 @@ export async function loadDocument(id) {
     request.onerror = () => { db.close(); reject(request.error); };
   });
 }
+
+export async function deleteDocuments(ids) {
+  if (!ids.length) return;
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(STORE, 'readwrite');
+    const store = transaction.objectStore(STORE);
+    for (const id of new Set(ids)) store.delete(id);
+    transaction.oncomplete = () => { db.close(); resolve(); };
+    transaction.onerror = () => { db.close(); reject(transaction.error); };
+    transaction.onabort = () => { db.close(); reject(transaction.error); };
+  });
+}

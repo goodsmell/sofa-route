@@ -163,10 +163,13 @@ body.dragging-route{user-select:none}
 .calendar-record strong{display:block;margin-bottom:5px}
 .calendar-record .info-line{align-items:center;margin:3px 0}
 nav.tabs{position:fixed;z-index:20;bottom:0;left:0;right:0;background:var(--paper);border-top:1px solid var(--rule);padding:0 max(8px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(8px,env(safe-area-inset-left,0px))}
-nav.tabs .in{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+nav.tabs .in{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
 nav.tabs button{border:0;border-top:3px solid transparent;border-radius:0;background:none;color:var(--muted);min-height:65px;padding:6px 3px;display:flex;flex-direction:column;font-size:15px;font-weight:700}
 nav.tabs button small{display:block;font-size:11px;font-weight:500;line-height:1.2;margin-top:2px}
 nav.tabs button[aria-selected=true]{border-top-color:var(--accent);color:var(--accent)}
+.route-map{width:100%;height:380px;border:1px solid var(--rule);border-radius:6px;overflow:hidden;background:var(--soft)}
+.map-setup{display:flex;flex-direction:column;gap:13px}
+.map-help{color:var(--accent);font-size:15px;font-weight:700;align-self:flex-start}
 .toast{position:fixed;z-index:30;bottom:calc(76px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);max-width:calc(100% - 28px);padding:9px 13px;border-radius:5px;background:var(--ink);color:var(--paper);font-size:14px;font-weight:700;text-align:center}
 .document-overlay{position:fixed;inset:0;z-index:80;background:#0009;display:flex;justify-content:center;align-items:center}
 .document-dialog{width:min(100%,900px);height:min(100%,1000px);min-height:0;background:var(--paper);display:flex;flex-direction:column;overflow:hidden}
