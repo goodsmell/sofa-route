@@ -33,3 +33,11 @@ test('복사한 코스 텍스트에 구간 이동과 전체 시간이 들어간�
   assert.match(text,/1\. 가[^\n]*\n이동: 41\.3km · 1시간 12분\n/);
   assert.match(text,/이동: 21km · 25분\n→ 귀가/);
 });
+
+test('T맵으로 받기 전에는 가짜 30분 대신 확인 전으로 적는다',async()=>{
+  const {courseText,emptyDay}=await import('./logic.js');
+  const text=courseText({...emptyDay('2026-11-16'),list:[{id:'a',name:'가',addr:'경기 성남시',slot:'any',travel:30}]});
+  assert.doesNotMatch(text,/30분/);
+  assert.match(text,/이동: 확인 전/);
+  assert.match(text,/총 이동 확인 전/);
+});

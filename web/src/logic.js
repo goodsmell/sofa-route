@@ -301,15 +301,9 @@ export function stopFacts(c) {
 }
 const legText = (day, i) => {
   const leg = legInfo(day, i);
-  return (
-    (leg.km != null ? leg.km + "km · " : "") +
-    fmtDuration(leg.min) +
-    (leg.state === "tmap"
-      ? ""
-      : leg.state === "stale"
-        ? " (순서 바뀜)"
-        : " (기본값)")
-  );
+  return leg.state === "tmap"
+    ? leg.km + "km · " + fmtDuration(leg.min)
+    : "확인 전 (T맵 이동시간 받기 필요)";
 };
 export function courseText(day) {
   const { rows, home } = compute(day),
@@ -320,12 +314,14 @@ export function courseText(day) {
       day.date + " 배송 코스 · " + rows.length + "곳",
       "출발 " + day.depart + " " + day.start,
       "귀가 " + day.end,
-      "총 이동 " +
-        (totals.km != null ? totals.km + "km · " : "") +
-        fmtDuration(totals.min) +
-        (totals.exact ? "" : " (일부 기본값)") +
-        " · 출발~귀가 " +
-        fmtDuration(home - toMin(day.depart)),
+      totals.exact
+        ? "총 이동 " +
+          totals.km +
+          "km · " +
+          fmtDuration(totals.min) +
+          " · 출발~귀가 " +
+          fmtDuration(home - toMin(day.depart))
+        : "총 이동 확인 전 (T맵 이동시간 받기 필요)",
     ];
   if (calls.length)
     out.push(

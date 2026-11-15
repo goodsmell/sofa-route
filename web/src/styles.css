@@ -227,3 +227,5 @@ nav.tabs button[aria-selected=true]{border-top-color:var(--accent);color:var(--a
 .route-totals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:10px 0 4px}
 .route-totals span{display:block;color:var(--muted);font-size:13px}
 .route-totals strong{font-size:17px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.route-leg.loading .leg-line{background:var(--accent);opacity:.4}
+.route-leg.pending small,.route-leg.loading small{font-size:13px}
