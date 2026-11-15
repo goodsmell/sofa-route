@@ -25,6 +25,16 @@ body{margin:0;background:var(--paper);color:var(--ink);font:17px/1.5 var(--font)
 .form-fields{display:flex;flex-direction:column;gap:14px}
 .stop-heading{flex:1;justify-content:space-between}
 .route-endpoint a{color:var(--accent);font-weight:700}
+.endpoint-text{display:flex;flex:1 1 190px;min-width:0;flex-direction:column;line-height:1.45;overflow-wrap:anywhere;word-break:keep-all}
+.endpoint-text strong{color:var(--ink);font-size:15px}
+.endpoint-text span{font-weight:400}
+.endpoint-actions{display:flex;flex:none;align-items:center;gap:14px}
+.endpoint-actions button{min-height:40px;padding:3px 1px;border:0;border-bottom:1px solid var(--rule);border-radius:0;background:none;color:var(--accent);font-size:14px}
+.info-line{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;min-width:0}
+.info-line .addr,.info-line .phone-value,.info-line a{flex:1;min-width:0;overflow-wrap:anywhere;word-break:keep-all}
+.phone-line{align-items:center}
+.phone-value{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.copy-action{flex:none;min-height:38px;padding:3px 0;border:0;border-bottom:1px solid var(--rule);border-radius:0;background:none;color:var(--accent);font-size:13px}
 h1,h2,h3,p{margin-top:0}
 h1{font-size:24px;line-height:1.25;letter-spacing:-.045em;margin-bottom:5px}
 h2{font-size:20px;line-height:1.3;letter-spacing:-.035em;margin-bottom:0}
@@ -90,7 +100,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .stop-heading h3{font-size:21px;line-height:1.2;letter-spacing:-.03em;margin:0}
 .stop-eta{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;color:var(--ink)}
 .stop-eta small{display:block;margin-top:4px;font-size:12px;font-weight:600;color:var(--muted)}
-.addr{font-size:15px;color:var(--ink);line-height:1.5;overflow-wrap:anywhere;margin:0}
+.addr{font-size:15px;color:var(--ink);line-height:1.5;overflow-wrap:anywhere;word-break:keep-all;margin:0}
 .tags{display:flex;flex-wrap:wrap;column-gap:0;row-gap:3px}
 .tag{font-size:13px;color:var(--muted);font-weight:600}
 .tag+.tag::before{content:" · ";white-space:pre;color:var(--muted)}
@@ -116,7 +126,7 @@ ol.stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .travel-adjust{display:flex;align-items:center;flex-wrap:wrap;gap:7px;font-size:14px}
 .travel-adjust span{flex:1}
 .travel-adjust button{min-height:39px;padding:4px 6px;font-size:13px}
-.extra-phones{display:flex;gap:12px;flex-wrap:wrap}
+.extra-phones{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .extra-phones a{color:var(--accent);font-size:14px;font-weight:700}
 .ctl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .ctl button{min-height:44px;font-size:14px}
@@ -146,6 +156,10 @@ body.dragging-route{user-select:none}
 .calendar-detail{display:flex;flex-direction:column;gap:10px;font-size:15px}
 .calendar-detail p{margin:0}
 .calendar-detail ol{margin:0;padding-left:22px}
+.calendar-detail li{overflow-wrap:anywhere;word-break:keep-all;margin:0 0 8px}
+.calendar-record{padding:9px 0;border-bottom:1px solid var(--rule)}
+.calendar-record strong{display:block;margin-bottom:5px}
+.calendar-record .info-line{align-items:center;margin:3px 0}
 nav.tabs{position:fixed;z-index:20;bottom:0;left:0;right:0;background:var(--paper);border-top:1px solid var(--rule);padding:0 max(8px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(8px,env(safe-area-inset-left,0px))}
 nav.tabs .in{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
 nav.tabs button{border:0;border-top:3px solid transparent;border-radius:0;background:none;color:var(--muted);min-height:65px;padding:6px 3px;display:flex;flex-direction:column;font-size:15px;font-weight:700}
