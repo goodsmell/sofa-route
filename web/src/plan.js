@@ -50,9 +50,13 @@ export function customerScore(day, stops, start, end, pos) {
     const move = p ? driveMin(here, p) : 30;
     drive += move;
     const w = visitWindow(c), reach = t + move, begin = Math.max(reach, w.s);
-    if (begin >= w.e) penalty += 1000 + (begin - w.e) * 10;
-    if (prefers(c) === 'late') penalty += (stops.length - 1 - i) * 40;
-    if (prefers(c) === 'early') penalty += i * 40;
+    if (begin >= w.e && (c.slot === 'am' || c.slot === 'pm' || isFixed(c))) penalty += 1000 + (begin - w.e) * 10;
+    // 희망 순서는 약속 시간과 운전 거리보다 약한 조건이다.
+    if (prefers(c) === 'late') penalty += (stops.length - 1 - i) * 8;
+    if (prefers(c) === 'early') penalty += i * 8;
+    if (/분당|판교/.test(c.addr || '') && begin < 600) penalty += 80;
+    if (/이천|여주|원주|강원/.test(c.addr || '') && begin >= 720) penalty += 25;
+    if (t >= 1020 && move > 20) penalty += 20;
     t = begin + serviceMin(c, move);
     if (p) here = p;
   });

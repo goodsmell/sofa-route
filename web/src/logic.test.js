@@ -83,6 +83,17 @@ test('한 집 시간: 50kg 미만 30분, 이상 1시간, 이동 20분 넘으면 
   assert.equal(home,13*60+10);
 });
 
+test('계단 작업과 기존 소파 수거는 무게별 기본 시간에 추가한다',async()=>{
+  const {serviceMin,emptyDay,precallList,compute}=await import('./logic.js');
+  assert.equal(20+serviceMin({weight:30},20),30);
+  assert.equal(20+serviceMin({weight:30,noelev:true,bs:true},20),60);
+  assert.equal(20+serviceMin({weight:70,noelev:true},20),75);
+  assert.equal(35+serviceMin({weight:30},35),45);
+  const day={...emptyDay('2026-11-16'),depart:'16:45',list:[{id:'a',slot:'any',weight:30,travel:20,call:true,phone2:'01012345678'}]};
+  const calls=precallList(compute(day).rows);
+  assert.deepEqual(calls[0].why,['전날 연락 요청','늦은 도착 안내']);
+});
+
 test('배송 중 실제 도착과 다음 집 출발 시각을 이후 예상 시간에 반영한다',async()=>{
   const {compute,emptyDay}=await import('./logic.js');
   const base={...emptyDay('2026-11-16'),depart:'09:00',list:[

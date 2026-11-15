@@ -281,12 +281,13 @@ body{font-size:18px}
 .text-btn{min-height:0;padding:0;border:0;background:none;color:var(--accent);font-size:16px;text-decoration:underline;text-underline-offset:3px;display:inline}
 
 .calls{margin-top:14px;border:1px solid var(--warn);border-radius:12px;padding:0 14px}
-.calls>summary{min-height:54px;color:var(--warn);font-size:17px}
+.calls>h3{margin:0;padding:14px 0;color:var(--warn);font-size:17px}
 .calls ul{list-style:none;margin:0 0 6px;padding:0}
 .calls li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--rule)}
 .calls li div{display:flex;flex-direction:column;min-width:0}
 .calls li strong{font-size:17px}
 .calls li span{font-size:15px;color:var(--muted)}
+.calls li a:not(.round){font-size:14px;color:var(--accent);font-weight:700}
 
 .round{flex:none;width:52px;height:52px;border-radius:50%;border:1px solid var(--rule);display:inline-flex;align-items:center;justify-content:center;color:var(--accent);background:var(--paper)}
 .round svg,.btn svg{width:24px;height:24px}

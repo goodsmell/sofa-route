@@ -112,9 +112,11 @@ export const blockMin = (c) => {
   const w = weightKg(c);
   return w != null && w < 50 ? 30 : 60;
 };
-// 이동이 20분을 넘으면 넘는 만큼 더한다. 그래서 작업에 남는 시간 = 한 집 시간 - min(이동, 20)
-export const serviceMin = (c, travel) =>
-  blockMin(c) - Math.min(Math.max(+travel || 0, 0), 20);
+// 이동 20분까지는 무게별 기본 시간에 포함한다. 계단·수거·복잡한 제품은 별도 여유를 더한다.
+export const serviceMin = (c, travel) => {
+  const base = blockMin(c) - Math.min(Math.max(+travel || 0, 0), 20);
+  return +c.work > 0 ? Math.max(base, +c.work) : base + workMin(c) - 15;
+};
 export function workMin(c) {
   if (+c.work > 0) return +c.work;
   let n = /리클라이너|전동/.test(c.prod || "") ? 30 : 15;
@@ -149,7 +151,7 @@ export function compute(day) {
       wait = start - reach,
       end = start + serviceMin(c, +c.travel || 0),
       flags = [];
-    if (start >= sl.e) flags.push(["bad", sl.label + " 시간 넘김"]);
+    if (start >= sl.e && (c.slot === "am" || c.slot === "pm" || c.promiseTime)) flags.push(["bad", sl.label + " 시간 넘김"]);
     else if (start >= 1020) flags.push(["warn", "17시 넘어 도착"]);
     if (c.noelev) flags.push(["", "엘리베이터 없음"]);
     if (c.bs) flags.push(["", "기존 소파 수거"]);
@@ -177,7 +179,7 @@ export function precallList(rows) {
         /전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(c.memo || "")
       )
         why.push("전날 연락 요청");
-      if (r.start >= r.sl.e) why.push(r.sl.label + " 약속 · 시간 조율");
+      if (r.start >= r.sl.e && (c.slot === "am" || c.slot === "pm" || c.promiseTime)) why.push(r.sl.label + " 약속 · 시간 조율");
       if (r.start >= 1020) why.push("늦은 도착 안내");
       if (c.sorry) why.push("양해 전화");
       if (softUnmet(c, r.start)) why.push(softUnmet(c, r.start));
@@ -205,7 +207,7 @@ function score(day, list) {
       sl = visitWindow(c),
       reach = t + (+c.travel || 30),
       start = Math.max(reach, sl.s);
-    if (start >= sl.e) score += 10000 + (start - sl.e + 1) * 100;
+    if (start >= sl.e && (c.slot === "am" || c.slot === "pm" || c.promiseTime)) score += 10000 + (start - sl.e + 1) * 100;
     score += Math.max(0, start - reach) * 0.3;
     if (area !== previous)
       score += area.split(" ")[0] === previous.split(" ")[0] ? 12 : 30;
@@ -369,7 +371,8 @@ export function courseText(day) {
           "번 " +
           (x.c.name || "고객") +
           ": " +
-          x.why.join(", "),
+          x.why.join(", ") +
+          (x.c.phone2 ? " · 2차 " + normalizePhone(x.c.phone2) : ""),
       ),
     );
   rows.forEach((r, i) => {

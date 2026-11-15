@@ -3,7 +3,7 @@ import {
   fmt,
   normalizePhone,
   digits,
-  blockMin,
+  serviceMin,
   weightKg,
   stopFacts,
   shortArea,
@@ -390,9 +390,7 @@ function StopCard({
             <div>
               <dt>한 집 시간</dt>
               <dd>
-                {blockMin(c) === 30 ? "30분" : "1시간"} (이동+작업)
-                {(+c.travel || 0) > 20 &&
-                  " + 먼 이동 " + ((+c.travel || 0) - 20) + "분"}
+                {fmtDuration((+c.travel || 0) + serviceMin(c, c.travel))} (이동+작업)
               </dd>
             </div>
           </dl>
@@ -642,8 +640,8 @@ function Timeline({ day, calc, calls, legBusy, actions }) {
   return (
     <>
       {calls.length > 0 && (
-        <details className="calls">
-          <summary>먼저 전화할 곳 {calls.length}곳</summary>
+        <section className="calls" aria-label="전날 먼저 전화할 고객">
+          <h3>전날 먼저 전화할 곳 {calls.length}곳</h3>
           <ul>
             {calls.map((x) => {
               const p = x.c.phone || x.c.safePhone;
@@ -654,6 +652,7 @@ function Timeline({ day, calc, calls, legBusy, actions }) {
                       {x.i + 1}. {x.c.name || "고객"}
                     </strong>
                     <span>{x.why.join(", ")}</span>
+                    {x.c.phone2 && <a href={"tel:" + digits(x.c.phone2)}>2차 연락처 {x.c.phone2}</a>}
                   </div>
                   {p && (
                     <a
@@ -668,7 +667,7 @@ function Timeline({ day, calc, calls, legBusy, actions }) {
               );
             })}
           </ul>
-        </details>
+        </section>
       )}
       {drag && (
         <p className="drag-hint" role="status">
@@ -744,10 +743,10 @@ function TotalsNote({ day, calc }) {
 
 const PLAN = {
   customer:
-    "고객이 원하는 시간(오전·오후, 늦게/이르게 요청)을 먼저 지키는 순서예요.",
+    "오전·오후 약속을 먼저 지키고, 가능하면 늦게·이르게 요청과 아침 외곽·10시 이후 분당 방문을 고려해요.",
   driver:
     "지도 좌표로 이동 거리를 줄인 순서예요. 실시간 교통은 반영하지 않습니다.",
-  balanced: "고객 약속을 지키면서 이동 거리도 줄이는 절충 순서예요.",
+  balanced: "고객 약속을 지키면서 이동 거리와 퇴근 시간대 긴 이동도 함께 고려해요.",
 };
 const BY = {
   ai: "AI 추천",
@@ -991,6 +990,7 @@ export default function RouteView(props) {
                       ? "현재 순서의 T맵 구간 시간이 반영됐어요."
                       : "순서나 약속 시간을 고친 뒤 이 버튼을 누르면 T맵 구간 시간을 새로 받습니다."}
                 </p>
+                <p className="note">출퇴근길 정체는 날짜에 따라 달라요. 배송 전 내비에서 출발 시간을 설정해 다시 확인해 주세요.</p>
                 {needCheck && (
                   <p className="note warn">
                     사진에서 읽은 정보 중 확인할 게 있어요.
