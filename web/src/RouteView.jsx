@@ -866,11 +866,10 @@ export default function RouteView(props) {
               <div className="plan">
                 <p className="note">{PLAN[mode]}</p>
                 {!actions.aiKey && <p className="note">고객 시간 AI 추천을 받으려면 <button type="button" className="text-btn" onClick={actions.aiSettings}>AI 키 연결</button>을 해 주세요. 연결 전에는 시간대·지역 기준으로 정렬합니다.</p>}
-                {(mode === "driver" || mode === "balanced") && !tmapReady ? (
+                {!tmapReady ? (
                   <>
                     <p className="note warn">
-                      운전 편한 길은 고객 위치가 필요해서 T맵을 연결해야 만들 수
-                      있어요.
+                      세 가지 추천의 구간 시간을 처음부터 계산하려면 T맵을 연결해 주세요.
                     </p>
                     <button
                       type="button"
@@ -887,7 +886,7 @@ export default function RouteView(props) {
                     disabled={aiBusy}
                     onClick={actions.makePlans}
                   >
-                    {aiBusy ? "만드는 중…" : "추천 코스 만들기"}
+                    {aiBusy ? "세 코스의 시간 계산 중…" : "추천 코스와 시간 만들기"}
                   </button>
                 )}
               </div>
@@ -905,7 +904,7 @@ export default function RouteView(props) {
                       type="button"
                       className="btn primary"
                       onClick={() => {
-                        actions.usePlan(plan.ids);
+                        actions.usePlan(mode);
                         setMode("fixed");
                       }}
                     >
@@ -948,6 +947,7 @@ export default function RouteView(props) {
                     </button>
                   </div>
                 )}
+                {plan?.timeError && <p className="note warn">{plan.timeError} ‘시간 계산하기’를 눌러 다시 받을 수 있어요.</p>}
 
                 {!tmapReady && (
                   <p className="note">

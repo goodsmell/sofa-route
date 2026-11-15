@@ -127,6 +127,30 @@ export function sortByFixed(day) {
 
 export const planKey = day => day.list.map(c => c.id).join(',');
 
+// 추천을 처음 만들 때 각 순서의 실제 도로 구간을 받아 둔다. 같은 순서는 한 번만 요청한다.
+export async function calculateRecommendedLegs(day, fetchRoute) {
+  const plans = {...day.plans}, located = {}, errors = [], routes = new Map();
+  for (const kind of ['customer', 'driver', 'balanced']) {
+    const plan = plans[kind];
+    if (!plan) continue;
+    const ordered = applyPlan(day, plan.ids), key = planKey(ordered);
+    try {
+      let route = routes.get(key);
+      if (!route) {
+        route = await fetchRoute(ordered);
+        if (!route.legs) throw new Error('T맵 구간 시간을 읽지 못했어요.');
+        routes.set(key, route);
+      }
+      plans[kind] = {...plan, legs: route.legs, legsKey: key, timeError: ''};
+      Object.assign(located, route.located);
+    } catch (error) {
+      errors.push({kind, error});
+      plans[kind] = {...plan, timeError: error.message || 'T맵 이동 시간을 받지 못했어요.'};
+    }
+  }
+  return {plans, located, errors};
+}
+
 // 추천 순서로 바꾼 하루. T맵 구간 시간을 그 순서로 받아 뒀으면 붙이고, 없으면 좌표로 어림한 시간만 넣는다.
 export function planDay(day, plan) {
   const ordered = applyPlan(day, plan.ids);

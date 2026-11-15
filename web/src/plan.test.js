@@ -56,3 +56,42 @@ test('추천 코스 화면은 그 순서로 받은 T맵 구간만 붙이고, 순
   assert.deepEqual(moved.list.map(s => s.id), ['a', 'b', 'c']);
   assert.equal(planDay(moved, moved.plans.driver).list[0].travelKm, undefined);
 });
+
+test('첫 추천 생성에서 세 코스의 구간 시간을 받고 선택한 순서에 붙인다', async () => {
+  const {calculateRecommendedLegs, planDay} = await import('./plan.js');
+  const day = {list: [stop('a'), stop('b'), stop('c')], plans: {
+    customer: {ids: ['a', 'b', 'c']},
+    driver: {ids: ['c', 'b', 'a']},
+    balanced: {ids: ['b', 'a', 'c']},
+  }};
+  const calls = [];
+  const result = await calculateRecommendedLegs(day, async ordered => {
+    calls.push(ordered.list.map(c => c.id).join(','));
+    return {legs: [{min: 11, km: 1}, {min: 22, km: 2}, {min: 33, km: 3}, {min: 44, km: 4}]};
+  });
+  assert.deepEqual(calls, ['a,b,c', 'c,b,a', 'b,a,c']);
+  assert.equal(result.errors.length, 0);
+  for (const kind of ['customer', 'driver', 'balanced']) {
+    const view = planDay({...day, plans: result.plans}, result.plans[kind]);
+    assert.deepEqual(view.list.map(c => c.travel), [11, 22, 33]);
+    assert.equal(view.endTravel, 44);
+  }
+});
+
+test('같은 추천 순서는 한 번만 계산하고 실패한 코스도 다시 계산할 수 있게 남긴다', async () => {
+  const {calculateRecommendedLegs} = await import('./plan.js');
+  const day = {list: [stop('a'), stop('b')], plans: {
+    customer: {ids: ['a', 'b']}, driver: {ids: ['a', 'b']}, balanced: {ids: ['b', 'a']},
+  }};
+  const calls = [];
+  const result = await calculateRecommendedLegs(day, async ordered => {
+    const order = ordered.list.map(c => c.id).join(',');
+    calls.push(order);
+    if (order === 'b,a') throw new Error('경로 실패');
+    return {legs: [{min: 10}, {min: 20}, {min: 30}]};
+  });
+  assert.deepEqual(calls, ['a,b', 'b,a']);
+  assert.equal(result.plans.customer.legs, result.plans.driver.legs);
+  assert.equal(result.plans.balanced.timeError, '경로 실패');
+  assert.equal(result.errors.length, 1);
+});

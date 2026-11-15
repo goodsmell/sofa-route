@@ -34,6 +34,8 @@ import {
   customerOrder,
   balancedOrder,
   applyPlan,
+  planDay,
+  calculateRecommendedLegs,
   sortByFixed,
   movePlan,
   planKey,
@@ -291,7 +293,7 @@ export default function App() {
         c.done,
       ]),
     });
-  // 추천 코스 2가지를 만든다: 고객 희망 시간 맞춤(AI 또는 지도 계산)과 운전이 편한 순서(지도 좌표)
+  // 처음 추천을 만들 때 세 코스의 도로 구간 시간도 함께 계산한다.
   async function makePlans(baseDay = day, quiet = false) {
     const rest = baseDay.list.filter((c) => !c.done);
     if (rest.length < 2) {
@@ -368,12 +370,35 @@ export default function App() {
         ),
         plans,
       };
-      setDay((d) => ({
+      let located = {};
+      let failed = 0;
+      if (key) {
+        let profile = { height: "340", weight: "3500" };
+        try {
+          profile = { ...profile, ...JSON.parse(localStorage.getItem(TRUCK_KEY) || "{}") };
+        } catch {}
+        setLegBusy(true);
+        try {
+          const result = await calculateRecommendedLegs(next, (ordered) =>
+            fetchTmapRoute(ordered, key, profile, fetch, { useCache: false }),
+          );
+          Object.assign(plans, result.plans);
+          located = result.located;
+          failed = result.errors.length;
+        } finally {
+          setLegBusy(false);
+        }
+      }
+      setDay((d) => routeSig(d) === routeSig(baseDay) ? ({
         ...d,
-        list: d.list.map((c) => (cache[c.id] ? { ...c, ...cache[c.id] } : c)),
+        list: d.list.map((c) => ({
+          ...c,
+          ...(cache[c.id] || {}),
+          ...(located[c.id] || {}),
+        })),
         plans,
-      }));
-      if (!quiet) flash("추천 코스를 새로 만들었어요.");
+      }) : d);
+      if (!quiet) flash(!key ? "추천을 만들었어요. 구간 시간은 T맵 연결 후 계산할 수 있어요." : failed ? `추천은 만들었지만 ${failed}개 코스의 구간 시간을 받지 못했어요.` : "세 코스의 추천과 구간 시간을 만들었어요.");
     } finally {
       setAiBusy(false);
     }
@@ -402,18 +427,20 @@ export default function App() {
           'T맵 구간 시간을 읽지 못했어요. "다시 받기"를 눌러 주세요.',
         );
       setDay((d) => {
+        if (routeSig(d) !== routeSig(baseDay)) return d;
         const p = d.plans?.[kind];
         const next = { ...d, list: markLocated(d.list, route) };
-        if (!p || planKey(applyPlan(d, p.ids)) !== wanted) return next;
+        if (!p || planKey(applyPlan(d, p.ids)) !== wanted || routeSig(applyPlan(d, p.ids)) !== routeSig(ordered)) return next;
         return {
           ...next,
           plans: {
             ...d.plans,
-            [kind]: { ...p, legs: route.legs, legsKey: wanted },
+            [kind]: { ...p, legs: route.legs, legsKey: wanted, timeError: "" },
           },
         };
       });
     } catch (error) {
+      setDay((d) => routeSig(d) === routeSig(baseDay) && d.plans?.[kind] ? ({...d, plans: {...d.plans, [kind]: {...d.plans[kind], timeError: error.message || "T맵 이동 시간을 받지 못했어요."}}}) : d);
       flash(error.message || "T맵 이동 시간을 받지 못했어요.");
     } finally {
       setLegBusy(false);
@@ -986,8 +1013,10 @@ export default function App() {
               switchTab,
               fetchLegs: () => fetchLegs(),
               makePlans: () => makePlans(),
-              usePlan: (ids) =>
-                setDay((d) => ({ ...applyPlan(d, ids), phase: "calling" })),
+              usePlan: (kind) =>
+                setDay((d) => d.plans?.[kind]
+                  ? ({ ...planDay(d, d.plans[kind]), phase: "calling" })
+                  : d),
               ready: () => setDay((d) => ({ ...d, phase: "ready" })),
               sortByFixed: () => setDay((d) => sortByFixed(d)),
               copy: copyText,
