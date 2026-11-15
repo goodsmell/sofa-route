@@ -2,6 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {restoreDay} from './logic.js';
 
+test('주간 날짜를 하루씩 넘기면 주와 달 경계도 이동한다',async()=>{
+  const {shiftDate}=await import('./logic.js');
+  assert.equal(shiftDate('2026-11-15',1),'2026-11-16');
+  assert.equal(shiftDate('2026-11-16',-1),'2026-11-15');
+  assert.equal(shiftDate('2026-11-30',1),'2026-12-01');
+});
+
 test('다음 날 배송을 준비한 뒤 다시 열어도 그 날짜와 코스를 유지한다',()=>{
   const stored={date:'2026-11-16',depart:'06:40',start:'출발',end:'귀가',list:[{id:'1',name:'고객',addr:'주소',phone:'0508-1234-5678'}]};
   const {d,h}=restoreDay(stored,{},'2026-11-15');
@@ -63,4 +70,17 @@ test('한 집 시간: 50kg 미만 30분, 이상 1시간, 이동 20분 넘으면 
   assert.deepEqual(rows.map(r=>[r.start,r.end].map(m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))),
     [['09:10','09:30'],['09:45','10:30'],['11:20','12:00'],['12:20','13:00']]);
   assert.equal(home,13*60+10);
+});
+
+test('배송 중 실제 도착과 다음 집 출발 시각을 이후 예상 시간에 반영한다',async()=>{
+  const {compute,emptyDay}=await import('./logic.js');
+  const base={...emptyDay('2026-11-16'),depart:'09:00',list:[
+    {id:'a',slot:'any',weight:30,travel:10},
+    {id:'b',slot:'any',weight:30,travel:20},
+  ]};
+  assert.equal(compute(base).rows[1].start,9*60+50);
+  const arrived={...base,list:[{...base.list[0],arrivedAt:'09:25'},base.list[1]]};
+  assert.equal(compute(arrived).rows[1].start,10*60+5);
+  const departed={...base,list:[{...base.list[0],done:true,arrivedAt:'09:25',doneAt:'10:20'},base.list[1]]};
+  assert.equal(compute(departed).rows[1].start,10*60+40);
 });

@@ -28,6 +28,11 @@ export const today = () => {
     String(d.getDate()).padStart(2, "0"),
   ].join("-");
 };
+export const shiftDate = (date, days) => {
+  const d = new Date(date + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
+};
 export const emptyDay = (date) => ({
   example: false,
   date,
@@ -80,6 +85,7 @@ export function baseCustomer(x = {}) {
     slot: x.slot || "any",
     promiseTime: x.promiseTime || "",
     callMemo: x.callMemo || "",
+    callConfirmed: !!x.callConfirmed,
     noelev: !!x.noelev,
     elevSize: x.elevSize || "",
     bs: !!x.bs,
@@ -94,6 +100,7 @@ export function baseCustomer(x = {}) {
     work: x.work || "",
     verified: x.verified !== false,
     done: !!x.done,
+    arrivedAt: x.arrivedAt || "",
     doneAt: x.doneAt || "",
   };
 }
@@ -137,7 +144,7 @@ export function compute(day) {
   for (const c of day.list) {
     const sl = visitWindow(c),
       reach = t + (+c.travel || 0),
-      start = Math.max(reach, sl.s),
+      start = c.arrivedAt ? toMin(c.arrivedAt) : Math.max(reach, sl.s),
       wait = start - reach,
       end = start + serviceMin(c, +c.travel || 0),
       flags = [];

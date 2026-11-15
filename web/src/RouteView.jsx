@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   fmt,
   normalizePhone,
@@ -10,6 +10,7 @@ import {
   toMin,
   compute,
   precallList,
+  shiftDate,
 } from "./logic.js";
 import { legInfo, fmtDuration, routeTotals } from "./tmapRoute.js";
 import { isFixed, planDay } from "./plan.js";
@@ -58,24 +59,78 @@ const NaviIcon = () => (
 );
 
 function WeekStrip({ day, history, onOpenDay }) {
-  const base = new Date(day.date + "T00:00:00");
-  const monday = new Date(base);
-  monday.setDate(base.getDate() - ((base.getDay() + 6) % 7));
-  const dates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    return d;
-  });
+  const weekMonday = (date) => {
+    const d = new Date(date + "T00:00:00");
+    return shiftDate(date, -((d.getDay() + 6) % 7));
+  };
+  const around = (date) => {
+    const monday = weekMonday(date);
+    return { start: shiftDate(monday, -28), end: shiftDate(monday, 34) };
+  };
+  const [range, setRange] = useState(() => around(day.date));
+  const [visibleMonth, setVisibleMonth] = useState(() => day.date.slice(0, 7));
+  const strip = useRef(null);
+  const previousDate = useRef(null);
+  const focusSelected = useRef(true);
+  const prependedWidth = useRef(null);
+  const extending = useRef(false);
+  const syncVisibleMonth = (node) => {
+    const center = node.scrollLeft + node.clientWidth / 2;
+    const visible = Array.from(node.children).find((item) => item.offsetLeft + item.offsetWidth > center);
+    if (visible?.dataset.date) setVisibleMonth(visible.dataset.date.slice(0, 7));
+  };
+  if (previousDate.current !== day.date) {
+    previousDate.current = day.date;
+    focusSelected.current = true;
+  }
+  useEffect(() => {
+    if (day.date < range.start || day.date > range.end) setRange(around(day.date));
+  }, [day.date, range.start, range.end]);
+  useLayoutEffect(() => {
+    const node = strip.current;
+    if (!node) return;
+    if (prependedWidth.current !== null) {
+      node.scrollLeft += node.scrollWidth - prependedWidth.current;
+      prependedWidth.current = null;
+    }
+    if (focusSelected.current) {
+      const monday = node.querySelector(`[data-date="${weekMonday(day.date)}"]`);
+      if (monday) {
+        node.scrollLeft = monday.offsetLeft;
+        focusSelected.current = false;
+      }
+    }
+    syncVisibleMonth(node);
+    extending.current = false;
+  }, [day.date, range.start, range.end]);
+  const dates = [];
+  for (let date = range.start; date <= range.end; date = shiftDate(date, 1)) dates.push(date);
   const todayIso = iso(new Date());
   return (
-    <div className="week" role="list" aria-label="이번 주 배송">
-      {dates.map((d) => {
-        const date = iso(d),
+    <div className="week-wrap">
+    <div className="week-month"><strong>{visibleMonth.replace('-', '년 ')}월</strong><span>좌우로 밀어 날짜 보기</span></div>
+    <div className="week" ref={strip} role="list" aria-label="날짜별 배송. 좌우로 스크롤해 다른 날짜를 볼 수 있습니다"
+      onScroll={e=>{
+        const node=e.currentTarget;
+        syncVisibleMonth(node);
+        if(extending.current)return;
+        if(node.scrollLeft<node.clientWidth){
+          extending.current=true;
+          prependedWidth.current=node.scrollWidth;
+          setRange(current=>({...current,start:shiftDate(current.start,-28)}));
+        }else if(node.scrollWidth-node.scrollLeft-node.clientWidth<node.clientWidth){
+          extending.current=true;
+          setRange(current=>({...current,end:shiftDate(current.end,28)}));
+        }
+      }}>
+      {dates.map((date) => {
+        const d = new Date(date + "T00:00:00"),
           record = date === day.date ? day : history[date],
           count = record?.list?.length || 0;
         return (
           <button
             key={date}
+            data-date={date}
             role="listitem"
             type="button"
             className={
@@ -86,12 +141,13 @@ function WeekStrip({ day, history, onOpenDay }) {
             aria-current={date === day.date ? "date" : undefined}
             onClick={() => onOpenDay(date)}
           >
-            <span>{DAY[d.getDay()]}</span>
+            <span>{d.getDate() === 1 ? `${d.getMonth() + 1}월` : DAY[d.getDay()]}</span>
             <strong>{d.getDate()}</strong>
             <small>{count ? count + "곳" : "-"}</small>
           </button>
         );
       })}
+    </div>
     </div>
   );
 }
@@ -197,15 +253,20 @@ function StopCard({
           {c.done && <span className="badge ok">완료 {c.doneAt}</span>}
           {late && !c.done && <span className="badge bad">약속 시간 넘김</span>}
           {reminder && !c.done && <span className="badge warn">먼저 전화</span>}
-          {!c.done && !isFixed(c) && (
-            <span className="badge dashed">시간 미확정</span>
+          {!c.done && !c.callConfirmed && !isFixed(c) && (
+            <span className="badge dashed">통화 전</span>
+          )}
+          {c.callConfirmed && !c.promiseTime && (
+            <span className="badge ok">통화 완료</span>
           )}
           {badges.map((b) => (
             <span
               key={b}
               className={
                 "badge" +
-                (b === "엘리베이터 없음" || b === "T맵 주소 확인" ? " warn" : "") +
+                (b === "엘리베이터 없음" || b === "T맵 주소 확인"
+                  ? " warn"
+                  : "") +
                 (b.endsWith(" 확정") ? " ok" : "") +
                 (b === "무게 확인" ? " dashed" : "")
               }
@@ -232,7 +293,8 @@ function StopCard({
           {c.geoMissing && (
             <div className="fix-time warn-box">
               <p className="note warn">
-                T맵이 이 주소를 못 찾아서 앞뒤 이동 시간을 모릅니다. 도로명 주소나 아파트 이름을 넣어 주세요.
+                T맵이 이 주소를 못 찾아서 앞뒤 이동 시간을 모릅니다. 도로명
+                주소나 아파트 이름을 넣어 주세요.
               </p>
               <label className="field">
                 <span>T맵 검색용 주소 (카드 주소는 그대로)</span>
@@ -240,7 +302,12 @@ function StopCard({
                   type="text"
                   value={c.mapAddr || ""}
                   placeholder="도로명 주소나 아파트 이름"
-                  onChange={(e) => actions.update(c.id, { mapAddr: e.target.value, geoAddr: "" })}
+                  onChange={(e) =>
+                    actions.update(c.id, {
+                      mapAddr: e.target.value,
+                      geoAddr: "",
+                    })
+                  }
                 />
               </label>
             </div>
@@ -256,7 +323,10 @@ function StopCard({
                   type="time"
                   value={c.promiseTime || ""}
                   onChange={(e) =>
-                    actions.update(c.id, { promiseTime: e.target.value })
+                    actions.update(c.id, {
+                      promiseTime: e.target.value,
+                      callConfirmed: !!e.target.value || c.callConfirmed,
+                    })
                   }
                 />
               </label>
@@ -278,6 +348,36 @@ function StopCard({
                       : "상관없음"}
                 </small>
               )}
+              <div className="call-slot-actions">
+                <span>통화 후 시간대</span>
+                {[
+                  ["am", "오전"],
+                  ["pm", "오후"],
+                  ["any", "시간 상관없음"],
+                ].map(([value, label]) => (
+                  <button
+                    type="button"
+                    key={value}
+                    className={c.slot === value ? "selected" : ""}
+                    onClick={() =>
+                      actions.update(c.id, { slot: value, callConfirmed: true })
+                    }
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="btn"
+                onClick={() =>
+                  actions.update(c.id, { callConfirmed: !c.callConfirmed })
+                }
+              >
+                {c.callConfirmed
+                  ? "통화 완료 취소"
+                  : "시간 변경 없이 통화 완료"}
+              </button>
             </div>
           )}
           <dl className="facts">
@@ -291,7 +391,8 @@ function StopCard({
               <dt>한 집 시간</dt>
               <dd>
                 {blockMin(c) === 30 ? "30분" : "1시간"} (이동+작업)
-                {(+c.travel || 0) > 20 && " + 먼 이동 " + ((+c.travel || 0) - 20) + "분"}
+                {(+c.travel || 0) > 20 &&
+                  " + 먼 이동 " + ((+c.travel || 0) - 20) + "분"}
               </dd>
             </div>
           </dl>
@@ -386,13 +487,18 @@ function StopCard({
                   <option value="any">시간 상관없음</option>
                 </select>
               </label>
-<label className="field">
+              <label className="field">
                 <span>T맵 검색용 주소 (카드 주소는 그대로)</span>
                 <input
                   type="text"
                   value={c.mapAddr || ""}
                   placeholder="도로명 주소나 아파트 이름"
-                  onChange={(e) => actions.update(c.id, { mapAddr: e.target.value, geoAddr: "" })}
+                  onChange={(e) =>
+                    actions.update(c.id, {
+                      mapAddr: e.target.value,
+                      geoAddr: "",
+                    })
+                  }
                 />
               </label>
               <label className="field">
@@ -402,7 +508,9 @@ function StopCard({
                   inputMode="decimal"
                   value={c.weight || ""}
                   placeholder="출고표 노란 줄의 총 무게"
-                  onChange={(e) => actions.update(c.id, { weight: e.target.value })}
+                  onChange={(e) =>
+                    actions.update(c.id, { weight: e.target.value })
+                  }
                 />
               </label>
               <label className="field">
@@ -441,9 +549,10 @@ function StopCard({
 
 const legsReadyOf = (day) =>
   day.list.length > 0 &&
-  Array.from({ length: day.list.length + 1 }, (_, i) => legInfo(day, i).state).every(
-    (s) => s === "tmap",
-  );
+  Array.from(
+    { length: day.list.length + 1 },
+    (_, i) => legInfo(day, i).state,
+  ).every((s) => s === "tmap");
 
 // 고객 카드 타임라인. 확정 코스와 추천 코스가 같은 화면을 쓴다.
 function Timeline({ day, calc, calls, legBusy, actions }) {
@@ -550,7 +659,8 @@ function Timeline({ day, calc, calls, legBusy, actions }) {
       )}
       {drag && (
         <p className="drag-hint" role="status">
-          {drag.from + 1}번 {day.list[drag.from]?.name} → {drag.to + 1}번째 자리로
+          {drag.from + 1}번 {day.list[drag.from]?.name} → {drag.to + 1}번째
+          자리로
         </p>
       )}
       <ol className="timeline">
@@ -569,7 +679,9 @@ function Timeline({ day, calc, calls, legBusy, actions }) {
             <li className="tl-stop" data-idx={i}>
               <time
                 className={
-                  row.flags.some(([k]) => k === "bad") && !row.c.done ? "late" : ""
+                  row.flags.some(([k]) => k === "bad") && !row.c.done
+                    ? "late"
+                    : ""
                 }
               >
                 {row.c.done && row.c.doneAt ? row.c.doneAt : fmt(row.start)}
@@ -579,7 +691,9 @@ function Timeline({ day, calc, calls, legBusy, actions }) {
                 index={i}
                 count={day.list.length}
                 open={openId === row.c.id}
-                onToggle={() => setOpenId(openId === row.c.id ? null : row.c.id)}
+                onToggle={() =>
+                  setOpenId(openId === row.c.id ? null : row.c.id)
+                }
                 reminder={calls.find((x) => x.c.id === row.c.id)}
                 actions={actions}
                 grip={grip(i)}
@@ -616,21 +730,31 @@ function TotalsNote({ day, calc }) {
 }
 
 const PLAN = {
-  customer: "고객이 원하는 시간(오전·오후, 늦게/이르게 요청)을 먼저 지키는 순서예요.",
-  driver: "고객 시간은 보지 않고, 이동 거리가 가장 짧게 한 바퀴 도는 순서예요.",
+  customer:
+    "고객이 원하는 시간(오전·오후, 늦게/이르게 요청)을 먼저 지키는 순서예요.",
+  driver:
+    "지도 좌표로 이동 거리를 줄인 순서예요. 실시간 교통은 반영하지 않습니다.",
+  balanced: "고객 약속을 지키면서 이동 거리도 줄이는 절충 순서예요.",
 };
-const BY = { ai: "AI 추천", map: "지도 위치로 계산", rule: "시간대·지역으로 정렬" };
+const BY = {
+  ai: "AI 추천",
+  map: "지도 위치로 계산",
+  rule: "시간대·지역으로 정렬",
+};
 
 export default function RouteView(props) {
-  const { day, history, calc, calls, legBusy, aiBusy, tmapReady, actions } = props;
+  const { day, history, calc, calls, legBusy, aiBusy, tmapReady, actions } =
+    props;
   const [armed, setArmed] = useState(false);
-  const [mode, setModeState] = useState(() => {
+  const [selectedMode, setModeState] = useState(() => {
     try {
-      return sessionStorage.getItem("sofa-route-mode") || "fixed";
+      return sessionStorage.getItem("sofa-route-mode") || "customer";
     } catch {
-      return "fixed";
+      return "customer";
     }
   });
+  const canCall = ["calling", "ready", "driving"].includes(day.phase);
+  const mode = !canCall && selectedMode === "fixed" ? "customer" : selectedMode;
   const setMode = (m) => {
     setModeState(m);
     window.scrollTo(0, 0);
@@ -639,9 +763,11 @@ export default function RouteView(props) {
     } catch {}
   };
   const rest = day.list.filter((c) => !c.done);
-  const fixedList = rest.filter(isFixed);
-  const fixedOutOfOrder = fixedList.some(
-    (c, i) => i > 0 && toMin(fixedList[i - 1].promiseTime) > toMin(c.promiseTime),
+  const fixedList = rest.filter((c) => c.callConfirmed || isFixed(c));
+  const exactList = rest.filter(isFixed);
+  const fixedOutOfOrder = exactList.some(
+    (c, i) =>
+      i > 0 && toMin(exactList[i - 1].promiseTime) > toMin(c.promiseTime),
   );
   const needCheck = day.list.some((c) => c.verified === false);
 
@@ -655,11 +781,27 @@ export default function RouteView(props) {
     : actions;
   const ready = legsReadyOf(viewDay);
   const done = day.list.filter((c) => c.done).length;
+  const stage = !day.list.length
+    ? 1
+    : day.phase === "ready" || day.phase === "driving"
+      ? 4
+      : day.phase === "calling"
+        ? 3
+        : 2;
 
   return (
     <section className="view">
       <div className="wrap">
         <WeekStrip day={day} history={history} onOpenDay={actions.openDay} />
+        <div className="flow-steps" aria-label="업무 순서">
+          {["출고표", "추천 선택", "전화 확정", "다음 날 배송"].map(
+            (label, i) => (
+              <span key={label} className={stage === i + 1 ? "active" : ""}>
+                {i + 1}. {label}
+              </span>
+            ),
+          )}
+        </div>
 
         {day.list.length === 0 ? (
           <div className="empty">
@@ -674,11 +816,16 @@ export default function RouteView(props) {
           </div>
         ) : (
           <>
-            <div className="modes" role="tablist" aria-label="코스 보기">
+            <div className={"modes" + (canCall ? " with-calling" : "")} role="tablist" aria-label="코스 보기">
               {[
                 ["customer", "고객 시간", "추천"],
-                ["driver", "운전 편한", "추천"],
-                ["fixed", "확정 코스", fixedList.length + "/" + rest.length + " 확정"],
+                ["driver", "빠른 이동", "추천"],
+                ["balanced", "균형 추천", "추천"],
+                ...(canCall ? [[
+                  "fixed",
+                  "전화 확정",
+                  fixedList.length + "/" + rest.length + " 확정",
+                ]] : []),
               ].map(([k, label, sub]) => (
                 <button
                   key={k}
@@ -703,21 +850,27 @@ export default function RouteView(props) {
               </div>
               <div>
                 <span>귀가 예상</span>
-                <strong>{mode !== "fixed" && !plan ? "-" : fmt(viewCalc.home)}</strong>
+                <strong>
+                  {mode !== "fixed" && !plan ? "-" : fmt(viewCalc.home)}
+                </strong>
               </div>
               <div>
                 <span>총 운전</span>
-                <strong>{ready ? fmtDuration(routeTotals(viewDay).min) : "-"}</strong>
+                <strong>
+                  {ready ? fmtDuration(routeTotals(viewDay).min) : "-"}
+                </strong>
               </div>
             </div>
 
             {mode !== "fixed" && !plan ? (
               <div className="plan">
                 <p className="note">{PLAN[mode]}</p>
-                {mode === "driver" && !tmapReady ? (
+                {!actions.aiKey && <p className="note">고객 시간 AI 추천을 받으려면 <button type="button" className="text-btn" onClick={actions.aiSettings}>AI 키 연결</button>을 해 주세요. 연결 전에는 시간대·지역 기준으로 정렬합니다.</p>}
+                {(mode === "driver" || mode === "balanced") && !tmapReady ? (
                   <>
                     <p className="note warn">
-                      운전 편한 길은 고객 위치가 필요해서 T맵을 연결해야 만들 수 있어요.
+                      운전 편한 길은 고객 위치가 필요해서 T맵을 연결해야 만들 수
+                      있어요.
                     </p>
                     <button
                       type="button"
@@ -756,7 +909,7 @@ export default function RouteView(props) {
                         setMode("fixed");
                       }}
                     >
-                      이 순서로 전화 돌리기
+                      이 순서 선택하고 전화 확정
                     </button>
                   </div>
                 ) : (
@@ -765,15 +918,16 @@ export default function RouteView(props) {
                       <span
                         style={{
                           width:
-                            (rest.length ? (fixedList.length / rest.length) * 100 : 0) +
-                            "%",
+                            (rest.length
+                              ? (fixedList.length / rest.length) * 100
+                              : 0) + "%",
                         }}
                       />
                     </div>
                     <p>
                       {rest.length && fixedList.length === rest.length
-                        ? "모든 고객 시간 확정 완료"
-                        : `전화로 시간 정한 고객 ${fixedList.length}/${rest.length}곳`}
+                        ? "모든 고객 통화 완료"
+                        : `통화 완료 ${fixedList.length}/${rest.length}곳`}
                     </p>
                     {fixedOutOfOrder && (
                       <button
@@ -784,6 +938,14 @@ export default function RouteView(props) {
                         확정 시간 순서로 정렬
                       </button>
                     )}
+                    <button
+                      type="button"
+                      className="btn primary"
+                      disabled={fixedList.length !== rest.length}
+                      onClick={actions.ready}
+                    >
+                      전화 확정 마치기 · 배송 준비
+                    </button>
                   </div>
                 )}
 
@@ -799,20 +961,27 @@ export default function RouteView(props) {
                     </button>
                   </p>
                 )}
-                {tmapReady && !ready && !legBusy && (
-                  <p className="note">
-                    이동 시간을 받지 못했어요.{" "}
-                    <button
-                      type="button"
-                      className="text-btn"
-                      onClick={plan ? () => actions.fetchPlanLegs(mode) : actions.fetchLegs}
-                    >
-                      다시 받기
-                    </button>
-                  </p>
-                )}
+                <button
+                  type="button"
+                  className="btn calculate-btn"
+                  disabled={legBusy || !tmapReady}
+                  onClick={
+                    plan ? () => actions.fetchPlanLegs(mode) : actions.fetchLegs
+                  }
+                >
+                  {legBusy ? "시간 계산 중…" : "시간 계산하기"}
+                </button>
+                <p className="note">
+                  {!tmapReady
+                    ? "T맵 앱키를 연결하면 구간 시간을 계산할 수 있어요."
+                    : ready
+                      ? "현재 순서의 T맵 구간 시간이 반영됐어요."
+                      : "순서나 약속 시간을 고친 뒤 이 버튼을 누르면 T맵 구간 시간을 새로 받습니다."}
+                </p>
                 {needCheck && (
-                  <p className="note warn">사진에서 읽은 정보 중 확인할 게 있어요.</p>
+                  <p className="note warn">
+                    사진에서 읽은 정보 중 확인할 게 있어요.
+                  </p>
                 )}
 
                 <Timeline
@@ -846,7 +1015,9 @@ export default function RouteView(props) {
                   <button
                     type="button"
                     className="btn"
-                    onClick={() => actions.copy(actions.courseText(viewDay), "코스 전체")}
+                    onClick={() =>
+                      actions.copy(actions.courseText(viewDay), "코스 전체")
+                    }
                   >
                     코스 복사
                   </button>
@@ -861,19 +1032,9 @@ export default function RouteView(props) {
           <summary>설정</summary>
           <div className="sub-body">
             <p className="note">
-              이동 시간은 T맵 화물차 경로 기준이에요. 실제 도로 사정은 운전 중 T맵에서
-              확인하세요.
+              이동 시간은 T맵 화물차 경로 기준이에요. 실제 도로 사정은 운전 중
+              T맵에서 확인하세요.
             </p>
-            {tmapReady && day.list.length > 0 && (
-              <button
-                type="button"
-                className="btn"
-                disabled={legBusy}
-                onClick={actions.fetchLegs}
-              >
-                이동 시간 새로 받기
-              </button>
-            )}
             <button type="button" className="btn" onClick={actions.aiSettings}>
               {actions.aiKey ? "자동 순서(AI) 키 변경" : "자동 순서(AI) 연결"}
             </button>

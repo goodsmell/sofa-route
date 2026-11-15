@@ -79,6 +79,26 @@ export function customerOrder(day, stops, start, end, pos) {
   return best;
 }
 
+// 시간 약속 위반은 크게 피하면서 운전 거리에도 비중을 두는 절충안.
+export function balancedOrder(day, stops, start, end, pos) {
+  let best = driverOrder(stops, start, end, pos);
+  const score = order => customerScore(day, order, start, end, pos) +
+    pathKm(start, order.filter(c => pos[c.id]), end, pos) * 2;
+  let bestScore = score(best);
+  for (let pass = 0; pass < 20; pass++) {
+    let changed = false;
+    for (let i = 0; i < best.length; i++) for (let j = 0; j < best.length; j++) {
+      if (i === j) continue;
+      const next = best.slice(), [item] = next.splice(i, 1);
+      next.splice(j, 0, item);
+      const value = score(next);
+      if (value < bestScore) {best = next; bestScore = value; changed = true}
+    }
+    if (!changed) break;
+  }
+  return best;
+}
+
 // 추천 순서(id 목록)를 지금 코스에 적용한다. 이미 완료한 곳은 앞에 그대로 둔다.
 export function applyPlan(day, ids) {
   const done = day.list.filter(c => c.done), rest = day.list.filter(c => !c.done);
