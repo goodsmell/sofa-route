@@ -326,3 +326,17 @@ nav.tabs button[aria-selected=true]{border-top-color:transparent;color:var(--ink
 .stop.done.open{opacity:1}
 .stop-text span{word-break:keep-all}
 .big-actions .btn{white-space:nowrap;padding:9px 8px}
+.grip{flex:none;width:52px;min-height:56px;padding:2px 0;border:1px dashed var(--rule);border-radius:12px;background:var(--paper);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:none;cursor:grab;font-weight:600}
+.grip svg{width:22px;height:22px}
+.grip small{font-size:11px;line-height:1.1}
+.stop.dragging{opacity:.45;border-style:dashed}
+.stop.drop-target{border:2px solid var(--accent);box-shadow:0 -6px 0 -3px var(--accent)}
+body.dragging-route{user-select:none;-webkit-user-select:none}
+body.dragging-route .grip{cursor:grabbing}
+.drag-hint{position:fixed;z-index:25;left:50%;transform:translateX(-50%);top:12px;margin:0;padding:10px 16px;border-radius:12px;background:var(--ink);color:var(--paper);font-size:16px;font-weight:700;max-width:calc(100% - 32px);text-align:center}
+.pick{flex:1 1 100%;display:flex;align-items:center;gap:10px;font-size:15px;color:var(--muted)}
+.pick select{flex:1;min-height:48px;font-size:17px}
+.stop-area{display:block;width:100%;min-height:0;margin:2px 0 0;padding:0 0 0 46px;border:0;background:none;text-align:left;justify-content:flex-start;font-size:16px;font-weight:400;color:var(--muted);word-break:keep-all;overflow-wrap:anywhere}
+.stop-head{gap:6px}
+.stop-head .round{width:48px;height:48px}
+.grip{width:46px;min-height:48px}

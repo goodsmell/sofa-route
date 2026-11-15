@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {fmt, normalizePhone, digits, workMin, stopFacts, shortArea, toMin} from './logic.js';
 import {legInfo, fmtDuration, routeTotals} from './tmapRoute.js';
 
@@ -7,6 +7,7 @@ const DAY = '일월화수목금토';
 const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 
 const PhoneIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.6 3.5h2.6l1.4 4-2 1.6a12 12 0 0 0 6.3 6.3l1.6-2 4 1.4v2.6c0 1-.8 1.8-1.8 1.8C10.4 19.2 4.8 13.6 4.8 5.3c0-1 .8-1.8 1.8-1.8z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>;
+const GripIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M5 12h14M5 16h14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>;
 const NaviIcon = () => <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0 1 13 0c0 4.9-6.5 11-6.5 11z" fill="none" stroke="currentColor" strokeWidth="1.8"/><circle cx="12" cy="10" r="2.3" fill="currentColor"/></svg>;
 
 function WeekStrip({day, history, onOpenDay}) {
@@ -31,7 +32,7 @@ function Leg({day, i, busy}) {
   return <div className="leg muted"><small>{busy ? '이동 시간 계산 중' : '이동 시간 모름'}</small></div>;
 }
 
-function StopCard({row, index, count, open, onToggle, reminder, actions}) {
+function StopCard({row, index, count, open, onToggle, reminder, actions, grip, dragging, target}) {
   const c = row.c;
   const phone = c.phone || c.safePhone;
   const late = row.flags.some(([k]) => k === 'bad');
@@ -40,17 +41,16 @@ function StopCard({row, index, count, open, onToggle, reminder, actions}) {
     c.noelev ? '엘리베이터 없음' : null,
     c.bs ? '기존 소파 수거' : null,
   ].filter(Boolean);
-  return <article className={'stop' + (c.done ? ' done' : '') + (open ? ' open' : '')}>
+  return <article className={'stop' + (c.done ? ' done' : '') + (open ? ' open' : '') + (dragging ? ' dragging' : '') + (target ? ' drop-target' : '')}>
     <div className="stop-head">
       <button type="button" className="stop-main" aria-expanded={open} onClick={onToggle}>
         <span className="stop-no">{index + 1}</span>
-        <span className="stop-text">
-          <strong>{c.name || '이름 확인'}</strong>
-          <span>{shortArea(c.addr) || '주소 확인 필요'}</span>
-        </span>
+        <span className="stop-text"><strong>{c.name || '이름 확인'}</strong></span>
       </button>
       {phone && !c.done && <a className="round" href={'tel:' + digits(phone)} aria-label={(c.name || '고객') + ' 전화'}><PhoneIcon/></a>}
+      {count > 1 && <button type="button" className="grip" aria-label={(c.name || '고객') + ' 순서 옮기기. 누른 채로 위아래로 끄세요'} {...grip}><GripIcon/><small>옮기기</small></button>}
     </div>
+    <button type="button" className="stop-area" onClick={onToggle} tabIndex={-1}>{shortArea(c.addr) || '주소 확인 필요'}</button>
     {(badges.length > 0 || late || reminder || c.done) && <div className="badges">
       {c.done && <span className="badge ok">완료 {c.doneAt}</span>}
       {late && !c.done && <span className="badge bad">약속 시간 넘김</span>}
@@ -75,6 +75,7 @@ function StopCard({row, index, count, open, onToggle, reminder, actions}) {
       <div className="row-actions">
         <button type="button" disabled={index === 0} onClick={() => actions.move(index, index - 1)}>▲ 앞으로</button>
         <button type="button" disabled={index === count - 1} onClick={() => actions.move(index, index + 1)}>▼ 뒤로</button>
+        <label className="pick"><span>순서</span><select value={index} onChange={e => actions.move(index, +e.target.value)} aria-label="몇 번째로 옮길지 고르기">{Array.from({length: count}, (_, i) => <option key={i} value={i}>{i + 1}번째</option>)}</select></label>
         <button type="button" onClick={() => actions.openDocument(c)}>출고표</button>
       </div>
       <details className="sub">
@@ -98,6 +99,39 @@ export default function RouteView(props) {
   const [openId, setOpenId] = useState(null);
   const [armed, setArmed] = useState(false);
   const totals = routeTotals(day);
+  const [drag, setDragState] = useState(null); // {from, to}
+  const dragRef = useRef(null);
+  const setDrag = next => {dragRef.current = typeof next === 'function' ? next(dragRef.current) : next; setDragState(dragRef.current)};
+  const pointerY = useRef(null);
+  useEffect(() => {
+    if (!drag) return;
+    let frame;
+    const tick = () => {
+      const p = pointerY.current;
+      if (p) {
+        const y = p.y;
+        if (y < 110) window.scrollBy(0, -Math.ceil((110 - y) / 6));
+        else if (y > window.innerHeight - 150) window.scrollBy(0, Math.ceil((y - window.innerHeight + 150) / 6));
+        const to = targetAt(p.x, y);
+        if (to != null) setDrag(d => d && d.to !== to ? {...d, to} : d);
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    document.body.classList.add('dragging-route');
+    return () => {cancelAnimationFrame(frame); document.body.classList.remove('dragging-route')};
+  }, [!!drag]);
+  const targetAt = (x, y) => {
+    const el = document.elementFromPoint(x, y)?.closest('[data-idx]');
+    return el ? +el.dataset.idx : null;
+  };
+  const grip = i => ({
+    onPointerDown: e => {e.preventDefault(); try {e.currentTarget.setPointerCapture(e.pointerId)} catch {} pointerY.current = {x: e.clientX, y: e.clientY}; setDrag({from: i, to: i})},
+    onPointerMove: e => {const d = dragRef.current; if (!d) return; pointerY.current = {x: e.clientX, y: e.clientY}; const to = targetAt(e.clientX, e.clientY); if (to != null && to !== d.to) setDrag({...d, to})},
+    onPointerUp: e => {const d = dragRef.current; if (d) {const to = targetAt(e.clientX, e.clientY) ?? d.to; if (to !== d.from) actions.move(d.from, to)} setDrag(null); pointerY.current = null},
+    onPointerCancel: () => {setDrag(null); pointerY.current = null},
+    onKeyDown: e => {if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {e.preventDefault(); actions.move(i, i + (e.key === 'ArrowUp' ? -1 : 1))}},
+  });
   const done = day.list.filter(c => c.done).length;
   const needCheck = day.list.some(c => c.verified === false);
 
@@ -125,13 +159,14 @@ export default function RouteView(props) {
         </li>})}</ul>
       </details>}
 
+      {drag && <p className="drag-hint" role="status">{drag.from + 1}번 {day.list[drag.from]?.name} → {drag.to + 1}번째 자리로</p>}
       <ol className="timeline">
         <li className="tl-end"><time>{day.depart}</time><div><strong>출발</strong><span>{day.start}</span></div></li>
         {calc.rows.map((row, i) => <React.Fragment key={row.c.id}>
           <li className="tl-leg"><Leg day={day} i={i} busy={legBusy}/></li>
-          <li className="tl-stop">
+          <li className="tl-stop" data-idx={i}>
             <time className={row.flags.some(([k]) => k === 'bad') && !row.c.done ? 'late' : ''}>{row.c.done && row.c.doneAt ? row.c.doneAt : fmt(row.start)}</time>
-            <StopCard row={row} index={i} count={day.list.length} open={openId === row.c.id} onToggle={() => setOpenId(openId === row.c.id ? null : row.c.id)} reminder={calls.find(x => x.c.id === row.c.id)} actions={actions}/>
+            <StopCard row={row} index={i} count={day.list.length} open={openId === row.c.id} onToggle={() => setOpenId(openId === row.c.id ? null : row.c.id)} reminder={calls.find(x => x.c.id === row.c.id)} actions={actions} grip={grip(i)} dragging={drag?.from === i} target={drag && drag.to === i && drag.from !== i}/>
           </li>
         </React.Fragment>)}
         <li className="tl-leg"><Leg day={day} i={day.list.length} busy={legBusy}/></li>
