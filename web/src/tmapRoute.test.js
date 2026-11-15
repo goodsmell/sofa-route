@@ -29,3 +29,21 @@ test('도로 경로 선만 지도 좌표로 변환한다',()=>{
   const lines=routeLines({features:[{geometry:{type:'LineString',coordinates:[[127.1,37.4],[127.2,37.5]]}},{geometry:{type:'Point',coordinates:[127,37]}}]});
   assert.deepEqual(lines,[[{lat:37.4,lng:127.1},{lat:37.5,lng:127.2}]]);
 });
+
+test('T맵 구간 거리·시간을 고객별 이동 시간으로 저장하고 순서가 바뀌면 다시 받아야 함을 표시한다',async()=>{
+  const {routeLegs,applyLegs,legInfo}=await import('./tmapRoute.js');
+  const points=[{lat:37.30,lng:126.80},{lat:37.40,lng:127.10},{lat:37.20,lng:127.00},{lat:37.33,lng:126.85}];
+  const line=(from,to,distance,time)=>({geometry:{type:'LineString',coordinates:[[from.lng,from.lat],[to.lng,to.lat]]},properties:{distance,time}});
+  const legs=routeLegs({features:[line(points[0],points[1],28400,2100),line(points[1],points[2],15000,1200),line(points[2],points[3],21000,1500)]},points);
+  assert.deepEqual(legs,[{km:28.4,min:35},{km:15,min:20},{km:21,min:25}]);
+  const split=routeLegs({features:[line(points[0],{lat:37.35,lng:127.0},10000,600),line({lat:37.35,lng:127.0},points[1],18400,1500),line(points[1],points[2],15000,1200),line(points[2],points[3],21000,1500)]},points);
+  assert.deepEqual(split,[{km:28.4,min:35},{km:15,min:20},{km:21,min:25}]);
+  const day={list:[{id:'a',travel:30},{id:'b',travel:30}]};
+  const next=applyLegs(day,legs);
+  assert.deepEqual([next.list[0].travel,next.list[1].travel,next.endTravel],[35,20,25]);
+  assert.deepEqual(legInfo(next,1),{min:20,km:15,state:'tmap'});
+  assert.deepEqual(legInfo(next,2),{min:25,km:21,state:'tmap'});
+  const swapped={...next,list:[next.list[1],next.list[0]]};
+  assert.equal(legInfo(swapped,0).state,'stale');
+  assert.deepEqual(legInfo(day,0),{min:30,km:null,state:'default'});
+});

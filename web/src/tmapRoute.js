@@ -65,5 +65,38 @@ export async function fetchTmapRoute(day, key, profile, fetcher=fetch) {
   const data = await response.json();
   const lines = routeLines(data);
   if (!lines.length) throw new Error('T맵이 도로 경로를 돌려주지 않았습니다.');
-  return {points,lines,truck:validTruck(profile)};
+  return {points,lines,legs:routeLegs(data,points),truck:validTruck(profile)};
+}
+
+const near=(a,b)=>Math.hypot((a.lat-b.lat)*111,(a.lng-b.lng)*88)<0.7;
+
+// 출발→1번, 1번→2번 … 마지막→귀가 구간별 거리(km)와 시간(분)
+export function routeLegs(data,points) {
+  const count=points.length-1;
+  const lines=(data?.features||[]).filter(feature=>feature?.geometry?.type==='LineString');
+  const leg=(distance,time)=>({km:Math.round(distance/100)/10,min:Math.max(1,Math.round(time/60))});
+  if (lines.length===count) return lines.map(feature=>leg(+feature.properties?.distance||0,+feature.properties?.time||0));
+  const legs=[];let distance=0,time=0;
+  for (const feature of lines) {
+    distance+=+feature.properties?.distance||0;time+=+feature.properties?.time||0;
+    const [lng,lat]=feature.geometry.coordinates.at(-1)||[];
+    if (legs.length<count-1&&near({lat:+lat,lng:+lng},points[legs.length+1])) {legs.push(leg(distance,time));distance=0;time=0}
+  }
+  legs.push(leg(distance,time));
+  return legs.length===count?legs:null;
+}
+
+// 구간 결과를 고객별 이동 시간에 저장한다. travelFrom은 그때의 바로 앞 장소라서 순서가 바뀌면 다시 받아야 함을 알 수 있다.
+export function applyLegs(day,legs) {
+  if (!legs||legs.length!==day.list.length+1) return day;
+  const list=day.list.map((stop,i)=>({...stop,travel:legs[i].min,travelKm:legs[i].km,travelFrom:i?day.list[i-1].id:'start'}));
+  const last=legs.at(-1);
+  return {...day,list,endTravel:last.min,endTravelKm:last.km,endFrom:day.list.at(-1)?.id||'start'};
+}
+
+export function legInfo(day,i) {
+  const stop=i<day.list.length?day.list[i]:null,prev=i?day.list[i-1].id:'start';
+  const km=stop?stop.travelKm:day.endTravelKm,from=stop?stop.travelFrom:day.endFrom,min=stop?(stop.travel??30):(day.endTravel??30);
+  if (km==null) return {min,km:null,state:'default'};
+  return {min,km,state:from===prev?'tmap':'stale'};
 }

@@ -212,3 +212,15 @@ nav.tabs button[aria-selected=true]{border-top-color:var(--accent);color:var(--a
 .stop-facts dt{color:var(--muted);white-space:nowrap}
 .stop-facts dd{margin:0;min-width:0;overflow-wrap:anywhere;word-break:keep-all}
 .stop-facts .fact-warn dd{color:var(--warn);font-weight:600}
+.leg-source{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:14px;color:var(--muted);margin:6px 0 4px}
+.leg-source.warn span{color:var(--warn);font-weight:600}
+.leg-source button{flex:none;border:0;border-bottom:1px solid var(--accent);border-radius:0;min-height:39px;padding:4px 0;color:var(--accent);font-size:14px;background:none}
+.route-leg{display:flex;align-items:center;gap:12px;padding:6px 0 6px 14px;border-bottom:1px solid var(--rule);color:var(--muted);font-size:14px}
+.leg-line{width:2px;align-self:stretch;min-height:22px;background:var(--rule)}
+.route-leg.tmap .leg-line{background:var(--accent)}
+.route-leg.stale .leg-line{background:var(--warn)}
+.leg-text{display:flex;align-items:baseline;flex-wrap:wrap;column-gap:8px}
+.leg-text strong{color:var(--ink);font-size:15px}
+.route-leg.tmap .leg-text>span{color:var(--ink);font-weight:600}
+.leg-text small{font-size:12px}
+.route-leg.stale small{color:var(--warn);font-weight:600}
