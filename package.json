@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build && node tools/publish-root.mjs",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test web/src/*.test.js"
   },
   "dependencies": {
     "react": "^19.0.0",
