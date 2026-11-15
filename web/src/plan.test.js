@@ -40,3 +40,19 @@ test('확정 시간 순 정렬은 확정한 고객끼리만 자리를 바꾼다'
   const day = {list: [stop('a', {promiseTime: '14:00'}), stop('b'), stop('c', {promiseTime: '10:00'}), stop('d', {promiseTime: '12:30'})]};
   assert.deepEqual(sortByFixed(day).list.map(s => s.id), ['c', 'b', 'd', 'a']);
 });
+
+test('추천 코스 화면은 그 순서로 받은 T맵 구간만 붙이고, 순서를 바꾸면 추천 순서만 바뀐다', async () => {
+  const {planDay, movePlan, planKey} = await import('./plan.js');
+  const day = {list: [stop('a'), stop('b'), stop('c')], plans: {driver: {ids: ['c', 'a', 'b']}}};
+  const plain = planDay(day, day.plans.driver);
+  assert.deepEqual(plain.list.map(s => s.id), ['c', 'a', 'b']);
+  assert.equal(plain.list[0].travelKm, undefined);
+  const legs = [{km: 10, min: 20}, {km: 5, min: 10}, {km: 7, min: 15}, {km: 30, min: 40}];
+  const withLegs = {...day, plans: {driver: {...day.plans.driver, legs, legsKey: planKey(plain)}}};
+  const view = planDay(withLegs, withLegs.plans.driver);
+  assert.deepEqual(view.list.map(s => [s.id, s.travel, s.travelKm]), [['c', 20, 10], ['a', 10, 5], ['b', 15, 7]]);
+  const moved = movePlan(withLegs, 'driver', 2, 0);
+  assert.deepEqual(moved.plans.driver.ids, ['b', 'c', 'a']);
+  assert.deepEqual(moved.list.map(s => s.id), ['a', 'b', 'c']);
+  assert.equal(planDay(moved, moved.plans.driver).list[0].travelKm, undefined);
+});

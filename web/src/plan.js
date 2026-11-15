@@ -1,4 +1,5 @@
 import {visitWindow, workMin, toMin} from './logic.js';
+import {applyLegs} from './tmapRoute.js';
 
 // 직선거리(km). 도로는 이보다 길어서 운전 시간 추정에만 쓴다.
 export function km(a, b) {
@@ -102,4 +103,33 @@ export function sortByFixed(day) {
   const list = day.list.slice();
   slots.forEach((slotIndex, k) => {list[slotIndex] = fixed[k]});
   return {...day, list};
+}
+
+export const planKey = day => day.list.map(c => c.id).join(',');
+
+// 추천 순서로 바꾼 하루. T맵 구간 시간을 그 순서로 받아 뒀으면 붙이고, 없으면 좌표로 어림한 시간만 넣는다.
+export function planDay(day, plan) {
+  const ordered = applyPlan(day, plan.ids);
+  if (plan.legs && plan.legsKey === planKey(ordered)) return applyLegs(ordered, plan.legs);
+  const geo = day.plans?.geo;
+  const at = c => (Number.isFinite(c?.lat) ? {lat: c.lat, lng: c.lng} : null);
+  let prev = geo?.start || null;
+  const list = ordered.list.map(c => {
+    const here = at(c);
+    const travel = prev && here ? Math.max(5, driveMin(prev, here)) : 30;
+    if (here) prev = here;
+    return {...c, travel, travelKm: undefined, travelFrom: undefined};
+  });
+  const last = at(list.at(-1));
+  return {...ordered, list, endTravel: last && geo?.end ? Math.max(5, driveMin(last, geo.end)) : 30, endTravelKm: undefined, endFrom: undefined};
+}
+
+export function movePlan(day, kind, from, to) {
+  const plan = day.plans?.[kind];
+  if (!plan || from === to) return day;
+  const list = applyPlan(day, plan.ids).list.slice();
+  if (to < 0 || to >= list.length || list[from]?.done || list[to]?.done) return day;
+  const [item] = list.splice(from, 1);
+  list.splice(to, 0, item);
+  return {...day, plans: {...day.plans, [kind]: {...plan, ids: list.filter(c => !c.done).map(c => c.id)}}};
 }

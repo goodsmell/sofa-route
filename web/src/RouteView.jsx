@@ -7,9 +7,11 @@ import {
   stopFacts,
   shortArea,
   toMin,
+  compute,
+  precallList,
 } from "./logic.js";
 import { legInfo, fmtDuration, routeTotals } from "./tmapRoute.js";
-import { planStops, isFixed } from "./plan.js";
+import { isFixed, planDay } from "./plan.js";
 
 const tmap = (s) => "tmap://search?name=" + encodeURIComponent(s);
 const DAY = "일월화수목금토";
@@ -395,121 +397,190 @@ function StopCard({
   );
 }
 
+const legsReadyOf = (day) =>
+  day.list.length > 0 &&
+  Array.from({ length: day.list.length + 1 }, (_, i) => legInfo(day, i).state).every(
+    (s) => s === "tmap",
+  );
+
+// 고객 카드 타임라인. 확정 코스와 추천 코스가 같은 화면을 쓴다.
+function Timeline({ day, calc, calls, legBusy, actions }) {
+  const [openId, setOpenId] = useState(null);
+  const [drag, setDragState] = useState(null); // {from, to}
+  const dragRef = useRef(null);
+  const setDrag = (next) => {
+    dragRef.current = typeof next === "function" ? next(dragRef.current) : next;
+    setDragState(dragRef.current);
+  };
+  const pointer = useRef(null);
+  const targetAt = (x, y) => {
+    const el = document.elementFromPoint(x, y)?.closest("[data-idx]");
+    return el ? +el.dataset.idx : null;
+  };
+  useEffect(() => {
+    if (!drag) return;
+    let frame;
+    const tick = () => {
+      const p = pointer.current;
+      if (p) {
+        if (p.y < 110) window.scrollBy(0, -Math.ceil((110 - p.y) / 6));
+        else if (p.y > window.innerHeight - 150)
+          window.scrollBy(0, Math.ceil((p.y - window.innerHeight + 150) / 6));
+        const to = targetAt(p.x, p.y);
+        if (to != null) setDrag((d) => (d && d.to !== to ? { ...d, to } : d));
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    document.body.classList.add("dragging-route");
+    return () => {
+      cancelAnimationFrame(frame);
+      document.body.classList.remove("dragging-route");
+    };
+  }, [!!drag]);
+  const grip = (i) => ({
+    onPointerDown: (e) => {
+      e.preventDefault();
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {}
+      pointer.current = { x: e.clientX, y: e.clientY };
+      setDrag({ from: i, to: i });
+    },
+    onPointerMove: (e) => {
+      const d = dragRef.current;
+      if (!d) return;
+      pointer.current = { x: e.clientX, y: e.clientY };
+      const to = targetAt(e.clientX, e.clientY);
+      if (to != null && to !== d.to) setDrag({ ...d, to });
+    },
+    onPointerUp: (e) => {
+      const d = dragRef.current;
+      if (d) {
+        const to = targetAt(e.clientX, e.clientY) ?? d.to;
+        if (to !== d.from) actions.move(d.from, to);
+      }
+      setDrag(null);
+      pointer.current = null;
+    },
+    onPointerCancel: () => {
+      setDrag(null);
+      pointer.current = null;
+    },
+    onKeyDown: (e) => {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+        e.preventDefault();
+        actions.move(i, i + (e.key === "ArrowUp" ? -1 : 1));
+      }
+    },
+  });
+
+  return (
+    <>
+      {calls.length > 0 && (
+        <details className="calls">
+          <summary>먼저 전화할 곳 {calls.length}곳</summary>
+          <ul>
+            {calls.map((x) => {
+              const p = x.c.phone || x.c.safePhone;
+              return (
+                <li key={x.c.id}>
+                  <div>
+                    <strong>
+                      {x.i + 1}. {x.c.name || "고객"}
+                    </strong>
+                    <span>{x.why.join(", ")}</span>
+                  </div>
+                  {p && (
+                    <a
+                      className="round"
+                      href={"tel:" + digits(p)}
+                      aria-label={(x.c.name || "고객") + " 전화"}
+                    >
+                      <PhoneIcon />
+                    </a>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </details>
+      )}
+      {drag && (
+        <p className="drag-hint" role="status">
+          {drag.from + 1}번 {day.list[drag.from]?.name} → {drag.to + 1}번째 자리로
+        </p>
+      )}
+      <ol className="timeline">
+        <li className="tl-end">
+          <time>{day.depart}</time>
+          <div>
+            <strong>출발</strong>
+            <span>{day.start}</span>
+          </div>
+        </li>
+        {calc.rows.map((row, i) => (
+          <React.Fragment key={row.c.id}>
+            <li className="tl-leg">
+              <Leg day={day} i={i} busy={legBusy} />
+            </li>
+            <li className="tl-stop" data-idx={i}>
+              <time
+                className={
+                  row.flags.some(([k]) => k === "bad") && !row.c.done ? "late" : ""
+                }
+              >
+                {row.c.done && row.c.doneAt ? row.c.doneAt : fmt(row.start)}
+              </time>
+              <StopCard
+                row={row}
+                index={i}
+                count={day.list.length}
+                open={openId === row.c.id}
+                onToggle={() => setOpenId(openId === row.c.id ? null : row.c.id)}
+                reminder={calls.find((x) => x.c.id === row.c.id)}
+                actions={actions}
+                grip={grip(i)}
+                dragging={drag?.from === i}
+                target={drag && drag.to === i && drag.from !== i}
+              />
+            </li>
+          </React.Fragment>
+        ))}
+        <li className="tl-leg">
+          <Leg day={day} i={day.list.length} busy={legBusy} />
+        </li>
+        <li className="tl-end">
+          <time>{fmt(calc.home)}</time>
+          <div>
+            <strong>귀가</strong>
+            <span>{day.end}</span>
+          </div>
+        </li>
+      </ol>
+    </>
+  );
+}
+
+function TotalsNote({ day, calc }) {
+  if (!legsReadyOf(day)) return null;
+  const totals = routeTotals(day);
+  return (
+    <p className="note center">
+      총 {totals.km}km · 운전 {fmtDuration(totals.min)} · 출발부터 귀가까지{" "}
+      {fmtDuration(calc.home - toMin(day.depart))}
+    </p>
+  );
+}
+
 const PLAN = {
   customer: "고객이 원하는 시간(오전·오후, 늦게/이르게 요청)을 먼저 지키는 순서예요.",
   driver: "고객 시간은 보지 않고, 이동 거리가 가장 짧게 한 바퀴 도는 순서예요.",
 };
 const BY = { ai: "AI 추천", map: "지도 위치로 계산", rule: "시간대·지역으로 정렬" };
 
-function PlanView({ kind, day, plan, busy, tmapReady, actions }) {
-  if (!plan)
-    return (
-      <div className="plan">
-        <p className="note">{PLAN[kind]}</p>
-        {kind === "driver" && !tmapReady ? (
-          <>
-            <p className="note warn">
-              운전 편한 길은 고객 위치가 필요해서 T맵을 연결해야 만들 수 있어요.
-            </p>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => actions.switchTab("map")}
-            >
-              T맵 연결하기
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            className="btn primary"
-            disabled={busy}
-            onClick={actions.makePlans}
-          >
-            {busy ? "만드는 중…" : "추천 코스 만들기"}
-          </button>
-        )}
-      </div>
-    );
-  const stops = planStops(day, plan.ids);
-  return (
-    <div className="plan">
-      <p className="note">
-        {PLAN[kind]}{" "}
-        <span className="by">
-          {BY[plan.by]} · {day.plans.at}
-        </span>
-      </p>
-      <ol className="plan-list">
-        <li className="plan-end">
-          <span>출발</span>
-          <strong>{day.depart}</strong>
-        </li>
-        {stops.map((c, i) => {
-          const want = isFixed(c)
-            ? c.promiseTime + " 확정"
-            : c.slot === "am"
-              ? "오전"
-              : c.slot === "pm"
-                ? "오후"
-                : "상관없음";
-          return (
-            <li key={c.id}>
-              <span className="stop-no">{i + 1}</span>
-              <div>
-                <strong>{c.name || "이름 확인"}</strong>
-                <span>{shortArea(c.addr)}</span>
-              </div>
-              <em
-                className={
-                  isFixed(c) ? "ok" : c.slot === "any" ? "" : "warn"
-                }
-              >
-                {want}
-              </em>
-            </li>
-          );
-        })}
-        <li className="plan-end">
-          <span>귀가</span>
-          <strong>{day.end.split("(")[0].trim()}</strong>
-        </li>
-      </ol>
-      <button
-        type="button"
-        className="btn primary"
-        onClick={() => {
-          actions.usePlan(plan.ids);
-          actions.setMode("fixed");
-        }}
-      >
-        이 순서로 전화 돌리기
-      </button>
-      <button
-        type="button"
-        className="btn"
-        disabled={busy}
-        onClick={actions.makePlans}
-      >
-        {busy ? "다시 만드는 중…" : "추천 다시 만들기"}
-      </button>
-    </div>
-  );
-}
-
 export default function RouteView(props) {
-  const {
-    day,
-    history,
-    calc,
-    calls,
-    legBusy,
-    aiBusy,
-    tmapReady,
-    legsReady,
-    actions,
-  } = props;
-  const [openId, setOpenId] = useState(null);
+  const { day, history, calc, calls, legBusy, aiBusy, tmapReady, actions } = props;
   const [armed, setArmed] = useState(false);
   const [mode, setModeState] = useState(() => {
     try {
@@ -530,78 +601,18 @@ export default function RouteView(props) {
   const fixedOutOfOrder = fixedList.some(
     (c, i) => i > 0 && toMin(fixedList[i - 1].promiseTime) > toMin(c.promiseTime),
   );
-  const totals = routeTotals(day);
-  const [drag, setDragState] = useState(null); // {from, to}
-  const dragRef = useRef(null);
-  const setDrag = (next) => {
-    dragRef.current = typeof next === "function" ? next(dragRef.current) : next;
-    setDragState(dragRef.current);
-  };
-  const pointerY = useRef(null);
-  useEffect(() => {
-    if (!drag) return;
-    let frame;
-    const tick = () => {
-      const p = pointerY.current;
-      if (p) {
-        const y = p.y;
-        if (y < 110) window.scrollBy(0, -Math.ceil((110 - y) / 6));
-        else if (y > window.innerHeight - 150)
-          window.scrollBy(0, Math.ceil((y - window.innerHeight + 150) / 6));
-        const to = targetAt(p.x, y);
-        if (to != null) setDrag((d) => (d && d.to !== to ? { ...d, to } : d));
-      }
-      frame = requestAnimationFrame(tick);
-    };
-    frame = requestAnimationFrame(tick);
-    document.body.classList.add("dragging-route");
-    return () => {
-      cancelAnimationFrame(frame);
-      document.body.classList.remove("dragging-route");
-    };
-  }, [!!drag]);
-  const targetAt = (x, y) => {
-    const el = document.elementFromPoint(x, y)?.closest("[data-idx]");
-    return el ? +el.dataset.idx : null;
-  };
-  const grip = (i) => ({
-    onPointerDown: (e) => {
-      e.preventDefault();
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {}
-      pointerY.current = { x: e.clientX, y: e.clientY };
-      setDrag({ from: i, to: i });
-    },
-    onPointerMove: (e) => {
-      const d = dragRef.current;
-      if (!d) return;
-      pointerY.current = { x: e.clientX, y: e.clientY };
-      const to = targetAt(e.clientX, e.clientY);
-      if (to != null && to !== d.to) setDrag({ ...d, to });
-    },
-    onPointerUp: (e) => {
-      const d = dragRef.current;
-      if (d) {
-        const to = targetAt(e.clientX, e.clientY) ?? d.to;
-        if (to !== d.from) actions.move(d.from, to);
-      }
-      setDrag(null);
-      pointerY.current = null;
-    },
-    onPointerCancel: () => {
-      setDrag(null);
-      pointerY.current = null;
-    },
-    onKeyDown: (e) => {
-      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-        e.preventDefault();
-        actions.move(i, i + (e.key === "ArrowUp" ? -1 : 1));
-      }
-    },
-  });
-  const done = day.list.filter((c) => c.done).length;
   const needCheck = day.list.some((c) => c.verified === false);
+
+  // 지금 보고 있는 코스: 확정 코스이거나, 고른 추천 코스 순서로 바꾼 하루
+  const plan = mode === "fixed" ? null : day.plans?.[mode];
+  const viewDay = plan ? planDay(day, plan) : day;
+  const viewCalc = plan ? compute(viewDay) : calc;
+  const viewCalls = plan ? precallList(viewCalc.rows) : calls;
+  const viewActions = plan
+    ? { ...actions, move: (from, to) => actions.movePlan(mode, from, to) }
+    : actions;
+  const ready = legsReadyOf(viewDay);
+  const done = day.list.filter((c) => c.done).length;
 
   return (
     <section className="view">
@@ -621,23 +632,6 @@ export default function RouteView(props) {
           </div>
         ) : (
           <>
-            <div className="overview">
-              <div>
-                <span>배송</span>
-                <strong>
-                  {day.list.length}곳
-                  {done > 0 && <small> · {done}곳 완료</small>}
-                </strong>
-              </div>
-              <div>
-                <span>귀가 예상</span>
-                <strong>{fmt(calc.home)}</strong>
-              </div>
-              <div>
-                <span>총 운전</span>
-                <strong>{legsReady ? fmtDuration(totals.min) : "-"}</strong>
-              </div>
-            </div>
             <div className="modes" role="tablist" aria-label="코스 보기">
               {[
                 ["customer", "고객 시간", "추천"],
@@ -656,184 +650,167 @@ export default function RouteView(props) {
                 </button>
               ))}
             </div>
-            {mode !== "fixed" ? (
-              <PlanView
-                kind={mode}
-                day={day}
-                plan={day.plans?.[mode]}
-                busy={aiBusy}
-                tmapReady={tmapReady}
-                actions={{ ...actions, setMode }}
-              />
-            ) : (
-            <>
-            <div className="fix-bar">
-              <div className="fix-meter" aria-hidden="true">
-                <span
-                  style={{
-                    width:
-                      (rest.length ? (fixedList.length / rest.length) * 100 : 0) + "%",
-                  }}
-                />
+
+            <div className="overview">
+              <div>
+                <span>배송</span>
+                <strong>
+                  {day.list.length}곳
+                  {done > 0 && <small> · {done}곳 완료</small>}
+                </strong>
               </div>
-              <p>
-                {rest.length && fixedList.length === rest.length
-                  ? "모든 고객 시간 확정 완료"
-                  : `전화로 시간 정한 고객 ${fixedList.length}/${rest.length}곳`}
-              </p>
-              {fixedOutOfOrder && (
-                <button
-                  type="button"
-                  className="btn primary"
-                  onClick={actions.sortByFixed}
-                >
-                  확정 시간 순서로 정렬
-                </button>
-              )}
+              <div>
+                <span>귀가 예상</span>
+                <strong>{mode !== "fixed" && !plan ? "-" : fmt(viewCalc.home)}</strong>
+              </div>
+              <div>
+                <span>총 운전</span>
+                <strong>{ready ? fmtDuration(routeTotals(viewDay).min) : "-"}</strong>
+              </div>
             </div>
-            {!tmapReady && (
-              <p className="note">
-                이동 시간을 보려면 지도 탭에서 T맵을 연결하세요.{" "}
-                <button
-                  type="button"
-                  className="text-btn"
-                  onClick={() => actions.switchTab("map")}
-                >
-                  연결하기
-                </button>
-              </p>
-            )}
-            {tmapReady && !legsReady && !legBusy && (
-              <p className="note">
-                이동 시간을 받지 못했어요.{" "}
-                <button
-                  type="button"
-                  className="text-btn"
-                  onClick={actions.fetchLegs}
-                >
-                  다시 받기
-                </button>
-              </p>
-            )}
-            {needCheck && (
-              <p className="note warn">
-                사진에서 읽은 정보 중 확인할 게 있어요.
-              </p>
-            )}
 
-            {calls.length > 0 && (
-              <details className="calls">
-                <summary>먼저 전화할 곳 {calls.length}곳</summary>
-                <ul>
-                  {calls.map((x) => {
-                    const p = x.c.phone || x.c.safePhone;
-                    return (
-                      <li key={x.c.id}>
-                        <div>
-                          <strong>
-                            {x.i + 1}. {x.c.name || "고객"}
-                          </strong>
-                          <span>{x.why.join(", ")}</span>
-                        </div>
-                        {p && (
-                          <a
-                            className="round"
-                            href={"tel:" + digits(p)}
-                            aria-label={(x.c.name || "고객") + " 전화"}
-                          >
-                            <PhoneIcon />
-                          </a>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
-              </details>
-            )}
-
-            {drag && (
-              <p className="drag-hint" role="status">
-                {drag.from + 1}번 {day.list[drag.from]?.name} → {drag.to + 1}
-                번째 자리로
-              </p>
-            )}
-            <ol className="timeline">
-              <li className="tl-end">
-                <time>{day.depart}</time>
-                <div>
-                  <strong>출발</strong>
-                  <span>{day.start}</span>
-                </div>
-              </li>
-              {calc.rows.map((row, i) => (
-                <React.Fragment key={row.c.id}>
-                  <li className="tl-leg">
-                    <Leg day={day} i={i} busy={legBusy} />
-                  </li>
-                  <li className="tl-stop" data-idx={i}>
-                    <time
-                      className={
-                        row.flags.some(([k]) => k === "bad") && !row.c.done
-                          ? "late"
-                          : ""
-                      }
+            {mode !== "fixed" && !plan ? (
+              <div className="plan">
+                <p className="note">{PLAN[mode]}</p>
+                {mode === "driver" && !tmapReady ? (
+                  <>
+                    <p className="note warn">
+                      운전 편한 길은 고객 위치가 필요해서 T맵을 연결해야 만들 수 있어요.
+                    </p>
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => actions.switchTab("map")}
                     >
-                      {row.c.done && row.c.doneAt
-                        ? row.c.doneAt
-                        : fmt(row.start)}
-                    </time>
-                    <StopCard
-                      row={row}
-                      index={i}
-                      count={day.list.length}
-                      open={openId === row.c.id}
-                      onToggle={() =>
-                        setOpenId(openId === row.c.id ? null : row.c.id)
-                      }
-                      reminder={calls.find((x) => x.c.id === row.c.id)}
-                      actions={actions}
-                      grip={grip(i)}
-                      dragging={drag?.from === i}
-                      target={drag && drag.to === i && drag.from !== i}
-                    />
-                  </li>
-                </React.Fragment>
-              ))}
-              <li className="tl-leg">
-                <Leg day={day} i={day.list.length} busy={legBusy} />
-              </li>
-              <li className="tl-end">
-                <time>{fmt(calc.home)}</time>
-                <div>
-                  <strong>귀가</strong>
-                  <span>{day.end}</span>
-                </div>
-              </li>
-            </ol>
+                      T맵 연결하기
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn primary"
+                    disabled={aiBusy}
+                    onClick={actions.makePlans}
+                  >
+                    {aiBusy ? "만드는 중…" : "추천 코스 만들기"}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                {plan ? (
+                  <div className="plan-head">
+                    <p className="note">
+                      {PLAN[mode]}{" "}
+                      <span className="by">
+                        {BY[plan.by]} · {day.plans.at}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      className="btn primary"
+                      onClick={() => {
+                        actions.usePlan(plan.ids);
+                        setMode("fixed");
+                      }}
+                    >
+                      이 순서로 전화 돌리기
+                    </button>
+                  </div>
+                ) : (
+                  <div className="fix-bar">
+                    <div className="fix-meter" aria-hidden="true">
+                      <span
+                        style={{
+                          width:
+                            (rest.length ? (fixedList.length / rest.length) * 100 : 0) +
+                            "%",
+                        }}
+                      />
+                    </div>
+                    <p>
+                      {rest.length && fixedList.length === rest.length
+                        ? "모든 고객 시간 확정 완료"
+                        : `전화로 시간 정한 고객 ${fixedList.length}/${rest.length}곳`}
+                    </p>
+                    {fixedOutOfOrder && (
+                      <button
+                        type="button"
+                        className="btn primary"
+                        onClick={actions.sortByFixed}
+                      >
+                        확정 시간 순서로 정렬
+                      </button>
+                    )}
+                  </div>
+                )}
 
-            <div className="bottom-actions">
-              <button
-                type="button"
-                className="btn"
-                onClick={() => setMode("customer")}
-              >
-                추천 코스 보기
-              </button>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => actions.copy(actions.courseText(), "코스 전체")}
-              >
-                코스 복사
-              </button>
-            </div>
-            {legsReady && (
-              <p className="note center">
-                총 {totals.km}km · 운전 {fmtDuration(totals.min)} · 출발부터
-                귀가까지 {fmtDuration(calc.home - toMin(day.depart))}
-              </p>
-            )}
-            </>
+                {!tmapReady && (
+                  <p className="note">
+                    이동 시간을 보려면 지도 탭에서 T맵을 연결하세요.{" "}
+                    <button
+                      type="button"
+                      className="text-btn"
+                      onClick={() => actions.switchTab("map")}
+                    >
+                      연결하기
+                    </button>
+                  </p>
+                )}
+                {tmapReady && !ready && !legBusy && (
+                  <p className="note">
+                    이동 시간을 받지 못했어요.{" "}
+                    <button
+                      type="button"
+                      className="text-btn"
+                      onClick={plan ? () => actions.fetchPlanLegs(mode) : actions.fetchLegs}
+                    >
+                      다시 받기
+                    </button>
+                  </p>
+                )}
+                {needCheck && (
+                  <p className="note warn">사진에서 읽은 정보 중 확인할 게 있어요.</p>
+                )}
+
+                <Timeline
+                  key={mode}
+                  day={viewDay}
+                  calc={viewCalc}
+                  calls={viewCalls}
+                  legBusy={legBusy}
+                  actions={viewActions}
+                />
+
+                <div className="bottom-actions">
+                  {plan ? (
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={aiBusy}
+                      onClick={actions.makePlans}
+                    >
+                      {aiBusy ? "다시 만드는 중…" : "추천 다시 만들기"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => setMode("customer")}
+                    >
+                      추천 코스 보기
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="btn"
+                    onClick={() => actions.copy(actions.courseText(viewDay), "코스 전체")}
+                  >
+                    코스 복사
+                  </button>
+                </div>
+                <TotalsNote day={viewDay} calc={viewCalc} />
+              </>
             )}
           </>
         )}
@@ -842,8 +819,8 @@ export default function RouteView(props) {
           <summary>설정</summary>
           <div className="sub-body">
             <p className="note">
-              이동 시간은 T맵 화물차 경로 기준이에요. 실제 도로 사정은 운전 중
-              T맵에서 확인하세요.
+              이동 시간은 T맵 화물차 경로 기준이에요. 실제 도로 사정은 운전 중 T맵에서
+              확인하세요.
             </p>
             {tmapReady && day.list.length > 0 && (
               <button

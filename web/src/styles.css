@@ -374,3 +374,5 @@ body.dragging-route .grip{cursor:grabbing}
 .fix-time label{flex:1 1 100%}
 .fix-time input{width:100%}
 .fix-time small,.fix-time .text-btn{padding-bottom:0}
+.plan-head{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.modes{margin-top:0;margin-bottom:4px}

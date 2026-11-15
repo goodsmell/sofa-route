@@ -8,7 +8,7 @@ import RouteMap from './RouteMap.jsx';
 import {planWithGemini} from './routeAI.js';
 import RouteView from './RouteView.jsx';
 import {fetchTmapRoute,applyLegs,legInfo,geocodeDay} from './tmapRoute.js';
-import {driverOrder,customerOrder,applyPlan,sortByFixed} from './plan.js';
+import {driverOrder,customerOrder,applyPlan,sortByFixed,movePlan,planKey} from './plan.js';
 
 const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}};
 const init=()=>restoreDay(read(KEY,null),read(HISTORY_KEY,{}));
@@ -72,9 +72,25 @@ export default function App(){
    if(aiKey){try{const next=await planWithGemini(baseDay,aiKey);customer={ids:next.list.filter(c=>!c.done).map(c=>c.id),by:'ai'}}catch(error){if(!quiet)flash(error.message)}}
    if(!customer)customer=geo?{ids:customerOrder(baseDay,rest,from,geo.end,geo.pos).map(c=>c.id),by:'map'}:{ids:recommendOrder(baseDay).list.filter(c=>!c.done).map(c=>c.id),by:'rule'};
    const cache=geo?.cache||{};
-   setDay(d=>({...d,list:d.list.map(c=>cache[c.id]?{...c,...cache[c.id]}:c),plans:{customer,driver,at:new Date().toTimeString().slice(0,5)}}));
+   const plans={customer,driver,at:new Date().toTimeString().slice(0,5),geo:geo?{start:from,end:geo.end}:null};
+   const next={...baseDay,list:baseDay.list.map(c=>cache[c.id]?{...c,...cache[c.id]}:c),plans};
+   setDay(d=>({...d,list:d.list.map(c=>cache[c.id]?{...c,...cache[c.id]}:c),plans}));
    if(!quiet)flash('추천 코스를 새로 만들었어요.');
+   if(key){for(const kind of ['customer','driver'])if(plans[kind])await fetchPlanLegs(kind,next)}
   }finally{setAiBusy(false)}
+ }
+ // 추천 코스 순서 그대로 T맵 구간 시간을 받아 그 추천에 붙여 둔다
+ async function fetchPlanLegs(kind,baseDay=dayRef.current){
+  const key=localStorage.getItem(TMAP_KEY),plan=baseDay.plans?.[kind];
+  if(!key||!plan)return;
+  let profile={height:'340',weight:'3500'};try{profile={...profile,...JSON.parse(localStorage.getItem(TRUCK_KEY)||'{}')}}catch{}
+  const ordered=applyPlan(baseDay,plan.ids),wanted=planKey(ordered);
+  setLegBusy(true);
+  try{
+   const route=await fetchTmapRoute(ordered,key,profile);
+   if(route.legs)setDay(d=>{const p=d.plans?.[kind];if(!p||planKey(applyPlan(d,p.ids))!==wanted)return d;return {...d,plans:{...d.plans,[kind]:{...p,legs:route.legs,legsKey:wanted}}}});
+  }catch(error){flash(error.message||'T맵 이동 시간을 받지 못했어요.')}
+  finally{setLegBusy(false)}
  }
  async function fetchLegs(baseDay=day,quiet=false){
   const key=localStorage.getItem(TMAP_KEY);
@@ -86,7 +102,7 @@ export default function App(){
    const route=await fetchTmapRoute(baseDay,key,profile);
    if(!route.legs)throw new Error('T맵 구간 시간을 읽지 못했어요.');
    if(signature(dayRef.current)!==signature(baseDay)){flash('코스가 바뀌어 이동 시간을 다시 받아 주세요.');return}
-   setDay(applyLegs(baseDay,route.legs));
+   setDay(d=>signature(d)===signature(baseDay)?applyLegs(d,route.legs):d);
    if(!quiet)flash('T맵 이동 시간을 반영했어요.');
   }catch(error){flash(error.message||'T맵 이동 시간을 받지 못했어요.')}
   finally{setLegBusy(false)}
@@ -142,7 +158,7 @@ export default function App(){
   <details className="panel" id="trip-settings"><summary>출발·귀가 장소</summary><p className="hint">3.5톤 · 높이 3.40m</p><Field label="출발하는 곳" value={day.start} onChange={v=>setDay(d=>({...d,start:v}))}/><Field label="마지막 귀가" value={day.end} onChange={v=>setDay(d=>({...d,end:v}))}/></details>
   <details className="panel" id="add-panel" open={!!editing||undefined}><summary>{editing?'고객 정보 수정':'직접 고객 추가'}</summary><div className="form-fields"><Field label="고객 이름" value={draft.name} onChange={v=>change('name',v)} placeholder="예: 홍길동"/><Field label="실제 연락처 (010 · 고객 목록)" type="tel" value={draft.phone} onChange={v=>change('phone',v)}/><Field label="주소" value={draft.addr} onChange={v=>change('addr',v)} placeholder="경기 수원시 영통구 ..."/><div className="field"><span>고객이 원하는 시간</span><div className="seg">{[['am','오전','9~13시'],['pm','오후','13~17시'],['any','지정불가','9~17시']].map(([v,l,s])=><label key={v}><input type="radio" checked={draft.slot===v} onChange={()=>change('slot',v)}/>{l}<small>{s}</small></label>)}</div></div><div className="field"><span>해당되는 것 누르기</span><div className="chips">{[['noelev','엘리베이터 없음'],['bs','기존 소파 수거'],['single','단품 (암체어 등)'],['call','전날 전화 요청']].map(([k,l])=><label className="chip" key={k}><input type="checkbox" checked={!!draft[k]} onChange={e=>change(k,e.target.checked)}/>{l}</label>)}</div></div><details><summary>더 적을 것 (제품, 특이사항, 2차 번호)</summary><div className="form-fields">{[['prod','제품'],['safePhone','안심번호 (0508)'],['phone2','2차 연락처'],['elevSize','엘리베이터 인승']].map(([k,l])=><Field key={k} label={l} value={draft[k]} onChange={v=>change(k,v)}/>)}<label className="field"><span>특이사항</span><textarea value={draft.memo||''} onChange={e=>change('memo',e.target.value)}/></label><Field label="정확한 방문 약속 시각" type="time" value={draft.promiseTime} onChange={v=>change('promiseTime',v)}/><Field label="설치 시간 (분) · 비우면 자동" type="number" value={draft.work} onChange={v=>change('work',v)}/><label className="chip"><input type="checkbox" checked={!!draft.sorry} onChange={e=>change('sorry',e.target.checked)}/>시간 조율·양해 전화 필요</label></div></details><button className="primary big" onClick={save}>{editing?'수정 저장':'＋ 이 고객 추가'}</button>{editing&&<button onClick={()=>{setEditing(null);setDraft(blank())}}>수정 그만두기</button>}</div></details>
  </div></section>}
- {tab==='order'&&<RouteView day={day} history={history} calc={calc} calls={calls} legBusy={legBusy} aiBusy={aiBusy} tmapReady={tmapReady} legsReady={legsReady} actions={{openDay:date=>openDay(date,'order'),switchTab,fetchLegs:()=>fetchLegs(),makePlans:()=>makePlans(),usePlan:ids=>setDay(d=>applyPlan(d,ids)),sortByFixed:()=>setDay(d=>sortByFixed(d)),copy:copyText,courseText:()=>courseText(day),update,move,edit,remove:id=>setDay(d=>({...d,list:d.list.filter(x=>x.id!==id)})),openDocument,aiKey,aiSettings:()=>{setKeyDraft(aiKey);setRememberKey(!!localStorage.getItem(AI_KEY));setAiSetup(true)},forgetAI,clearDay:()=>{setDay(d=>({...d,list:[],contacts:[]}));switchTab('add')}}}/>}
+ {tab==='order'&&<RouteView day={day} history={history} calc={calc} calls={calls} legBusy={legBusy} aiBusy={aiBusy} tmapReady={tmapReady} legsReady={legsReady} actions={{openDay:date=>openDay(date,'order'),switchTab,fetchLegs:()=>fetchLegs(),makePlans:()=>makePlans(),usePlan:ids=>setDay(d=>applyPlan(d,ids)),sortByFixed:()=>setDay(d=>sortByFixed(d)),copy:copyText,courseText:d=>courseText(d||day),movePlan:(kind,from,to)=>{const next=movePlan(dayRef.current,kind,from,to);if(next===dayRef.current)return;setDay(next);void fetchPlanLegs(kind,next)},fetchPlanLegs:kind=>fetchPlanLegs(kind),update,move,edit,remove:id=>setDay(d=>({...d,list:d.list.filter(x=>x.id!==id)})),openDocument,aiKey,aiSettings:()=>{setKeyDraft(aiKey);setRememberKey(!!localStorage.getItem(AI_KEY));setAiSetup(true)},forgetAI,clearDay:()=>{setDay(d=>({...d,list:[],contacts:[]}));switchTab('add')}}}/>}
  {tab==='map'&&<RouteMap day={day}/>}
  {tab==='calendar'&&<section className="view"><div className="wrap"><div className="panel"><div className="calendar-head"><button aria-label="이전 달" onClick={()=>changeMonth(-1)}>‹</button><h2>{year}년 {mon+1}월</h2><button aria-label="다음 달" onClick={()=>changeMonth(1)}>›</button></div><div className="calendar-grid">{'일월화수목금토'.split('').map((w,i)=><span key={i} className="calendar-weekday">{w}</span>)}{Array.from({length:offset},(_,i)=><span key={'e'+i}/>)}{Array.from({length:days},(_,i)=>{const date=year+'-'+String(mon+1).padStart(2,'0')+'-'+String(i+1).padStart(2,'0'),record=date===day.date?day:history[date],count=record?.list?.length||0;return <button key={date} className={'calendar-day '+(count?'has-route ':'')+(selected===date?'selected ':'')+(today()===date?'today':'')} onClick={()=>setSelected(date)}>{i+1}{count>0&&<small>{count}곳</small>}</button>})}</div></div><div className="panel"><h2>{labelDate(selected)}</h2>{chosen?.list?.length?<div className="calendar-detail"><p>{chosen.list.length}곳 · 완료 {chosen.list.filter(c=>c.done).length}곳</p><ol>{chosen.list.map(c=><li key={c.id} className="calendar-record"><strong><button type="button" className="customer-name" onClick={()=>openDocument(c)} aria-label={c.name+' 출고표 보기'}>{c.name}<small>출고표</small></button>{c.done&&c.doneAt?' · 완료 '+c.doneAt:''}</strong><div className="info-line"><span>{c.addr}</span><button type="button" className="copy-action" aria-label={c.name+" 주소 복사"} onClick={()=>copyText(c.addr,"주소")}>복사</button></div>{(c.phone||c.safePhone)&&<div className="info-line"><span>{normalizePhone(c.phone||c.safePhone)}</span><button type="button" className="copy-action" aria-label={c.name+" 전화번호 복사"} onClick={()=>copyText(normalizePhone(c.phone||c.safePhone),"전화번호")}>복사</button></div>}</li>)}</ol></div>:<p className="hint">저장된 배송 기록이 없습니다.</p>}<button className="primary big" onClick={()=>openDay(selected)}>이 날짜 코스 열기</button><button className="big" onClick={()=>openDay(today())}>오늘 코스 보기</button>{selected<today()&&chosen?.list?.length>0&&<button className="danger big" onClick={()=>deletePastDates([selected])}>이 날짜 기록 삭제</button>}{pastDates.length>0&&<button className="danger big" onClick={()=>deletePastDates(pastDates)}>지난 기록 전체 삭제</button>}</div></div></section>}
  </div><nav className="tabs" aria-label="화면 바꾸기"><div className="in" role="tablist">{[['order','오늘 코스'],['add',pending.length?'추가 ('+pending.length+')':'추가'],['map','지도'],['calendar','달력']].map(([k,l])=><button key={k} role="tab" aria-selected={tab===k} onClick={()=>switchTab(k)}><TabIcon name={k}/>{l}</button>)}</div></nav><AiSetup open={aiSetup} keyValue={keyDraft} onKeyChange={setKeyDraft} remember={rememberKey} onRemember={setRememberKey} onClose={()=>setAiSetup(false)} onStart={connectAI}/><DocumentViewer viewer={viewer} url={documentUrl} status={documentStatus} zoom={zoom} onZoom={setZoom} onClose={()=>setViewer(null)} onUpload={()=>{setViewer(null);switchTab('add')}}/>{toast&&<div className="toast" role="status">{toast}</div>}</>
