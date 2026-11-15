@@ -3,7 +3,8 @@ import {
   fmt,
   normalizePhone,
   digits,
-  workMin,
+  blockMin,
+  weightKg,
   stopFacts,
   shortArea,
   toMin,
@@ -136,6 +137,7 @@ function StopCard({
           : null,
     c.noelev ? "엘리베이터 없음" : null,
     c.bs ? "기존 소파 수거" : null,
+    weightKg(c) == null ? "무게 확인" : null,
   ].filter(Boolean);
   return (
     <article
@@ -203,7 +205,8 @@ function StopCard({
               className={
                 "badge" +
                 (b === "엘리베이터 없음" ? " warn" : "") +
-                (b.endsWith(" 확정") ? " ok" : "")
+                (b.endsWith(" 확정") ? " ok" : "") +
+                (b === "무게 확인" ? " dashed" : "")
               }
             >
               {b}
@@ -268,8 +271,11 @@ function StopCard({
               </div>
             ))}
             <div>
-              <dt>작업 예상</dt>
-              <dd>{workMin(c)}분</dd>
+              <dt>한 집 시간</dt>
+              <dd>
+                {blockMin(c) === 30 ? "30분" : "1시간"} (이동+작업)
+                {(+c.travel || 0) > 20 && " + 먼 이동 " + ((+c.travel || 0) - 20) + "분"}
+              </dd>
             </div>
           </dl>
           {c.callMemo && <p className="note">통화 메모: {c.callMemo}</p>}
@@ -345,7 +351,7 @@ function StopCard({
             </button>
           </div>
           <details className="sub">
-            <summary>희망 시간대 · 통화 메모 · 고객 수정</summary>
+            <summary>희망 시간대 · 무게 · 통화 메모 · 고객 수정</summary>
             <div className="sub-body">
               <label className="field">
                 <span>약속 시간대</span>
@@ -362,6 +368,16 @@ function StopCard({
                   <option value="pm">오후 13~17시</option>
                   <option value="any">시간 상관없음</option>
                 </select>
+              </label>
+              <label className="field">
+                <span>총 무게 (kg)</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={c.weight || ""}
+                  placeholder="출고표 노란 줄의 총 무게"
+                  onChange={(e) => actions.update(c.id, { weight: e.target.value })}
+                />
               </label>
               <label className="field">
                 <span>통화 메모</span>

@@ -87,6 +87,7 @@ export function baseCustomer(x = {}) {
     call: !!x.call,
     sorry: !!x.sorry,
     prod: x.prod || "",
+    weight: x.weight || "",
     memo: x.memo || "",
     travel: x.travel ?? 30,
     work: x.work || "",
@@ -95,6 +96,16 @@ export function baseCustomer(x = {}) {
     doneAt: x.doneAt || "",
   };
 }
+// 물건 무게(kg). 모르면 null
+export const weightKg = (c) => (+c.weight > 0 ? +c.weight : null);
+// 한 집에 잡는 시간(이동+작업): 50kg 미만 30분, 50kg 이상이나 무게를 모르면 1시간
+export const blockMin = (c) => {
+  const w = weightKg(c);
+  return w != null && w < 50 ? 30 : 60;
+};
+// 이동이 20분을 넘으면 넘는 만큼 더한다. 그래서 작업에 남는 시간 = 한 집 시간 - min(이동, 20)
+export const serviceMin = (c, travel) =>
+  blockMin(c) - Math.min(Math.max(+travel || 0, 0), 20);
 export function workMin(c) {
   if (+c.work > 0) return +c.work;
   let n = /리클라이너|전동/.test(c.prod || "") ? 30 : 15;
@@ -127,7 +138,7 @@ export function compute(day) {
       reach = t + (+c.travel || 0),
       start = Math.max(reach, sl.s),
       wait = start - reach,
-      end = start + workMin(c),
+      end = start + serviceMin(c, +c.travel || 0),
       flags = [];
     if (start >= sl.e) flags.push(["bad", sl.label + " 시간 넘김"]);
     else if (start >= 1020) flags.push(["warn", "17시 넘어 도착"]);
@@ -196,7 +207,7 @@ function score(day, list) {
     t =
       c.done && /^\d{2}:\d{2}$/.test(c.doneAt || "")
         ? toMin(c.doneAt)
-        : start + workMin(c);
+        : start + serviceMin(c, +c.travel || 30);
   }
   if (list.length) {
     const last = list.at(-1).addr || "";
@@ -295,7 +306,8 @@ export function stopFacts(c) {
           ? "있음 · " + c.elevSize
           : "확인 필요",
     ],
-    ["기존 소파 수거", c.bs ? "있음 · 시간 여유" : "없음"],
+    ["무게", weightKg(c) != null ? weightKg(c) + "kg" : "확인 필요"],
+    ["기존 소파 수거", c.bs ? "있음" : "없음"],
     ["특이사항", c.memo || "없음"],
   ];
 }

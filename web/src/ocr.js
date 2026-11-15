@@ -2,6 +2,8 @@ import {baseCustomer,normalizePhone} from "./logic.js";
 export function loadOCR(){return new Promise((resolve,reject)=>{if(window.Tesseract){resolve(window.Tesseract);return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=()=>resolve(window.Tesseract);s.onerror=()=>reject(new Error('글자 읽기 도구를 내려받지 못했습니다. 인터넷 연결을 확인해 주세요.'));document.head.appendChild(s)})}
 function wordsIn(words,w,h,x0,y0,x1,y1){return words.filter(q=>{const b=q.bbox||{},x=((b.x0||0)+(b.x1||0))/2/w,y=((b.y0||0)+(b.y1||0))/2/h;return x>=x0&&x<=x1&&y>=y0&&y<=y1}).sort((a,b)=>(a.bbox.y0-b.bbox.y0)>12?(a.bbox.y0-b.bbox.y0):(a.bbox.x0-b.bbox.x0)).map(q=>q.text).join(' ').trim()}
 function decodeSlot(value){const s=String(value||'').replace(/\s/g,'');if(/지정불가|시간무관|09[:시]?00[-~]17[:시]?00/.test(s))return'any';if(/오전|09[:시]?00[-~]13[:시]?00/.test(s))return'am';if(/오후|13[:시]?00[-~]17[:시]?00/.test(s))return'pm';return'any'}
+// 노란 줄 "오더별 수량 합계 4 1.581 90.2 20" 에서 세 번째 숫자가 총 무게(kg)
+export function readWeight(text){const m=String(text||'').replace(/,/g,'').match(/합\s*계\s*(\d{1,3})\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/);const kg=m?parseFloat(m[3]):NaN;return kg>0&&kg<2000?String(kg):''}
 export function parseFormOCR(data,w,h,file){
   const words=data.words||[],text=data.text||'';
   const field=(x0,y0,x1,y1)=>wordsIn(words,w,h,x0,y0,x1,y1);
@@ -22,9 +24,10 @@ export function parseFormOCR(data,w,h,file){
   const elevSize=/\d+\s*인승/.test(rawElevSize)&&parseInt(rawElevSize,10)>=6?rawElevSize:'';
   const second=(rawNotes.match(/0(?:10|11|16|17|18|19)[-\s]?\d{3,4}[-\s]?\d{4}/)||[])[0]||'';
   const order=(text.match(/주문번호\s*([0-9]{8,12})/)||[])[1]||'';
+  const weight=readWeight(text);
   if(!name){const m=text.match(/고객명\s*([가-힣]{2,5})/);if(m)name=m[1]}
   if(!addr){const m=text.match(/(?:경기(?:도)?|서울(?:특별시)?|인천(?:광역시)?|강원(?:도|특별자치도)?)\s*[가-힣\d\s,()\-]{12,100}/);if(m)addr=m[0].split(/\n/)[0].trim()}
-  return {...baseCustomer({source:'form',verified:false,name,addr,safePhone,phone2:normalizePhone(second),slot,prod:product,elevSize,noelev:/^N$|^X$|없음|계단/i.test(elevText),memo:[notes,order?'주문 '+order:''].filter(Boolean).join(' · '),call:/전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(rawNotes),bs:/기존\s*소파\s*BS|(?:BS|8S|85)\s*정\s*보|완\s*제\s*품/.test(text)}),file};
+  return {...baseCustomer({source:'form',verified:false,name,addr,safePhone,phone2:normalizePhone(second),slot,prod:product,weight,elevSize,noelev:/^N$|^X$|없음|계단/i.test(elevText),memo:[notes,order?'주문 '+order:''].filter(Boolean).join(' · '),call:/전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(rawNotes),bs:/기존\s*소파\s*BS|(?:BS|8S|85)\s*정\s*보|완\s*제\s*품/.test(text)}),file};
 }
 export async function readFormFields(worker,canvas,customer){
   const box=async(x0,y0,x1,y1)=>{

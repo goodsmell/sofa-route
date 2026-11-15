@@ -1,4 +1,4 @@
-import {visitWindow, workMin, toMin} from './logic.js';
+import {visitWindow, serviceMin, toMin} from './logic.js';
 import {applyLegs} from './tmapRoute.js';
 
 // 직선거리(km). 도로는 이보다 길어서 운전 시간 추정에만 쓴다.
@@ -53,7 +53,7 @@ export function customerScore(day, stops, start, end, pos) {
     if (begin >= w.e) penalty += 1000 + (begin - w.e) * 10;
     if (prefers(c) === 'late') penalty += (stops.length - 1 - i) * 40;
     if (prefers(c) === 'early') penalty += i * 40;
-    t = begin + workMin(c);
+    t = begin + serviceMin(c, move);
     if (p) here = p;
   });
   drive += driveMin(here, end);

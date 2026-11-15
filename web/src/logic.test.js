@@ -49,3 +49,18 @@ test('주소를 시·구·동만 남긴 짧은 지역으로 줄인다',async()=>
   assert.equal(shortArea('경기도 용인시 처인구 중부대로 1168 (삼가동) 힐스테이트용인포레, 110동 1305호'),'용인시 처인구 삼가동');
   assert.equal(shortArea('서울특별시 강남구 테헤란로 1 (역삼동)'),'강남구 역삼동');
 });
+
+test('한 집 시간: 50kg 미만 30분, 이상 1시간, 이동 20분 넘으면 넘는 만큼 더한다',async()=>{
+  const {compute,emptyDay}=await import('./logic.js');
+  const s=(id,o)=>({id,name:id,addr:'경기',slot:'any',done:false,...o});
+  const day={...emptyDay('2026-11-16'),depart:'09:00',endTravel:10,list:[
+    s('light',{weight:21,travel:10}),   // 10분 이동 + 20분 작업 = 30분
+    s('heavy',{weight:145,travel:15}),  // 15분 이동 + 45분 작업 = 60분
+    s('far',{weight:90,travel:50}),     // 60분 + (50-20)=30분 → 이동 50 + 작업 40
+    s('unknown',{travel:20}),           // 무게 모름은 1시간으로
+  ]};
+  const {rows,home}=compute(day);
+  assert.deepEqual(rows.map(r=>[r.start,r.end].map(m=>String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'))),
+    [['09:10','09:30'],['09:45','10:30'],['11:20','12:00'],['12:20','13:00']]);
+  assert.equal(home,13*60+10);
+});

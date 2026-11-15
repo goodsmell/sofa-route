@@ -1,4 +1,4 @@
-import {workMin} from './logic.js';
+import {blockMin} from './logic.js';
 
 const MODEL = 'gemini-3.5-flash-lite';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
@@ -23,7 +23,7 @@ export function routeInput(day) {
       id: stop.id,
       area: coarseArea(stop.addr),
       window: stop.promiseTime ? `${stop.promiseTime}부터 30분` : stop.slot === 'am' ? '09:00~13:00' : stop.slot === 'pm' ? '13:00~17:00' : '09:00~17:00',
-      workMinutes: workMin(stop),
+      minutesWithTravel: blockMin(stop),
       preferred: /가장\s*늦게|가능하면\s*늦게/.test(stop.memo || '') ? '늦게' : /가장\s*이르게|가능하면\s*이르게/.test(stop.memo || '') ? '이르게' : '',
     })),
   };
@@ -47,6 +47,7 @@ export async function planWithGemini(day, key, fetcher = fetch) {
     '당신은 한국의 3.5톤 소파 배송 기사 방문 순서를 추천한다.',
     '아래 데이터에는 고객 이름, 전화번호, 정확한 번지가 없다. 지역과 시간 조건만 보고 순서를 정한다.',
     '시간 약속을 가장 우선한다. 오전은 13시 전, 오후는 13~17시, 정확한 시각은 시작부터 30분 안에 도착해야 한다.',
+    '각 집 minutesWithTravel은 그 집까지 이동과 작업을 합친 시간(30분 또는 60분)이다. 이동이 20분을 넘으면 넘는 만큼 더 걸린다.',
     '06:40 안산 출발, 먼 외곽은 이른 시간 후보, 분당·판교는 10시 이후 후보, 마지막은 안산 복귀에 유리한 지역을 고려한다.',
     '실시간 교통이나 정확한 도로 거리는 알 수 없으므로 추측한 분 단위 이동시간을 만들지 말라.',
     '모든 stop id를 정확히 한 번씩 포함한 방문 순서만 JSON {"order":["id",...]}로 답하라.',
