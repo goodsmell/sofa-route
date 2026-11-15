@@ -340,3 +340,37 @@ body.dragging-route .grip{cursor:grabbing}
 .stop-head{gap:6px}
 .stop-head .round{width:48px;height:48px}
 .grip{width:46px;min-height:48px}
+
+/* 코스 보기 전환 · 추천 코스 · 시간 확정 */
+.modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin-top:16px;padding:4px;border-radius:14px;background:var(--soft)}
+.modes button{min-height:58px;border:0;border-radius:11px;background:none;color:var(--muted);font-size:16px;flex-direction:column;gap:0;padding:6px 4px}
+.modes button small{font-size:12px;font-weight:500}
+.modes button[aria-selected=true]{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.plan{display:flex;flex-direction:column;gap:10px;margin-top:6px}
+.plan .by{display:inline-block;font-size:13px;color:var(--muted);border:1px solid var(--rule);border-radius:999px;padding:0 8px;margin-left:2px}
+.plan-list{list-style:none;margin:6px 0;padding:0;border-top:1px solid var(--rule)}
+.plan-list li{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--rule)}
+.plan-list li>div{flex:1;min-width:0;display:flex;flex-direction:column}
+.plan-list li strong{font-size:19px}
+.plan-list li>div span{font-size:15px;color:var(--muted);word-break:keep-all}
+.plan-list em{flex:none;font-style:normal;font-size:14px;font-weight:600;padding:3px 9px;border-radius:999px;border:1px solid var(--rule)}
+.plan-list em.warn{color:var(--warn);border-color:var(--warn)}
+.plan-list em.ok{color:var(--ok);border-color:var(--ok)}
+.plan-list .plan-end{color:var(--muted);font-size:15px;padding:8px 0}
+.plan-list .plan-end span{width:34px;text-align:center}
+.plan-list .plan-end strong{font-size:15px;font-weight:600}
+.fix-bar{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.fix-bar p{margin:0;font-size:16px;font-weight:600}
+.fix-meter{height:8px;border-radius:99px;background:var(--soft);overflow:hidden}
+.fix-meter span{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .2s}
+.badge.dashed{border-style:dashed;color:var(--muted)}
+.fix-time{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:12px;border-radius:12px;background:var(--soft)}
+.fix-time label{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.fix-time label span{font-size:15px;font-weight:700}
+.fix-time input{font-size:22px;font-weight:700;min-height:54px}
+.fix-time small{font-size:14px;color:var(--muted);padding-bottom:14px;white-space:nowrap}
+.fix-time .text-btn{padding-bottom:14px;white-space:nowrap}
+.fix-time{flex-wrap:wrap;align-items:center}
+.fix-time label{flex:1 1 100%}
+.fix-time input{width:100%}
+.fix-time small,.fix-time .text-btn{padding-bottom:0}

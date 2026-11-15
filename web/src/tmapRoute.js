@@ -109,3 +109,20 @@ export function routeTotals(day) {
   const km=legs.every(leg=>leg.km!=null)?Math.round(legs.reduce((sum,leg)=>sum+leg.km,0)*10)/10:null;
   return {km,min:legs.reduce((sum,leg)=>sum+(+leg.min||0),0),exact:legs.every(leg=>leg.state==='tmap')};
 }
+
+// 출발·귀가·고객 주소를 좌표로 바꾼다. 주소가 그대로면 고객에 저장해 둔 좌표를 다시 쓴다.
+export async function geocodeDay(day, key, fetcher = fetch) {
+  const one = async address => {
+    if (!mapAddress(address)) return null;
+    try {return await geocode(address, key, fetcher)} catch (error) {if (/앱키/.test(error.message)) throw error; return null}
+  };
+  const start = await one(day.start), end = await one(day.end);
+  if (!start || !end) throw new Error('출발지나 귀가 장소 위치를 찾지 못했습니다.');
+  const pos = {}, cache = {};
+  for (const stop of day.list) {
+    if (stop.geoAddr === stop.addr && Number.isFinite(stop.lat)) {pos[stop.id] = {lat: stop.lat, lng: stop.lng}; continue}
+    const point = await one(stop.addr);
+    if (point) {pos[stop.id] = point; cache[stop.id] = {lat: point.lat, lng: point.lng, geoAddr: stop.addr}}
+  }
+  return {start, end, pos, cache};
+}

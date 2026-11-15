@@ -7,7 +7,8 @@ import AiSetup from './AiSetup.jsx';
 import RouteMap from './RouteMap.jsx';
 import {planWithGemini} from './routeAI.js';
 import RouteView from './RouteView.jsx';
-import {fetchTmapRoute,applyLegs,legInfo} from './tmapRoute.js';
+import {fetchTmapRoute,applyLegs,legInfo,geocodeDay} from './tmapRoute.js';
+import {driverOrder,customerOrder,applyPlan,sortByFixed} from './plan.js';
 
 const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k))??f}catch{return f}};
 const init=()=>restoreDay(read(KEY,null),read(HISTORY_KEY,{}));
@@ -57,18 +58,23 @@ export default function App(){
  const switchTab=t=>{setTab(t);window.scrollTo(0,0)};
  const openDocument=c=>setViewer({name:c.name||'고객',imageId:c.imageId||''});
  const signature=d=>JSON.stringify({date:d.date,depart:d.depart,start:d.start,end:d.end,list:d.list.map(c=>[c.id,c.addr,c.slot,c.promiseTime,c.travel,c.work,c.done])});
- async function runAI(baseDay=day,key=aiKey){
-  if(!key){setKeyDraft('');setAiSetup(true);return}
-  if(baseDay.list.filter(c=>!c.done).length<2){flash('방문지가 2곳 이상일 때 AI로 순서를 짤 수 있어요.');return}
+ // 추천 코스 2가지를 만든다: 고객 희망 시간 맞춤(AI 또는 지도 계산)과 운전이 편한 순서(지도 좌표)
+ async function makePlans(baseDay=day,quiet=false){
+  const rest=baseDay.list.filter(c=>!c.done);
+  if(rest.length<2){if(!quiet)flash('배송지가 2곳 이상일 때 추천 코스를 만들 수 있어요.');return}
   setAiBusy(true);
   try{
-   const next=await planWithGemini(baseDay,key);
-   if(signature(dayRef.current)!==signature(baseDay)){flash('코스가 바뀌어 AI 결과를 적용하지 않았어요.');return}
-   setDay(next);
-   flash('AI 추천 순서를 적용했어요.');
-
-  }catch(error){flash(error.message||'AI 연결에 실패했습니다.')}
-  finally{setAiBusy(false)}
+   const key=localStorage.getItem(TMAP_KEY);let geo=null;
+   if(key){try{geo=await geocodeDay(baseDay,key)}catch(error){if(!quiet)flash(error.message)}}
+   const lastDone=baseDay.list.filter(c=>c.done).at(-1),from=geo&&(lastDone&&geo.pos[lastDone.id]||geo.start);
+   const driver=geo?{ids:driverOrder(rest,from,geo.end,geo.pos).map(c=>c.id),by:'map'}:null;
+   let customer=null;
+   if(aiKey){try{const next=await planWithGemini(baseDay,aiKey);customer={ids:next.list.filter(c=>!c.done).map(c=>c.id),by:'ai'}}catch(error){if(!quiet)flash(error.message)}}
+   if(!customer)customer=geo?{ids:customerOrder(baseDay,rest,from,geo.end,geo.pos).map(c=>c.id),by:'map'}:{ids:recommendOrder(baseDay).list.filter(c=>!c.done).map(c=>c.id),by:'rule'};
+   const cache=geo?.cache||{};
+   setDay(d=>({...d,list:d.list.map(c=>cache[c.id]?{...c,...cache[c.id]}:c),plans:{customer,driver,at:new Date().toTimeString().slice(0,5)}}));
+   if(!quiet)flash('추천 코스를 새로 만들었어요.');
+  }finally{setAiBusy(false)}
  }
  async function fetchLegs(baseDay=day,quiet=false){
   const key=localStorage.getItem(TMAP_KEY);
@@ -100,7 +106,7 @@ export default function App(){
   if(!key)return;
   sessionStorage.setItem(AI_KEY,key);
   if(rememberKey)localStorage.setItem(AI_KEY,key);else localStorage.removeItem(AI_KEY);
-  setAiKey(key);setAiSetup(false);runAI(day,key);
+  setAiKey(key);setAiSetup(false);void makePlans(day);
  }
  function forgetAI(){
   sessionStorage.removeItem(AI_KEY);localStorage.removeItem(AI_KEY);
@@ -122,10 +128,10 @@ export default function App(){
   try{await deleteDocuments(removedImages)}catch{flash('기록은 삭제됐지만 일부 사진은 기기에 남아 있을 수 있어요.');return}
   flash(targets.length===1?'배송 기록을 삭제했어요.':'지난 배송 기록을 모두 삭제했어요.');
  }
- function save(){if(!draft.name.trim()||!draft.addr.trim()){flash('고객 이름과 주소를 적어 주세요.');return}const c={...draft,name:draft.name.trim(),addr:draft.addr.trim(),phone:normalizePhone(draft.phone),safePhone:normalizePhone(draft.safePhone),phone2:normalizePhone(draft.phone2),verified:true};const next=editing?{...day,list:day.list.map(x=>x.id===editing?c:x)}:recommendOrder({...day,list:[...day.list,c]});setDay(next);setDraft(blank());setEditing(null);switchTab('order');flash('고객 정보를 저장했어요.');if(!editing&&aiKey&&next.list.filter(x=>!x.done).length>1)void runAI(next,aiKey)}
+ function save(){if(!draft.name.trim()||!draft.addr.trim()){flash('고객 이름과 주소를 적어 주세요.');return}const c={...draft,name:draft.name.trim(),addr:draft.addr.trim(),phone:normalizePhone(draft.phone),safePhone:normalizePhone(draft.safePhone),phone2:normalizePhone(draft.phone2),verified:true};const next=editing?{...day,list:day.list.map(x=>x.id===editing?c:x)}:recommendOrder({...day,list:[...day.list,c]});setDay(next);setDraft(blank());setEditing(null);switchTab('order');flash('고객 정보를 저장했어요.');if(!editing&&next.list.filter(x=>!x.done).length>1)void makePlans(next,true)}
  function edit(c){setDraft({...c});setEditing(c.id);switchTab('add');setTimeout(()=>document.getElementById('add-panel')?.scrollIntoView({behavior:'smooth'}),30)}
  function commit(items){const ready=items.filter(c=>c.name.trim()&&(c.source==='list'||c.addr.trim())),missing=items.filter(c=>!c.name.trim()||(c.source!=='list'&&!c.addr.trim()));ready.sort((a,b)=>(a.source==='list')-(b.source==='list'));let next=structuredClone(day);for(const c of ready)next=mergeCustomer(next,c);next=recommendOrder(next);setDay(next);setPending(missing);if(next.list.length)switchTab('order');flash(ready.length+'건을 읽었어요. 주소와 번호를 확인해 주세요.');return {next,missing}}
- async function importImages(files){if(!files.length)return;setBusy(true);setStatus('글자 읽기 도구 준비 중…');let worker;try{const OCR=await loadOCR();worker=await OCR.createWorker(['kor','eng'],1,{logger:m=>{if(m.status==='recognizing text')setStatus('사진 글자 읽는 중… '+Math.round((m.progress||0)*100)+'%')}});const results=[];let imageSaveFailed=false;for(let i=0;i<files.length;i++){setStatus('사진 '+(i+1)+'/'+files.length+' 읽는 중…');const canvas=await imageCanvas(files[i]),{data}=await worker.recognize(canvas);if(canvas.isForm){let c=parseFormOCR(data,canvas.width,canvas.fullHeight,files[i].name);c=await readFormFields(worker,canvas,c);try{c.imageId=await saveDocument(files[i])}catch{imageSaveFailed=true}results.push(c)}else results.push(...parseTableOCR(data,canvas.width,canvas.fullHeight,files[i].name))}const {next,missing}=commit([...pending,...results]);setStatus(files.length+'장 읽음 · '+next.list.length+'곳 코스 · 확인 필요 '+missing.length+'건'+(imageSaveFailed?' · 출고표 사진 저장 실패':''));if(aiKey&&next.list.length>1)void runAI(next,aiKey)}catch(e){setStatus('읽기 실패: '+(e.message||e)+' 사진을 다시 찍거나 직접 입력해 주세요.')}finally{if(worker)await worker.terminate();setBusy(false)}}
+ async function importImages(files){if(!files.length)return;setBusy(true);setStatus('글자 읽기 도구 준비 중…');let worker;try{const OCR=await loadOCR();worker=await OCR.createWorker(['kor','eng'],1,{logger:m=>{if(m.status==='recognizing text')setStatus('사진 글자 읽는 중… '+Math.round((m.progress||0)*100)+'%')}});const results=[];let imageSaveFailed=false;for(let i=0;i<files.length;i++){setStatus('사진 '+(i+1)+'/'+files.length+' 읽는 중…');const canvas=await imageCanvas(files[i]),{data}=await worker.recognize(canvas);if(canvas.isForm){let c=parseFormOCR(data,canvas.width,canvas.fullHeight,files[i].name);c=await readFormFields(worker,canvas,c);try{c.imageId=await saveDocument(files[i])}catch{imageSaveFailed=true}results.push(c)}else results.push(...parseTableOCR(data,canvas.width,canvas.fullHeight,files[i].name))}const {next,missing}=commit([...pending,...results]);setStatus(files.length+'장 읽음 · '+next.list.length+'곳 코스 · 확인 필요 '+missing.length+'건'+(imageSaveFailed?' · 출고표 사진 저장 실패':''));if(next.list.length>1)void makePlans(next,true)}catch(e){setStatus('읽기 실패: '+(e.message||e)+' 사진을 다시 찍거나 직접 입력해 주세요.')}finally{if(worker)await worker.terminate();setBusy(false)}}
  function move(from,to){if(from===to||to<0||to>=day.list.length)return;setDay(d=>{const list=d.list.slice(),[c]=list.splice(from,1);list.splice(to,0,c);return {...d,list}})}
  const chosen=selected===day.date?day:history[selected],pastDates=Object.keys({...history,[day.date]:day}).filter(date=>date<today()&&({...history,[day.date]:day})[date]?.list?.length),md=new Date(month+'-01T00:00:00'),year=md.getFullYear(),mon=md.getMonth(),offset=md.getDay(),days=new Date(year,mon+1,0).getDate();
  const changeMonth=n=>{const d=new Date(year,mon+n,1);setMonth(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'))};
@@ -136,7 +142,7 @@ export default function App(){
   <details className="panel" id="trip-settings"><summary>출발·귀가 장소</summary><p className="hint">3.5톤 · 높이 3.40m</p><Field label="출발하는 곳" value={day.start} onChange={v=>setDay(d=>({...d,start:v}))}/><Field label="마지막 귀가" value={day.end} onChange={v=>setDay(d=>({...d,end:v}))}/></details>
   <details className="panel" id="add-panel" open={!!editing||undefined}><summary>{editing?'고객 정보 수정':'직접 고객 추가'}</summary><div className="form-fields"><Field label="고객 이름" value={draft.name} onChange={v=>change('name',v)} placeholder="예: 홍길동"/><Field label="실제 연락처 (010 · 고객 목록)" type="tel" value={draft.phone} onChange={v=>change('phone',v)}/><Field label="주소" value={draft.addr} onChange={v=>change('addr',v)} placeholder="경기 수원시 영통구 ..."/><div className="field"><span>고객이 원하는 시간</span><div className="seg">{[['am','오전','9~13시'],['pm','오후','13~17시'],['any','지정불가','9~17시']].map(([v,l,s])=><label key={v}><input type="radio" checked={draft.slot===v} onChange={()=>change('slot',v)}/>{l}<small>{s}</small></label>)}</div></div><div className="field"><span>해당되는 것 누르기</span><div className="chips">{[['noelev','엘리베이터 없음'],['bs','기존 소파 수거'],['single','단품 (암체어 등)'],['call','전날 전화 요청']].map(([k,l])=><label className="chip" key={k}><input type="checkbox" checked={!!draft[k]} onChange={e=>change(k,e.target.checked)}/>{l}</label>)}</div></div><details><summary>더 적을 것 (제품, 특이사항, 2차 번호)</summary><div className="form-fields">{[['prod','제품'],['safePhone','안심번호 (0508)'],['phone2','2차 연락처'],['elevSize','엘리베이터 인승']].map(([k,l])=><Field key={k} label={l} value={draft[k]} onChange={v=>change(k,v)}/>)}<label className="field"><span>특이사항</span><textarea value={draft.memo||''} onChange={e=>change('memo',e.target.value)}/></label><Field label="정확한 방문 약속 시각" type="time" value={draft.promiseTime} onChange={v=>change('promiseTime',v)}/><Field label="설치 시간 (분) · 비우면 자동" type="number" value={draft.work} onChange={v=>change('work',v)}/><label className="chip"><input type="checkbox" checked={!!draft.sorry} onChange={e=>change('sorry',e.target.checked)}/>시간 조율·양해 전화 필요</label></div></details><button className="primary big" onClick={save}>{editing?'수정 저장':'＋ 이 고객 추가'}</button>{editing&&<button onClick={()=>{setEditing(null);setDraft(blank())}}>수정 그만두기</button>}</div></details>
  </div></section>}
- {tab==='order'&&<RouteView day={day} history={history} calc={calc} calls={calls} legBusy={legBusy} aiBusy={aiBusy} tmapReady={tmapReady} legsReady={legsReady} actions={{openDay:date=>openDay(date,'order'),switchTab,fetchLegs:()=>fetchLegs(),runAI:()=>runAI(),copy:copyText,courseText:()=>courseText(day),update,move,edit,remove:id=>setDay(d=>({...d,list:d.list.filter(x=>x.id!==id)})),openDocument,aiKey,aiSettings:()=>{setKeyDraft(aiKey);setRememberKey(!!localStorage.getItem(AI_KEY));setAiSetup(true)},forgetAI,clearDay:()=>{setDay(d=>({...d,list:[],contacts:[]}));switchTab('add')}}}/>}
+ {tab==='order'&&<RouteView day={day} history={history} calc={calc} calls={calls} legBusy={legBusy} aiBusy={aiBusy} tmapReady={tmapReady} legsReady={legsReady} actions={{openDay:date=>openDay(date,'order'),switchTab,fetchLegs:()=>fetchLegs(),makePlans:()=>makePlans(),usePlan:ids=>setDay(d=>applyPlan(d,ids)),sortByFixed:()=>setDay(d=>sortByFixed(d)),copy:copyText,courseText:()=>courseText(day),update,move,edit,remove:id=>setDay(d=>({...d,list:d.list.filter(x=>x.id!==id)})),openDocument,aiKey,aiSettings:()=>{setKeyDraft(aiKey);setRememberKey(!!localStorage.getItem(AI_KEY));setAiSetup(true)},forgetAI,clearDay:()=>{setDay(d=>({...d,list:[],contacts:[]}));switchTab('add')}}}/>}
  {tab==='map'&&<RouteMap day={day}/>}
  {tab==='calendar'&&<section className="view"><div className="wrap"><div className="panel"><div className="calendar-head"><button aria-label="이전 달" onClick={()=>changeMonth(-1)}>‹</button><h2>{year}년 {mon+1}월</h2><button aria-label="다음 달" onClick={()=>changeMonth(1)}>›</button></div><div className="calendar-grid">{'일월화수목금토'.split('').map((w,i)=><span key={i} className="calendar-weekday">{w}</span>)}{Array.from({length:offset},(_,i)=><span key={'e'+i}/>)}{Array.from({length:days},(_,i)=>{const date=year+'-'+String(mon+1).padStart(2,'0')+'-'+String(i+1).padStart(2,'0'),record=date===day.date?day:history[date],count=record?.list?.length||0;return <button key={date} className={'calendar-day '+(count?'has-route ':'')+(selected===date?'selected ':'')+(today()===date?'today':'')} onClick={()=>setSelected(date)}>{i+1}{count>0&&<small>{count}곳</small>}</button>})}</div></div><div className="panel"><h2>{labelDate(selected)}</h2>{chosen?.list?.length?<div className="calendar-detail"><p>{chosen.list.length}곳 · 완료 {chosen.list.filter(c=>c.done).length}곳</p><ol>{chosen.list.map(c=><li key={c.id} className="calendar-record"><strong><button type="button" className="customer-name" onClick={()=>openDocument(c)} aria-label={c.name+' 출고표 보기'}>{c.name}<small>출고표</small></button>{c.done&&c.doneAt?' · 완료 '+c.doneAt:''}</strong><div className="info-line"><span>{c.addr}</span><button type="button" className="copy-action" aria-label={c.name+" 주소 복사"} onClick={()=>copyText(c.addr,"주소")}>복사</button></div>{(c.phone||c.safePhone)&&<div className="info-line"><span>{normalizePhone(c.phone||c.safePhone)}</span><button type="button" className="copy-action" aria-label={c.name+" 전화번호 복사"} onClick={()=>copyText(normalizePhone(c.phone||c.safePhone),"전화번호")}>복사</button></div>}</li>)}</ol></div>:<p className="hint">저장된 배송 기록이 없습니다.</p>}<button className="primary big" onClick={()=>openDay(selected)}>이 날짜 코스 열기</button><button className="big" onClick={()=>openDay(today())}>오늘 코스 보기</button>{selected<today()&&chosen?.list?.length>0&&<button className="danger big" onClick={()=>deletePastDates([selected])}>이 날짜 기록 삭제</button>}{pastDates.length>0&&<button className="danger big" onClick={()=>deletePastDates(pastDates)}>지난 기록 전체 삭제</button>}</div></div></section>}
  </div><nav className="tabs" aria-label="화면 바꾸기"><div className="in" role="tablist">{[['order','오늘 코스'],['add',pending.length?'추가 ('+pending.length+')':'추가'],['map','지도'],['calendar','달력']].map(([k,l])=><button key={k} role="tab" aria-selected={tab===k} onClick={()=>switchTab(k)}><TabIcon name={k}/>{l}</button>)}</div></nav><AiSetup open={aiSetup} keyValue={keyDraft} onKeyChange={setKeyDraft} remember={rememberKey} onRemember={setRememberKey} onClose={()=>setAiSetup(false)} onStart={connectAI}/><DocumentViewer viewer={viewer} url={documentUrl} status={documentStatus} zoom={zoom} onZoom={setZoom} onClose={()=>setViewer(null)} onUpload={()=>{setViewer(null);switchTab('add')}}/>{toast&&<div className="toast" role="status">{toast}</div>}</>

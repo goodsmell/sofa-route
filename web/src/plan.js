@@ -1,0 +1,105 @@
+import {visitWindow, workMin, toMin} from './logic.js';
+
+// 직선거리(km). 도로는 이보다 길어서 운전 시간 추정에만 쓴다.
+export function km(a, b) {
+  const rad = x => x * Math.PI / 180;
+  const dLat = rad(b.lat - a.lat), dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(h));
+}
+
+// 화물차 평균 시속 약 40km, 도로는 직선의 1.3배로 잡은 대략 시간(분)
+export const driveMin = (a, b) => Math.round(km(a, b) * 1.3 / 40 * 60);
+
+const pathKm = (start, stops, end, pos) => {
+  let total = 0, prev = start;
+  for (const s of stops) {total += km(prev, pos[s.id]); prev = pos[s.id]}
+  return total + km(prev, end);
+};
+
+// 운전이 가장 편한 순서: 가까운 곳부터 잇고(최근접) 2-opt로 꼬인 구간을 푼다. 고객 희망 시간은 보지 않는다.
+export function driverOrder(stops, start, end, pos) {
+  const left = stops.filter(s => pos[s.id]), unknown = stops.filter(s => !pos[s.id]);
+  const order = [];
+  let here = start;
+  while (left.length) {
+    let best = 0;
+    for (let i = 1; i < left.length; i++) if (km(here, pos[left[i].id]) < km(here, pos[left[best].id])) best = i;
+    const [next] = left.splice(best, 1);
+    order.push(next); here = pos[next.id];
+  }
+  let improved = true;
+  while (improved) {
+    improved = false;
+    for (let i = 0; i < order.length - 1; i++) for (let j = i + 1; j < order.length; j++) {
+      const next = [...order.slice(0, i), ...order.slice(i, j + 1).reverse(), ...order.slice(j + 1)];
+      if (pathKm(start, next, end, pos) + 1e-9 < pathKm(start, order, end, pos)) {order.splice(0, order.length, ...next); improved = true}
+    }
+  }
+  return [...order, ...unknown];
+}
+
+const prefers = c => /가장\s*늦게|가능하면\s*늦게|늦은\s*시간/.test(c.memo || '') ? 'late' : /가장\s*이르게|가능하면\s*이르게/.test(c.memo || '') ? 'early' : '';
+
+// 대략 시간으로 순서를 돌려 보고, 약속을 어기거나 요청과 다르면 큰 벌점을 준다.
+export function customerScore(day, stops, start, end, pos) {
+  let t = toMin(day.depart), here = start, penalty = 0, drive = 0;
+  stops.forEach((c, i) => {
+    const p = pos[c.id];
+    const move = p ? driveMin(here, p) : 30;
+    drive += move;
+    const w = visitWindow(c), reach = t + move, begin = Math.max(reach, w.s);
+    if (begin >= w.e) penalty += 1000 + (begin - w.e) * 10;
+    if (prefers(c) === 'late') penalty += (stops.length - 1 - i) * 40;
+    if (prefers(c) === 'early') penalty += i * 40;
+    t = begin + workMin(c);
+    if (p) here = p;
+  });
+  drive += driveMin(here, end);
+  return penalty + drive;
+}
+
+// 고객 희망 시간에 맞춘 순서: 시간대 순으로 시작해 한 곳씩 옮겨 보며 점수가 낮아지는 쪽을 고른다.
+export function customerOrder(day, stops, start, end, pos) {
+  const slot = {am: 0, any: 1, pm: 2};
+  let best = driverOrder(stops, start, end, pos).sort((a, b) => visitWindow(a).s - visitWindow(b).s || slot[a.slot] - slot[b.slot]);
+  let bestScore = customerScore(day, best, start, end, pos);
+  for (let pass = 0; pass < 20; pass++) {
+    let changed = false;
+    for (let i = 0; i < best.length; i++) for (let j = 0; j < best.length; j++) {
+      if (i === j) continue;
+      const next = best.slice(), [item] = next.splice(i, 1);
+      next.splice(j, 0, item);
+      const value = customerScore(day, next, start, end, pos);
+      if (value < bestScore) {best = next; bestScore = value; changed = true}
+    }
+    if (!changed) break;
+  }
+  return best;
+}
+
+// 추천 순서(id 목록)를 지금 코스에 적용한다. 이미 완료한 곳은 앞에 그대로 둔다.
+export function applyPlan(day, ids) {
+  const done = day.list.filter(c => c.done), rest = day.list.filter(c => !c.done);
+  const byId = new Map(rest.map(c => [c.id, c]));
+  const ordered = ids.map(id => byId.get(id)).filter(Boolean);
+  const missing = rest.filter(c => !ids.includes(c.id));
+  return {...day, list: [...done, ...ordered, ...missing]};
+}
+
+export function planStops(day, ids) {
+  const byId = new Map(day.list.map(c => [c.id, c]));
+  const listed = (ids || []).map(id => byId.get(id)).filter(c => c && !c.done);
+  return [...listed, ...day.list.filter(c => !c.done && !(ids || []).includes(c.id))];
+}
+
+export const isFixed = c => /^\d{2}:\d{2}$/.test(c.promiseTime || '');
+
+// 확정 시간이 있는 고객끼리만 시간 순으로 자리를 바꾼다. 아직 통화 안 한 고객은 자리를 그대로 둔다.
+export function sortByFixed(day) {
+  const slots = day.list.map((c, i) => (!c.done && isFixed(c) ? i : -1)).filter(i => i >= 0);
+  const fixed = slots.map(i => day.list[i]).sort((a, b) => toMin(a.promiseTime) - toMin(b.promiseTime));
+  const list = day.list.slice();
+  slots.forEach((slotIndex, k) => {list[slotIndex] = fixed[k]});
+  return {...day, list};
+}
