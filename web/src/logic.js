@@ -370,3 +370,16 @@ export function courseText(day) {
   );
   return out.join("\n");
 }
+
+// "경기도 성남시 분당구 방아로29번길 7, 103동 (이매동, 동양파크빌)" → "성남시 분당구 이매동"
+export function shortArea(addr) {
+  const text = String(addr || "");
+  const city = text.match(/([가-힣]+(?:시|군))(?=\s)/)?.[1] || "";
+  const gu = text.match(/\s([가-힣]+구)(?=\s)/)?.[1] || "";
+  const dong =
+    text.match(/\(([가-힣0-9]+(?:동|읍|면|리|가))(?=[,)\s])/)?.[1] ||
+    text.match(/\s([가-힣]+[0-9]*(?:동|읍|면))(?=[\s,]|$)/)?.[1] ||
+    "";
+  const parts = [/특별시|광역시/.test(city) ? "" : city, gu, dong].filter(Boolean);
+  return parts.join(" ") || text.split(",")[0];
+}

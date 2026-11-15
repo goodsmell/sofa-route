@@ -41,3 +41,11 @@ test('T맵으로 받기 전에는 가짜 30분 대신 확인 전으로 적는다
   assert.match(text,/이동: 확인 전/);
   assert.match(text,/총 이동 확인 전/);
 });
+
+test('주소를 시·구·동만 남긴 짧은 지역으로 줄인다',async()=>{
+  const {shortArea}=await import('./logic.js');
+  assert.equal(shortArea('경기도 성남시 분당구 방아로29번길 7, 103동 301호 (이매동, 동양파크빌)'),'성남시 분당구 이매동');
+  assert.equal(shortArea('경기도 이천시 신중리로 29 (중리동, 이천중리 우미린 어반퍼스트) 110동 804호'),'이천시 중리동');
+  assert.equal(shortArea('경기도 용인시 처인구 중부대로 1168 (삼가동) 힐스테이트용인포레, 110동 1305호'),'용인시 처인구 삼가동');
+  assert.equal(shortArea('서울특별시 강남구 테헤란로 1 (역삼동)'),'강남구 역삼동');
+});
