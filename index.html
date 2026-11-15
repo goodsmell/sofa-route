@@ -89,14 +89,6 @@ details ol{margin:6px 0 0;padding-left:22px;display:flex;flex-direction:column;g
 .sbox.home{grid-column:1/-1;background:var(--accent-soft)}
 .sbox.home strong{color:var(--accent);font-size:32px}
 
-/* precall */
-.precall{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
-.precall li{background:var(--call-soft);border-radius:12px;padding:10px 14px}
-.precall b{font-size:19px}
-.precall .ph{font-variant-numeric:tabular-nums;font-weight:600}
-.precall .why{display:block;color:var(--call);font-size:16px}
-.precall .none{background:var(--ok-soft);color:var(--ok)}
-
 /* stop list */
 ol.stops{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .leg{display:flex;align-items:center;gap:8px;padding:8px 0 8px 22px;margin-left:24px;border-left:3px dashed var(--line);flex-wrap:wrap}
@@ -176,11 +168,6 @@ h2{font-size:20px;letter-spacing:-.025em}
 .sbox strong{font-size:23px}
 .summary-foot{grid-column:1/-1;margin:0;padding:0 3px;color:var(--muted);font-size:14px}
 .summary-foot small{display:block;font-size:12px}
-.precall-panel{background:var(--call-soft);border-color:transparent;gap:8px}
-.precall-panel h2{color:var(--call)}
-.precall li{background:var(--panel);padding:10px 12px}
-.precall b{font-size:17px}
-.precall a{color:var(--accent);font-weight:700;text-decoration:none}
 ol.stops{gap:10px}
 .route-endpoint{list-style:none;color:var(--muted);font-size:15px;font-weight:700;padding:3px 4px;display:flex;align-items:center;flex-wrap:wrap;gap:5px}
 .route-endpoint button{min-height:40px;font-size:14px;padding:4px 8px}
@@ -195,6 +182,16 @@ ol.stops{gap:10px}
 .stop-card .addr{font-size:16px;line-height:1.45;color:var(--ink)}
 .stop-card .tags{gap:5px}
 .stop-card .tag{font-size:13px;padding:3px 8px}
+.stop-card .drag-handle{width:50px;height:58px;min-height:58px;flex:none;padding:3px;border:1px solid var(--accent-soft);border-radius:13px;background:var(--accent-soft);color:var(--accent);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:none;cursor:grab}
+.drag-handle strong{font-size:20px;line-height:1.1}
+.drag-handle small{font-size:11px;line-height:1.2}
+.drag-handle:active{cursor:grabbing}
+.stop-card.drag-source{opacity:.45}
+.stop-card.drop-before{box-shadow:0 -5px 0 var(--accent),0 2px 12px rgba(16,36,43,.035)}
+.stop-card.drop-after{box-shadow:0 5px 0 var(--accent),0 2px 12px rgba(16,36,43,.035)}
+.drag-ghost{position:fixed;z-index:60;left:0;top:0;transform:translate(-50%,-50%);pointer-events:none;background:var(--accent);color:var(--accent-ink);border-radius:14px;padding:11px 18px;box-shadow:0 8px 28px rgba(16,36,43,.22);font-size:17px;font-weight:700;max-width:80vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.dragging-route{user-select:none}
+.call-reminder{background:var(--call-soft);color:var(--call);border-radius:12px;padding:9px 11px;font-size:15px;font-weight:700;line-height:1.4}
 .stop-main-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .stop-main-actions a{min-height:58px;padding:8px;font-size:18px;text-decoration:none}
 .stop-main-actions .phone-action{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
@@ -306,13 +303,9 @@ nav.tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--
     <div class="wrap" style="gap:14px">
       <p class="example" id="example-note">연습용 예시 코스입니다.</p>
       <p class="example" id="review-alert" hidden></p>
-      <div class="panel precall-panel" id="precall-panel" hidden>
-        <h2>먼저 연락할 고객</h2>
-        <ul class="precall" id="precall"></ul>
-      </div>
       <div class="route-section">
         <div class="route-title"><h2>방문 순서</h2><button type="button" id="btn-sort">남은 코스 다시 짜기</button></div>
-        <p class="hint">전화 후 약속 시간을 바꾸면 남은 방문 순서를 다시 계산합니다.</p>
+        <p class="hint" id="drag-help">번호 손잡이를 누른 채 끌어서 순서를 바꾸세요. 전화 후 약속 시간도 다시 계산할 수 있습니다.</p>
         <ol class="stops" id="stops"></ol>
       </div>
       <div class="summary" id="summary"></div>
@@ -368,7 +361,6 @@ const KEY='sofa-route-v1', HISTORY_KEY='sofa-route-history-v1', TABKEY='sofa-rou
 const SLOT={am:{label:'오전',s:540,e:780},pm:{label:'오후',s:780,e:1020},any:{label:'시간 지정 없음',s:540,e:1020}};
 const $=id=>document.getElementById(id);
 document.querySelector('#tab-add > .wrap').prepend($('photo-panel'));
-$('review-alert').before($('precall').closest('.panel'));
 const toMin=s=>{const m=/^(\d{1,2}):(\d{2})/.exec(s||'');return m?(+m[1])*60+(+m[2]):480};
 const fmt=m=>{m=Math.round(m);return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -436,7 +428,7 @@ function compute(day=S){
 }
 function precallList(rows){
   const out=[];
-  rows.forEach((r,i)=>{const why=[];const c=r.c;
+  rows.forEach((r,i)=>{const why=[];const c=r.c;if(c.done)return;
     if(c.call||/전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(c.memo||''))why.push('전날 연락 요청');
     if(r.start>=r.sl.e)why.push(r.sl.label+' 약속인데 '+fmt(r.start)+' 도착 예상 → 시간 조율');
     if(r.start>=1020)why.push(fmt(r.start)+' 도착 예상 → 늦은 도착 안내');
@@ -489,20 +481,19 @@ function render(){
     `<div class="sbox"><span>시간 주의</span><strong style="color:${bad?'var(--bad)':'var(--ok)'}">${bad?bad+'곳':'없음'}</strong></div>`+
     `<p class="summary-foot">이동 ${rows.length?travel:0}분 · 설치 ${rows.length?work:0}분 · 대기 ${rows.length?wait:0}분 <small>※ 이동은 임시 추정</small></p>`;
   let h=`<li class="route-endpoint">${esc(S.depart)} · 그레이박스에서 출발</li>`;
+  const callReasons=new Map(precallList(rows).map(p=>[p.i,p.why]));
   rows.forEach((r,i)=>{const c=r.c;
     const phone=c.phone||c.safePhone||c.phone2,phoneName=c.phone?'010 전화':c.safePhone?'안심번호 전화':'2차 번호 전화';
-    const visibleFlags=r.flags.filter(f=>f[0]==='bad'||f[1]==='사진 글자 확인'||f[1]==='전날 전화'||f[1]==='통화 내용 반영');
-    h+=`<li class="stop stop-card ${c.done?'completed':''}" data-index="${i}"><div class="stop-top"><span class="num">${i+1}</span><div class="stop-heading"><span class="stop-eta">${fmt(r.start)} <small>도착 예상</small></span><h3>${esc(c.name)}</h3></div></div>`+
+    const visibleFlags=r.flags.filter(f=>f[0]==='bad'||f[1]==='사진 글자 확인'||f[1]==='통화 내용 반영');
+    h+=`<li class="stop stop-card ${c.done?'completed':''}" data-index="${i}"><div class="stop-top"><button type="button" class="drag-handle" data-drag-handle aria-label="${esc(c.name)} ${i+1}번, 누른 채 끌어서 순서 이동" aria-describedby="drag-help"><strong>${i+1}</strong><small>⠿ 끌기</small></button><div class="stop-heading"><span class="stop-eta">${fmt(r.start)} <small>도착 예상</small></span><h3>${esc(c.name)}</h3></div></div>`+
       `<p class="addr">${esc(c.addr)}</p><div class="tags"><span class="tag slot">${esc(r.sl.label)}</span>${visibleFlags.map(f=>`<span class="tag ${f[0]}">${esc(f[1])}</span>`).join('')}</div>`+
+      (callReasons.has(i)?`<div class="call-reminder">☎ 미리 연락 · ${callReasons.get(i).map(esc).join(' · ')}</div>`:'')+
       `<div class="stop-main-actions">${phone?`<a class="btn phone-action" href="tel:${digits(phone)}">☎ ${phoneName}</a>`:''}<a class="btn map-action" href="tmap://search?name=${encodeURIComponent(c.addr)}">↗ T맵 이동</a></div>`+
       `<div class="stop-secondary"><details class="call-adjust"><summary>통화 후 변경</summary><div class="adjust-fields"><p class="hint">고객과 다시 약속한 시간을 적으세요. 완료한 배송은 움직이지 않습니다.</p><label class="field"><span>방문 시간대</span><select data-call-slot><option value="any" ${c.slot==='any'?'selected':''}>시간 지정 없음</option><option value="am" ${c.slot==='am'?'selected':''}>오전 9~13시</option><option value="pm" ${c.slot==='pm'?'selected':''}>오후 13~17시</option></select></label><label class="field"><span>정확한 도착 약속 (있을 때만)</span><input type="time" data-call-time value="${esc(c.promiseTime||'')}"><small>입력하면 그 시각부터 30분 안에 도착하도록 계산해요.</small></label><label class="field"><span>통화 메모</span><textarea data-call-memo placeholder="예: 14시 이후, 주차장 진입 전 전화">${esc(c.callMemo||'')}</textarea></label><button class="primary big" type="button" data-call-save="${i}">저장하고 남은 코스 다시 짜기</button></div></details><button type="button" class="done-action" data-done="${i}">${c.done?'✓ 완료됨 · 취소':'✓ 배송 완료'}</button></div>`+
-      `<details class="more-actions"><summary>이동 시간·순서·상세</summary><div class="more-body"><p>이동 ${+c.travel||0}분 · 설치 ${workMin(c)}분 · ${fmt(r.end)} 종료 예상${c.doneAt?' · 실제 완료 '+esc(c.doneAt):''}</p><div class="travel-adjust"><span>이 고객까지 이동</span><button type="button" data-tv="${i}" data-d="-5">−5분</button><button type="button" data-tv="${i}" data-d="5">+5분</button></div>${c.prod?`<p>제품: ${esc(c.prod)}</p>`:''}${c.memo?`<p>현장 메모: ${esc(c.memo)}</p>`:''}${c.callMemo?`<p>통화 메모: ${esc(c.callMemo)}</p>`:''}<div class="extra-phones">${c.phone&&c.safePhone?`<a href="tel:${digits(c.safePhone)}">안심 ${esc(c.safePhone)}</a>`:''}${c.phone2?`<a href="tel:${digits(c.phone2)}">2차 ${esc(c.phone2)}</a>`:''}</div><div class="ctl"><button type="button" data-up="${i}" ${i&&!c.done&&!rows[i-1].c.done?'':'disabled'}>▲ 위로</button><button type="button" data-down="${i}" ${i<rows.length-1&&!c.done&&!rows[i+1].c.done?'':'disabled'}>▼ 아래로</button><button type="button" data-edit="${i}">정보 수정</button><button type="button" class="danger" data-del="${i}">지우기</button></div></div></details></li>`;
+      `<details class="more-actions"><summary>이동 시간·상세</summary><div class="more-body"><p>이동 ${+c.travel||0}분 · 설치 ${workMin(c)}분 · ${fmt(r.end)} 종료 예상${c.doneAt?' · 실제 완료 '+esc(c.doneAt):''}</p><div class="travel-adjust"><span>이 고객까지 이동</span><button type="button" data-tv="${i}" data-d="-5">−5분</button><button type="button" data-tv="${i}" data-d="5">+5분</button></div>${c.prod?`<p>제품: ${esc(c.prod)}</p>`:''}${c.memo?`<p>현장 메모: ${esc(c.memo)}</p>`:''}${c.callMemo?`<p>통화 메모: ${esc(c.callMemo)}</p>`:''}<div class="extra-phones">${c.phone&&c.safePhone?`<a href="tel:${digits(c.safePhone)}">안심 ${esc(c.safePhone)}</a>`:''}${c.phone2?`<a href="tel:${digits(c.phone2)}">2차 ${esc(c.phone2)}</a>`:''}</div><div class="ctl"><button type="button" data-edit="${i}">정보 수정</button><button type="button" class="danger" data-del="${i}">지우기</button></div></div></details></li>`;
   });
   h+=`<li class="route-endpoint">${rows.length?fmt(home):'--:--'} · 팔곡화물차고지 귀가 예상 <button type="button" data-tv="end" data-d="-5">−5분</button><button type="button" data-tv="end" data-d="5">+5분</button></li>`;
   $('stops').innerHTML=rows.length?h:'<li class="hint">아직 고객이 없어요. ① 고객 넣기에서 추가하세요.</li>';
-  const pc=precallList(rows);
-  $('precall-panel').hidden=!pc.length;
-  $('precall').innerHTML=pc.length?pc.map(p=>`<li><b>${p.i+1}번 ${esc(p.c.name)}</b> ${p.c.phone?`<a href="tel:${digits(p.c.phone)}">실제 ${esc(p.c.phone)}</a>`:''}${p.c.safePhone?` <a href="tel:${digits(p.c.safePhone)}">안심 ${esc(p.c.safePhone)}</a>`:''}${p.c.phone2?` <a href="tel:${digits(p.c.phone2)}">2차 ${esc(p.c.phone2)}</a>`:''}<span class="why">${p.why.map(esc).join(' · ')}</span></li>`).join(''):'<li class="none">미리 전화할 곳이 없어요.</li>';
   persist();
   if(tab==='calendar')renderCalendar();
 }
@@ -538,14 +529,66 @@ $('stops').addEventListener('click',e=>{
   if(d.callSave!=null){const i=+d.callSave,c=L[i],card=b.closest('.stop-card');c.slot=card.querySelector('[data-call-slot]').value;c.promiseTime=card.querySelector('[data-call-time]').value;c.callMemo=card.querySelector('[data-call-memo]').value.trim();recommendOrder();render();toast('통화 내용을 저장하고 남은 코스를 다시 짰어요');return}
   if(d.copyaddr!=null){navigator.clipboard.writeText(L[+d.copyaddr].addr).then(()=>toast('주소를 복사했어요'),()=>toast('주소 복사가 안 됐어요'));return}
   if(d.tv!=null){const v=x=>Math.max(0,(+x||0)+(+d.d));if(d.tv==='end')S.endTravel=v(S.endTravel);else L[+d.tv].travel=v(L[+d.tv].travel);render();return}
-  if(d.up!=null){const i=+d.up;if(i<1||L[i].done||L[i-1].done)return;[L[i-1],L[i]]=[L[i],L[i-1]]}
-  else if(d.down!=null){const i=+d.down;if(i>=L.length-1||L[i].done||L[i+1].done)return;[L[i+1],L[i]]=[L[i],L[i+1]]}
-  else if(d.del!=null){const i=+d.del;
+  if(d.del!=null){const i=+d.del;
     if(armedDel!==i){armedDel=i;b.textContent='정말 지우기';b.classList.add('armed');clearTimeout(armT);armT=setTimeout(()=>{armedDel=null;if(b.isConnected){b.textContent='지우기';b.classList.remove('armed')}},4000);return}
     const nm=L[i].name;L.splice(i,1);armedDel=null;if(editing!=null)setEditing(null);toast(nm+' 님 지웠어요')}
   else if(d.edit!=null){setEditing(+d.edit);return}
   else return;
   armedDel=null;render();
+});
+/* Drag the numbered handle on touch or mouse; keep keyboard arrows available. */
+let routeDrag=null;
+function moveStop(from,to){
+  if(to<0||to>=S.list.length||from===to)return false;
+  const [customer]=S.list.splice(from,1);S.list.splice(to,0,customer);
+  render();$('stops').querySelector(`[data-index="${to}"] .drag-handle`)?.focus({preventScroll:true});
+  toast((customer.name||'고객')+' 님을 '+(to+1)+'번째로 옮겼어요');return true;
+}
+function dropPosition(y){
+  const cards=[...$('stops').querySelectorAll('.stop-card')].filter(card=>card!==routeDrag.card);
+  if(!cards.length)return null;
+  for(const card of cards){const rect=card.getBoundingClientRect();if(y<rect.top+rect.height/2)return {card,after:false,boundary:+card.dataset.index}}
+  const card=cards[cards.length-1];return {card,after:true,boundary:+card.dataset.index+1};
+}
+function updateDrop(y){
+  if(!routeDrag)return;
+  $('stops').querySelectorAll('.drop-before,.drop-after').forEach(card=>card.classList.remove('drop-before','drop-after'));
+  routeDrag.drop=dropPosition(y);
+  if(routeDrag.drop)routeDrag.drop.card.classList.add(routeDrag.drop.after?'drop-after':'drop-before');
+}
+function routeAutoScroll(){
+  if(!routeDrag)return;
+  const y=routeDrag.y,step=y<90?-13:y>innerHeight-100?13:0;
+  if(step){window.scrollBy(0,step);updateDrop(y)}
+  routeDrag.raf=requestAnimationFrame(routeAutoScroll);
+}
+$('stops').addEventListener('pointerdown',e=>{
+  const handle=e.target.closest('[data-drag-handle]');if(!handle||e.button!==0||routeDrag)return;
+  const card=handle.closest('.stop-card'),from=+card.dataset.index;
+  e.preventDefault();handle.setPointerCapture(e.pointerId);
+  const ghost=document.createElement('div');ghost.className='drag-ghost';ghost.textContent=(from+1)+'. '+(S.list[from].name||'고객');document.body.append(ghost);
+  routeDrag={pointerId:e.pointerId,handle,card,from,ghost,y:e.clientY,drop:null,raf:0};
+  ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';card.classList.add('drag-source');document.body.classList.add('dragging-route');
+  routeDrag.raf=requestAnimationFrame(routeAutoScroll);
+});
+$('stops').addEventListener('pointermove',e=>{
+  if(!routeDrag||routeDrag.pointerId!==e.pointerId)return;
+  e.preventDefault();routeDrag.y=e.clientY;routeDrag.ghost.style.left=e.clientX+'px';routeDrag.ghost.style.top=e.clientY+'px';updateDrop(e.clientY);
+});
+function finishRouteDrag(e,commit){
+  if(!routeDrag||routeDrag.pointerId!==e.pointerId)return;
+  const drag=routeDrag,drop=drag.drop;routeDrag=null;
+  cancelAnimationFrame(drag.raf);drag.ghost.remove();drag.card.classList.remove('drag-source');document.body.classList.remove('dragging-route');
+  $('stops').querySelectorAll('.drop-before,.drop-after').forEach(card=>card.classList.remove('drop-before','drop-after'));
+  if(drag.handle.hasPointerCapture(e.pointerId))drag.handle.releasePointerCapture(e.pointerId);
+  if(commit&&drop){const to=drop.boundary-(drag.from<drop.boundary?1:0);moveStop(drag.from,to)}
+}
+$('stops').addEventListener('pointerup',e=>finishRouteDrag(e,true));
+$('stops').addEventListener('pointercancel',e=>finishRouteDrag(e,false));
+$('stops').addEventListener('keydown',e=>{
+  const handle=e.target.closest('[data-drag-handle]');if(!handle)return;
+  const from=+handle.closest('.stop-card').dataset.index,to=e.key==='ArrowUp'?from-1:e.key==='ArrowDown'?from+1:e.key==='Home'?0:e.key==='End'?S.list.length-1:null;
+  if(to==null)return;e.preventDefault();moveStop(from,to);
 });
 function areaKey(addr){const m=String(addr||'').match(/(?:특별시|광역시|특별자치시|도)?\s*([가-힣]+시)\s*([가-힣]+구|[가-힣]+군)?/);return m?(m[1]+' '+(m[2]||'')).trim():String(addr||'').split(/\s+/).slice(0,2).join(' ')}
 function routeScore(list){
