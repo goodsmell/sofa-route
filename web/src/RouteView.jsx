@@ -138,6 +138,7 @@ function StopCard({
     c.noelev ? "엘리베이터 없음" : null,
     c.bs ? "기존 소파 수거" : null,
     weightKg(c) == null ? "무게 확인" : null,
+    c.geoMissing ? "T맵 주소 확인" : c.geoApprox ? "위치 대략" : null,
   ].filter(Boolean);
   return (
     <article
@@ -204,7 +205,7 @@ function StopCard({
               key={b}
               className={
                 "badge" +
-                (b === "엘리베이터 없음" ? " warn" : "") +
+                (b === "엘리베이터 없음" || b === "T맵 주소 확인" ? " warn" : "") +
                 (b.endsWith(" 확정") ? " ok" : "") +
                 (b === "무게 확인" ? " dashed" : "")
               }
@@ -228,6 +229,22 @@ function StopCard({
               </button>
             )}
           </p>
+          {c.geoMissing && (
+            <div className="fix-time warn-box">
+              <p className="note warn">
+                T맵이 이 주소를 못 찾아서 앞뒤 이동 시간을 모릅니다. 도로명 주소나 아파트 이름을 넣어 주세요.
+              </p>
+              <label className="field">
+                <span>T맵 검색용 주소 (카드 주소는 그대로)</span>
+                <input
+                  type="text"
+                  value={c.mapAddr || ""}
+                  placeholder="도로명 주소나 아파트 이름"
+                  onChange={(e) => actions.update(c.id, { mapAddr: e.target.value, geoAddr: "" })}
+                />
+              </label>
+            </div>
+          )}
           {reminder && (
             <p className="note warn">먼저 전화: {reminder.why.join(", ")}</p>
           )}
@@ -351,7 +368,7 @@ function StopCard({
             </button>
           </div>
           <details className="sub">
-            <summary>희망 시간대 · 무게 · 통화 메모 · 고객 수정</summary>
+            <summary>희망 시간대 · 무게 · T맵 주소 · 고객 수정</summary>
             <div className="sub-body">
               <label className="field">
                 <span>약속 시간대</span>
@@ -368,6 +385,15 @@ function StopCard({
                   <option value="pm">오후 13~17시</option>
                   <option value="any">시간 상관없음</option>
                 </select>
+              </label>
+<label className="field">
+                <span>T맵 검색용 주소 (카드 주소는 그대로)</span>
+                <input
+                  type="text"
+                  value={c.mapAddr || ""}
+                  placeholder="도로명 주소나 아파트 이름"
+                  onChange={(e) => actions.update(c.id, { mapAddr: e.target.value, geoAddr: "" })}
+                />
               </label>
               <label className="field">
                 <span>총 무게 (kg)</span>

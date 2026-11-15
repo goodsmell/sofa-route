@@ -57,6 +57,10 @@ export default function App(){
  const update=(id,patch)=>setDay(d=>({...d,list:d.list.map(c=>c.id===id?{...c,...patch}:c)}));
  const switchTab=t=>{setTab(t);window.scrollTo(0,0)};
  const openDocument=c=>setViewer({name:c.name||'고객',imageId:c.imageId||''});
+ const routeSig=d=>JSON.stringify([d.date,d.depart,d.start,d.end,d.list.map(c=>[c.id,c.addr,c.mapAddr||''])]);
+ // 못 찾은 고객 표시와 찾은 좌표를 고객에 저장
+ const markLocated=(list,route)=>list.map(c=>route.located?.[c.id]?{...c,...route.located[c.id],geoMissing:false}:route.missing?.some(m=>m.id===c.id)?{...c,geoMissing:true}:c);
+ const missingNote=route=>route.missing?.length?route.missing.map(m=>m.name).slice(0,3).join(', ')+(route.missing.length>3?' 외 '+(route.missing.length-3)+'곳':'')+' 주소를 T맵에서 못 찾았어요. 카드에서 "T맵 검색용 주소"를 넣어 주세요.':'';
  const signature=d=>JSON.stringify({date:d.date,depart:d.depart,start:d.start,end:d.end,list:d.list.map(c=>[c.id,c.addr,c.slot,c.promiseTime,c.travel,c.work,c.done])});
  // 추천 코스 2가지를 만든다: 고객 희망 시간 맞춤(AI 또는 지도 계산)과 운전이 편한 순서(지도 좌표)
  async function makePlans(baseDay=day,quiet=false){
@@ -65,7 +69,7 @@ export default function App(){
   setAiBusy(true);
   try{
    const key=localStorage.getItem(TMAP_KEY);let geo=null;
-   if(key){try{geo=await geocodeDay(baseDay,key)}catch(error){if(!quiet)flash(error.message)}}
+   if(key){try{geo=await geocodeDay(baseDay,key);const note=missingNote(geo);if(note&&!quiet)flash(note)}catch(error){if(!quiet)flash(error.message)}}
    const lastDone=baseDay.list.filter(c=>c.done).at(-1),from=geo&&(lastDone&&geo.pos[lastDone.id]||geo.start);
    const driver=geo?{ids:driverOrder(rest,from,geo.end,geo.pos).map(c=>c.id),by:'map'}:null;
    let customer=null;
@@ -88,7 +92,8 @@ export default function App(){
   setLegBusy(true);
   try{
    const route=await fetchTmapRoute(ordered,key,profile);
-   if(route.legs)setDay(d=>{const p=d.plans?.[kind];if(!p||planKey(applyPlan(d,p.ids))!==wanted)return d;return {...d,plans:{...d.plans,[kind]:{...p,legs:route.legs,legsKey:wanted}}}});
+   if(!route.legs)throw new Error('T맵 구간 시간을 읽지 못했어요. "다시 받기"를 눌러 주세요.');
+   setDay(d=>{const p=d.plans?.[kind];const next={...d,list:markLocated(d.list,route)};if(!p||planKey(applyPlan(d,p.ids))!==wanted)return next;return {...next,plans:{...d.plans,[kind]:{...p,legs:route.legs,legsKey:wanted}}}});
   }catch(error){flash(error.message||'T맵 이동 시간을 받지 못했어요.')}
   finally{setLegBusy(false)}
  }
@@ -100,23 +105,28 @@ export default function App(){
   setLegBusy(true);
   try{
    const route=await fetchTmapRoute(baseDay,key,profile);
-   if(!route.legs)throw new Error('T맵 구간 시간을 읽지 못했어요.');
-   if(signature(dayRef.current)!==signature(baseDay)){flash('코스가 바뀌어 이동 시간을 다시 받아 주세요.');return}
-   setDay(d=>signature(d)===signature(baseDay)?applyLegs(d,route.legs):d);
-   if(!quiet)flash('T맵 이동 시간을 반영했어요.');
-  }catch(error){flash(error.message||'T맵 이동 시간을 받지 못했어요.')}
+   if(!route.legs)throw new Error('T맵 구간 시간을 읽지 못했어요. "다시 받기"를 눌러 주세요.');
+   setDay(d=>{const next={...d,list:markLocated(d.list,route)};return routeSig(d)===routeSig(baseDay)?applyLegs(next,route.legs):next});
+   legRetries.current=0;
+   const note=missingNote(route);
+   if(note)flash(note);else if(!quiet)flash('T맵 이동 시간을 반영했어요.');
+  }catch(error){
+   flash(error.message||'T맵 이동 시간을 받지 못했어요.');
+   // 자동으로 받다가 실패하면 조금 뒤 두 번까지 다시 시도
+   if(quiet&&legRetries.current<2&&!/앱키|사용량/.test(error.message||'')){legRetries.current++;setTimeout(()=>{legTried.current='';setRetryTick(x=>x+1)},15000)}
+  }
   finally{setLegBusy(false)}
  }
  const legsReady=day.list.length>0&&Array.from({length:day.list.length+1},(_,i)=>legInfo(day,i).state).every(x=>x==='tmap'),tmapReady=!!localStorage.getItem(TMAP_KEY);
- const legTried=useRef('');
+ const legTried=useRef(''),legRetries=useRef(0),[retryTick,setRetryTick]=useState(0);
  useEffect(()=>{
   if(tab!=='order'||legBusy||aiBusy||!day.list.length||!localStorage.getItem(TMAP_KEY))return;
   if(Array.from({length:day.list.length+1},(_,i)=>legInfo(day,i).state).every(x=>x==='tmap'))return;
-  const sig=JSON.stringify([day.date,day.start,day.end,day.depart,day.list.map(c=>[c.id,c.addr])]);
+  const sig=routeSig(day);
   if(legTried.current===sig)return;
   const timer=setTimeout(()=>{legTried.current=sig;void fetchLegs(dayRef.current,true)},800);
   return ()=>clearTimeout(timer);
- },[tab,day,legBusy,aiBusy]);
+ },[tab,day,legBusy,aiBusy,retryTick]);
  function connectAI(){
   const key=keyDraft.trim();
   if(!key)return;

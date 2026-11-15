@@ -24,7 +24,7 @@ function drawMap(node,Tmap,route) {
   const map=new Tmap.Map(node.id,{center:new Tmap.LatLng(center.lat,center.lng),width:'100%',height:'380px',zoom:10,zoomControl:true,scrollwheel:true});
   const overlays=[];
   for (const line of lines) overlays.push(new Tmap.Polyline({path:line.map(point=>new Tmap.LatLng(point.lat,point.lng)),strokeColor:'#285b6b',strokeWeight:5,map}));
-  points.forEach((point,i)=>overlays.push(new Tmap.Marker({position:new Tmap.LatLng(point.lat,point.lng),map,title:i===0?'출발':i===points.length-1?'귀가':`${i}번 배송`,label:i===0?'출발':i===points.length-1?'귀가':String(i)})));
+  points.forEach((point,i)=>overlays.push(new Tmap.Marker({position:new Tmap.LatLng(point.lat,point.lng),map,title:point.label==='출발'||point.label==='귀가'?point.label:`${point.label}번 배송`,label:point.label||String(i)})));
   const lat=points.map(point=>point.lat),lng=points.map(point=>point.lng);
   try {
     const bounds=new Tmap.LatLngBounds(new Tmap.LatLng(Math.min(...lat),Math.min(...lng)),new Tmap.LatLng(Math.max(...lat),Math.max(...lng)));
@@ -46,7 +46,7 @@ export default function RouteMap({day}) {
     if(!key||!day.list.length)return;
     let active=true;
     setRoute(null);setStatus('지도 경로 불러오는 중…');
-    Promise.all([loadSdk(key),fetchTmapRoute(day,key,profile)]).then(([loaded,result])=>{
+    Promise.all([loadSdk(key),fetchTmapRoute(day,key,profile,fetch,{useCache:false})]).then(([loaded,result])=>{
       if(!active)return;
       setSdk(loaded);setRoute(result);setStatus('');
     }).catch(error=>{if(active)setStatus(error.message||'지도를 불러오지 못했습니다.')});
@@ -60,7 +60,7 @@ export default function RouteMap({day}) {
   const changeProfile=(field,value)=>setProfile(previous=>{const next={...previous,[field]:value};localStorage.setItem(PROFILE,JSON.stringify(next));return next});
   return <section className="view"><div className="wrap">
     <div className="panel"><div className="route-title"><h2>배송 지도</h2>{key&&day.list.length>0&&<button type="button" onClick={()=>setVersion(v=>v+1)}>새로고침</button>}</div>
-      {!key?<div className="map-setup"><p className="hint">T맵 앱키를 넣으면 방문 순서대로 도로 경로를 표시합니다.</p><label className="field"><span>T맵 앱키</span><input type="text" value={draft} onChange={e=>setDraft(e.target.value)} autoComplete="off"/></label><button className="primary big" onClick={saveKey} disabled={!draft.trim()}>지도 연결</button><a className="map-help" href="https://openapi.sk.com/" target="_blank" rel="noreferrer">T맵 앱키 만들기</a></div>:day.list.length===0?<p className="hint">배송지를 추가하면 지도에 경로가 표시됩니다.</p>:<><div id="tmap-route-map" ref={node} className="route-map" aria-label="방문 순서 지도" role="img"/>{status&&<p className="hint" role="status">{status}</p>}{route&&<p className="hint">출발 → {day.list.map((stop,i)=>`${i+1} ${stop.name||'고객'}`).join(' → ')} → 귀가</p>}<p className="hint">{route?.truck?`높이 ${(Number(profile.height)/100).toFixed(2)}m 등 입력한 화물차 제원 반영`:'차량 높이·폭 등 제한 미반영 · T맵 운전 경로에서 확인'}</p></>}
+      {!key?<div className="map-setup"><p className="hint">T맵 앱키를 넣으면 방문 순서대로 도로 경로를 표시합니다.</p><label className="field"><span>T맵 앱키</span><input type="text" value={draft} onChange={e=>setDraft(e.target.value)} autoComplete="off"/></label><button className="primary big" onClick={saveKey} disabled={!draft.trim()}>지도 연결</button><a className="map-help" href="https://openapi.sk.com/" target="_blank" rel="noreferrer">T맵 앱키 만들기</a></div>:day.list.length===0?<p className="hint">배송지를 추가하면 지도에 경로가 표시됩니다.</p>:<><div id="tmap-route-map" ref={node} className="route-map" aria-label="방문 순서 지도" role="img"/>{status&&<p className="hint" role="status">{status}</p>}{route?.missing?.length>0&&<p className="hint" role="status">지도에 못 올린 곳: {route.missing.map(m=>m.name).join(', ')} · 카드에서 "T맵 검색용 주소"를 넣어 주세요.</p>}{route&&<p className="hint">출발 → {day.list.map((stop,i)=>`${i+1} ${stop.name||'고객'}`).join(' → ')} → 귀가</p>}<p className="hint">{route?.truck?`높이 ${(Number(profile.height)/100).toFixed(2)}m 등 입력한 화물차 제원 반영`:'차량 높이·폭 등 제한 미반영 · T맵 운전 경로에서 확인'}</p></>}
     </div>
     {key&&<details className="panel"><summary>화물차 제원 · 앱키</summary><p className="hint">제원을 모두 입력하면 화물차 경로를 요청합니다. 차량 등록 정보를 확인해 적어 주세요.</p><div className="two">{[['height','높이 (cm)'],['width','폭 (cm)'],['length','길이 (cm)'],['weight','적재중량 (kg)'],['totalWeight','총중량 (kg)']].map(([field,label])=><label className="field" key={field}><span>{label}</span><input type="number" inputMode="numeric" value={profile[field]} onChange={e=>changeProfile(field,e.target.value)}/></label>)}</div>{validTruck(profile)&&<p className="hint">제원 저장됨 · 지도 새로고침을 누르면 반영됩니다.</p>}<label className="field"><span>T맵 앱키 변경</span><input type="text" value={draft} onChange={e=>setDraft(e.target.value)} autoComplete="off"/></label><button onClick={saveKey}>앱키 저장</button><button onClick={()=>{localStorage.removeItem(KEY);setKey('');setDraft('');setRoute(null)}}>앱키 지우기</button></details>}
   </div></section>;

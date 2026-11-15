@@ -88,6 +88,7 @@ export function baseCustomer(x = {}) {
     sorry: !!x.sorry,
     prod: x.prod || "",
     weight: x.weight || "",
+    mapAddr: x.mapAddr || "",
     memo: x.memo || "",
     travel: x.travel ?? 30,
     work: x.work || "",
