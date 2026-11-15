@@ -467,6 +467,11 @@ function StopCard({
             <button type="button" onClick={() => actions.openDocument(c)}>
               출고표
             </button>
+            {c.imageId && (!c.prod || !c.weight || (!c.noelev && !c.elevSize && !c.elevatorKnown)) && (
+              <button type="button" disabled={!!actions.rereadId} onClick={() => actions.rereadDocument(c)}>
+                {actions.rereadId === c.id ? "출고표 다시 읽는 중…" : "빈 정보 다시 읽기"}
+              </button>
+            )}
           </div>
           <details className="sub">
             <summary>희망 시간대 · 무게 · T맵 주소 · 고객 수정</summary>
@@ -500,6 +505,14 @@ function StopCard({
                     })
                   }
                 />
+              </label>
+              <label className="field">
+                <span>엘리베이터</span>
+                <select value={c.noelev ? "no" : c.elevSize || c.elevatorKnown ? "yes" : "unknown"} onChange={e=>actions.update(c.id, e.target.value === "unknown" ? {noelev:false,elevatorKnown:false,elevSize:""} : e.target.value === "no" ? {noelev:true,elevatorKnown:true,elevSize:""} : {noelev:false,elevatorKnown:true})}>
+                  <option value="unknown">확인 전</option>
+                  <option value="yes">있음</option>
+                  <option value="no">없음 · 계단 작업</option>
+                </select>
               </label>
               <label className="field">
                 <span>총 무게 (kg)</span>

@@ -9,6 +9,17 @@ test('주간 날짜를 하루씩 넘기면 주와 달 경계도 이동한다',as
   assert.equal(shiftDate('2026-11-30',1),'2026-12-01');
 });
 
+test('출고표를 다시 읽으면 빈 정보만 채우고 직접 수정한 값은 지킨다',async()=>{
+  const {fillMissingFormFields,stopFacts}=await import('./logic.js');
+  const read={prod:'보네르 3000',weight:'90.2',elevatorKnown:true,noelev:false};
+  const filled=fillMissingFormFields({prod:'',weight:'',noelev:false,elevatorKnown:false},read);
+  assert.deepEqual(stopFacts(filled).slice(0,3),[['제품','보네르 3000'],['엘리베이터','있음'],['무게','90.2kg']]);
+  const manual=fillMissingFormFields({prod:'직접 적은 제품',weight:'75',noelev:true,elevatorKnown:true},read);
+  assert.equal(manual.prod,'직접 적은 제품');
+  assert.equal(manual.weight,'75');
+  assert.equal(manual.noelev,true);
+});
+
 test('다음 날 배송을 준비한 뒤 다시 열어도 그 날짜와 코스를 유지한다',()=>{
   const stored={date:'2026-11-16',depart:'06:40',start:'출발',end:'귀가',list:[{id:'1',name:'고객',addr:'주소',phone:'0508-1234-5678'}]};
   const {d,h}=restoreDay(stored,{},'2026-11-15');

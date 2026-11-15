@@ -88,6 +88,7 @@ export function baseCustomer(x = {}) {
     callConfirmed: !!x.callConfirmed,
     noelev: !!x.noelev,
     elevSize: x.elevSize || "",
+    elevatorKnown: !!x.elevatorKnown,
     bs: !!x.bs,
     single: !!x.single,
     call: !!x.call,
@@ -291,8 +292,9 @@ export function mergeCustomer(day, c) {
     next.list.push(person);
     return next;
   }
-  for (const f of ["phone", "safePhone", "phone2", "prod", "elevSize"])
+  for (const f of ["phone", "safePhone", "phone2", "prod", "elevSize", "weight"])
     if (c[f] && !found[f]) found[f] = c[f];
+  if (c.elevatorKnown) found.elevatorKnown = true;
   if (c.imageId) found.imageId = c.imageId;
   if (c.addr && c.addr.length > (found.addr || "").length) found.addr = c.addr;
   if (c.slot && (c.source === "form" || c.slot !== "any")) found.slot = c.slot;
@@ -301,6 +303,17 @@ export function mergeCustomer(day, c) {
   for (const f of ["noelev", "bs", "single", "call"])
     found[f] = !!(found[f] || c[f]);
   found.verified = found.verified && c.verified !== false;
+  return next;
+}
+export function fillMissingFormFields(current, read) {
+  const next = {...current};
+  if (!next.prod && read.prod) next.prod = read.prod;
+  if (weightKg(next) == null && weightKg(read) != null) next.weight = read.weight;
+  if (!next.noelev && !next.elevSize && !next.elevatorKnown && read.elevatorKnown) {
+    next.noelev = !!read.noelev;
+    next.elevatorKnown = true;
+    next.elevSize = read.elevSize || '';
+  }
   return next;
 }
 export function stopFacts(c) {
@@ -312,6 +325,8 @@ export function stopFacts(c) {
         ? "없음 · 계단 작업"
         : c.elevSize
           ? "있음 · " + c.elevSize
+          : c.elevatorKnown
+            ? "있음"
           : "확인 필요",
     ],
     ["무게", weightKg(c) != null ? weightKg(c) + "kg" : "확인 필요"],

@@ -12,6 +12,7 @@ import {
   precallList,
   recommendOrder,
   mergeCustomer,
+  fillMissingFormFields,
   courseText,
 } from "./logic.js";
 import {
@@ -132,6 +133,7 @@ export default function App() {
     [pending, setPending] = useState([]),
     [status, setStatus] = useState(""),
     [busy, setBusy] = useState(false),
+    [rereadId, setRereadId] = useState(null),
     [toast, setToast] = useState(""),
     [storageError, setStorageError] = useState(""),
     [selected, setSelected] = useState(day.date),
@@ -690,6 +692,30 @@ export default function App() {
       setBusy(false);
     }
   }
+  async function rereadDocument(c) {
+    if (!c.imageId || rereadId) return;
+    setRereadId(c.id);
+    let worker;
+    try {
+      const record = await loadDocument(c.imageId);
+      if (!record?.image) throw new Error("저장된 출고표가 없습니다. 사진을 다시 넣어 주세요.");
+      const OCR = await loadOCR();
+      worker = await OCR.createWorker(["kor", "eng"]);
+      const canvas = await imageCanvas(record.image);
+      const {data} = await worker.recognize(canvas);
+      let read = parseFormOCR(data, canvas.width, canvas.fullHeight, record.name || "출고표");
+      read = await readFormFields(worker, canvas, read);
+      const filled = fillMissingFormFields(c, read);
+      const gained = ["prod", "weight", "elevatorKnown"].filter(k => !c[k] && filled[k]);
+      setDay(d => ({...d, list:d.list.map(x => x.id === c.id && x.imageId === c.imageId ? fillMissingFormFields(x, read) : x)}));
+      flash(gained.length ? "출고표에서 " + gained.length + "개 정보를 다시 읽었어요." : "출고표를 다시 읽었지만 빈 정보를 찾지 못했어요. 사진을 확인해 주세요.");
+    } catch (error) {
+      flash(error.message || "출고표를 다시 읽지 못했어요.");
+    } finally {
+      if (worker) await worker.terminate();
+      setRereadId(null);
+    }
+  }
   function move(from, to) {
     if (from === to || to < 0 || to >= day.list.length) return;
     setDay((d) => {
@@ -1033,6 +1059,8 @@ export default function App() {
                   list: d.list.filter((x) => x.id !== id),
                 })),
               openDocument,
+              rereadDocument,
+              rereadId,
               aiKey,
               aiSettings: () => {
                 setKeyDraft(aiKey);
