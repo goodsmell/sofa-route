@@ -984,12 +984,12 @@ export default function App() {
                           onChange={(e) => change("memo", e.target.value)}
                         />
                       </label>
-                      <Field
+                      {["calling", "ready", "driving"].includes(day.phase) && <Field
                         label="정확한 방문 약속 시각"
                         type="time"
                         value={draft.promiseTime}
                         onChange={(v) => change("promiseTime", v)}
-                      />
+                      />}
                       <Field
                         label="설치 시간 (분) · 비우면 자동"
                         type="number"

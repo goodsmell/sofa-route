@@ -179,6 +179,8 @@ function StopCard({
   grip,
   dragging,
   target,
+  callMode,
+  deliveryMode,
 }) {
   const c = row.c;
   const phone = c.phone || c.safePhone;
@@ -218,7 +220,7 @@ function StopCard({
             <strong>{c.name || "이름 확인"}</strong>
           </span>
         </button>
-        {phone && !c.done && (
+        {callMode && phone && !c.done && (
           <a
             className="round"
             href={"tel:" + digits(phone)}
@@ -253,10 +255,10 @@ function StopCard({
           {c.done && <span className="badge ok">완료 {c.doneAt}</span>}
           {late && !c.done && <span className="badge bad">약속 시간 넘김</span>}
           {reminder && !c.done && <span className="badge warn">먼저 전화</span>}
-          {!c.done && !c.callConfirmed && !isFixed(c) && (
+          {callMode && !c.done && !c.callConfirmed && !isFixed(c) && (
             <span className="badge dashed">통화 전</span>
           )}
-          {c.callConfirmed && !c.promiseTime && (
+          {callMode && c.callConfirmed && !c.promiseTime && (
             <span className="badge ok">통화 완료</span>
           )}
           {badges.map((b) => (
@@ -315,7 +317,7 @@ function StopCard({
           {reminder && (
             <p className="note warn">먼저 전화: {reminder.why.join(", ")}</p>
           )}
-          {!c.done && (
+          {callMode && !c.done && (
             <div className="fix-time">
               <label>
                 <span>통화로 정한 시간</span>
@@ -400,7 +402,7 @@ function StopCard({
               <NaviIcon />
               T맵 길안내
             </a>
-            <button
+            {deliveryMode && <button
               type="button"
               className={"btn" + (c.done ? "" : " ok")}
               onClick={() =>
@@ -411,9 +413,9 @@ function StopCard({
               }
             >
               {c.done ? "완료 취소" : "배송 완료"}
-            </button>
+            </button>}
           </div>
-          <div className="phones">
+          {callMode && <div className="phones">
             {c.phone && (
               <a className="btn" href={"tel:" + digits(c.phone)}>
                 <PhoneIcon />
@@ -432,7 +434,7 @@ function StopCard({
                 2차 {normalizePhone(c.phone2)}
               </a>
             )}
-          </div>
+          </div>}
           <div className="row-actions">
             <button
               type="button"
@@ -524,7 +526,7 @@ function StopCard({
                   }
                 />
               </label>
-              <label className="field">
+              {callMode && <label className="field">
                 <span>통화 메모</span>
                 <textarea
                   value={c.callMemo || ""}
@@ -532,7 +534,7 @@ function StopCard({
                     actions.update(c.id, { callMemo: e.target.value })
                   }
                 />
-              </label>
+              </label>}
               <div className="row-actions">
                 <button type="button" onClick={() => actions.edit(c)}>
                   고객 정보 수정
@@ -566,7 +568,7 @@ const legsReadyOf = (day) =>
   ).every((s) => s === "tmap");
 
 // 고객 카드 타임라인. 확정 코스와 추천 코스가 같은 화면을 쓴다.
-function Timeline({ day, calc, calls, legBusy, actions }) {
+function Timeline({ day, calc, calls, legBusy, actions, callMode, deliveryMode }) {
   const [openId, setOpenId] = useState(null);
   const [drag, setDragState] = useState(null); // {from, to}
   const dragRef = useRef(null);
@@ -639,7 +641,7 @@ function Timeline({ day, calc, calls, legBusy, actions }) {
 
   return (
     <>
-      {calls.length > 0 && (
+      {callMode && calls.length > 0 && (
         <section className="calls" aria-label="전날 먼저 전화할 고객">
           <h3>전날 먼저 전화할 곳 {calls.length}곳</h3>
           <ul>
@@ -706,11 +708,13 @@ function Timeline({ day, calc, calls, legBusy, actions }) {
                 onToggle={() =>
                   setOpenId(openId === row.c.id ? null : row.c.id)
                 }
-                reminder={calls.find((x) => x.c.id === row.c.id)}
+                reminder={callMode ? calls.find((x) => x.c.id === row.c.id) : null}
                 actions={actions}
                 grip={grip(i)}
                 dragging={drag?.from === i}
                 target={drag && drag.to === i && drag.from !== i}
+                callMode={callMode}
+                deliveryMode={deliveryMode}
               />
             </li>
           </React.Fragment>
@@ -1004,6 +1008,8 @@ export default function RouteView(props) {
                   calls={viewCalls}
                   legBusy={legBusy}
                   actions={viewActions}
+                  callMode={mode === "fixed" && canCall}
+                  deliveryMode={mode === "fixed" && ["ready", "driving"].includes(day.phase)}
                 />
 
                 <div className="bottom-actions">
