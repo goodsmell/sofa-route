@@ -47,3 +47,13 @@ test('T맵 구간 거리·시간을 고객별 이동 시간으로 저장하고 �
   assert.equal(legInfo(swapped,0).state,'stale');
   assert.deepEqual(legInfo(day,0),{min:30,km:null,state:'default'});
 });
+
+test('이동 시간을 시간·분으로 쓰고 전체 이동 거리·시간을 합산한다',async()=>{
+  const {fmtDuration,routeTotals}=await import('./tmapRoute.js');
+  assert.equal(fmtDuration(52),'52분');
+  assert.equal(fmtDuration(72),'1시간 12분');
+  assert.equal(fmtDuration(120),'2시간');
+  const day={list:[{id:'a',travel:35,travelKm:28.4,travelFrom:'start'},{id:'b',travel:20,travelKm:15,travelFrom:'a'}],endTravel:25,endTravelKm:21,endFrom:'b'};
+  assert.deepEqual(routeTotals(day),{km:64.4,min:80,exact:true});
+  assert.deepEqual(routeTotals({list:[{id:'a',travel:30}],endTravel:30}),{km:null,min:60,exact:false});
+});

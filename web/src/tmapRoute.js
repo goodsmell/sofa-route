@@ -100,3 +100,12 @@ export function legInfo(day,i) {
   if (km==null) return {min,km:null,state:'default'};
   return {min,km,state:from===prev?'tmap':'stale'};
 }
+
+export const fmtDuration=min=>{min=Math.max(0,Math.round(min));const h=Math.floor(min/60),m=min%60;return h?(m?`${h}시간 ${m}분`:`${h}시간`):`${m}분`};
+
+// 출발~귀가 전체 이동 거리·시간. 거리는 모든 구간을 T맵으로 받았을 때만 합산한다.
+export function routeTotals(day) {
+  const legs=Array.from({length:day.list.length+1},(_,i)=>legInfo(day,i));
+  const km=legs.every(leg=>leg.km!=null)?Math.round(legs.reduce((sum,leg)=>sum+leg.km,0)*10)/10:null;
+  return {km,min:legs.reduce((sum,leg)=>sum+(+leg.min||0),0),exact:legs.every(leg=>leg.state==='tmap')};
+}

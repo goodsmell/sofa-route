@@ -24,3 +24,12 @@ test('코스 텍스트에 전화·주소·제품·엘리베이터·BS·특이사
   assert.match(text,/2\. 주영걸[\s\S]*엘리베이터: 없음/);
   assert.match(text,/2번 주영걸: 전날 연락 요청/);
 });
+
+test('복사한 코스 텍스트에 구간 이동과 전체 시간이 들어간다',async()=>{
+  const {courseText,emptyDay}=await import('./logic.js');
+  const day={...emptyDay('2026-11-16'),endTravel:25,endTravelKm:21,endFrom:'a',list:[{id:'a',name:'가',addr:'경기 성남시',slot:'any',travel:72,travelKm:41.3,travelFrom:'start'}]};
+  const text=courseText(day);
+  assert.match(text,/총 이동 62\.3km · 1시간 37분 · 출발~귀가/);
+  assert.match(text,/1\. 가[^\n]*\n이동: 41\.3km · 1시간 12분\n/);
+  assert.match(text,/이동: 21km · 25분\n→ 귀가/);
+});
