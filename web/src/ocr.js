@@ -4,6 +4,7 @@ function wordsIn(words,w,h,x0,y0,x1,y1){return words.filter(q=>{const b=q.bbox||
 function decodeSlot(value){const s=String(value||'').replace(/\s/g,'');if(/지정불가|시간무관|09[:시]?00[-~]17[:시]?00/.test(s))return'any';if(/오전|09[:시]?00[-~]13[:시]?00/.test(s))return'am';if(/오후|13[:시]?00[-~]17[:시]?00/.test(s))return'pm';return'any'}
 // 노란 줄 "오더별 수량 합계 4 1.581 90.2 20" 에서 세 번째 숫자가 총 무게(kg)
 export function readWeight(text){const value=String(text||'').replace(/,/g,''),sum=value.match(/합\s*계\s*(\d{1,3})\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)/),labeled=value.match(/(?:총\s*무게|총\s*중량|무게\s*합계)\s*[:：]?\s*(\d+(?:\.\d+)?)\s*(?:kg|㎏)?/i);const kg=sum?parseFloat(sum[3]):labeled?parseFloat(labeled[1]):NaN;return kg>0&&kg<2000?String(kg):''}
+function readWeightCell(text){const value=String(text||'').replace(/,/g,'').trim();return /^\d{1,3}(?:\.\d{1,3})?$/.test(value)&&Number(value)>0?String(Number(value)):''}
 export function readProduct(text){
   const value=String(text||'').replace(/^\s*제품(?:명)?\s*[:：]?\s*/,'').replace(/\s+/g,' ').trim();
   return value&&value.length<120&&!/^(제품|모델|품목|확인|없음)$/.test(value)?value:'';
@@ -25,7 +26,8 @@ export function parseFormOCR(data,w,h,file){
   if(!/^0\d{9,11}$/.test(safePhone.replace(/\D/g,''))){const m=row.match(/0\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4}/);safePhone=m?normalizePhone(m[0]):''}
   const slotText=field(.50,.25,.67,.32)+' '+text.match(/(?:오전|오후)\s*\(?\d{1,2}[:시]/)?.[0];
   const slot=decodeSlot(slotText);
-  const product=readProduct(field(.16,.32,.56,.39))||readProduct(text.match(/(?:제품명|제품)\s*[:：]?\s*([^\n]+)/)?.[1]);
+  // 제품명은 '제품명' 머리글 다음 줄의 첫 제품정보 행에 있다.
+  const product=readProduct(field(.16,.36,.57,.405));
   const rawNotes=field(.02,.51,.96,.66).replace(/현장\s*특이사항/g,'').trim();
   const noteKeywords=/전날|연락|해피콜|진입시간|늦게|이르게|직접\s*수령|사다리차|기존\s*소파/;
   const koreanRatio=(rawNotes.match(/[가-힣]/g)||[]).length/Math.max(1,rawNotes.length);
@@ -34,7 +36,7 @@ export function parseFormOCR(data,w,h,file){
   const elevator=readElevator(elevText,rawElevSize);
   const second=(rawNotes.match(/0(?:10|11|16|17|18|19)[-\s]?\d{3,4}[-\s]?\d{4}/)||[])[0]||'';
   const order=(text.match(/주문번호\s*([0-9]{8,12})/)||[])[1]||'';
-  const weight=readWeight(text);
+  const weight=readWeight(text)||readWeightCell(field(.75,.466,.81,.505));
   if(!name){const m=text.match(/고객명\s*([가-힣]{2,5})/);if(m)name=m[1]}
   if(!addr){const m=text.match(/(?:경기(?:도)?|서울(?:특별시)?|인천(?:광역시)?|강원(?:도|특별자치도)?)\s*[가-힣\d\s,()\-]{12,100}/);if(m)addr=m[0].split(/\n/)[0].trim()}
   return {...baseCustomer({source:'form',verified:false,name,addr,safePhone,phone2:normalizePhone(second),slot,prod:product,weight,...elevator,memo:[notes,order?'주문 '+order:''].filter(Boolean).join(' · '),call:/전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(rawNotes),bs:/기존\s*소파\s*BS|(?:BS|8S|85)\s*정\s*보|완\s*제\s*품/.test(text)}),file};
@@ -50,14 +52,17 @@ export async function readFormFields(worker,canvas,customer){
   const slot=await box(.515,.282,.65,.309);
   const elevator=await box(.735,.282,.80,.308);
   const capacity=await box(.81,.282,.9,.308);
-  if(!customer.prod)customer.prod=readProduct(await box(.17,.335,.56,.381));
+  if(!customer.prod)customer.prod=readProduct(await box(.165,.36,.57,.405));
   if(name.length>=2)customer.name=name;
   if(addr.length>=8)customer.addr=addr;
   if(/^0\d{9,11}$/.test(phone.replace(/\D/g,'')))customer.safePhone=phone;
   if(slot)customer.slot=decodeSlot(slot);
   const elevatorInfo=readElevator(elevator,capacity);
   if(elevatorInfo.elevatorKnown)Object.assign(customer,elevatorInfo);
-  if(!customer.weight)customer.weight=readWeight(await box(0,.55,1,.99));
+  if(!customer.weight){
+    customer.weight=readWeight(await box(.53,.463,.83,.51));
+    if(!customer.weight)customer.weight=readWeightCell(await box(.75,.466,.81,.505));
+  }
   return customer;
 }
 export function parseTableOCR(data,w,h,file){
