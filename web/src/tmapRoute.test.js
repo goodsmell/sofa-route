@@ -11,6 +11,31 @@ test('지오코딩 결과에서 출입구 좌표를 우선 사용한다',()=>{
   assert.deepEqual(parseGeocode({coordinateInfo:{coordinate:[{newLatEntr:'37.51',newLonEntr:'127.01',newLat:'37.52',newLon:'127.02'}]}}),{lat:37.51,lng:127.01});
 });
 
+test('도로명·건물 번호·지역이 정확한 좌표만 이동 시간에 사용한다',async()=>{
+  const {exactGeocode}=await import('./tmapRoute.js');
+  const item={newLatEntr:'37.51',newLonEntr:'127.01',newMatchFlag:'N51',newRoadName:'중부대로',newBuildingIndex:'123',city_do:'경기도',gu_gun:'팔달구'};
+  const result=overrides=>({coordinateInfo:{coordinate:[{...item,...overrides}]}});
+  const query='경기 수원시 팔달구 중부대로 123';
+  assert.deepEqual(exactGeocode(result({}),query),{lat:37.51,lng:127.01});
+  assert.equal(exactGeocode(result({newRoadName:'충부대로'}),query),null);
+  assert.equal(exactGeocode(result({newBuildingIndex:'321'}),query),null);
+  assert.equal(exactGeocode(result({newMatchFlag:'N55'}),query),null);
+  assert.equal(exactGeocode(result({gu_gun:'영통구'}),query),null);
+  assert.equal(exactGeocode(result({city_do:'서울특별시'}),query),null);
+});
+
+test('주소를 고치면 저장된 잘못된 좌표와 이동 시간을 버린다',async()=>{
+  const {invalidateAddress,legInfo}=await import('./tmapRoute.js');
+  const day={list:[{id:'a',addr:'경기 수원시 충부대로 123',lat:37.1,lng:127,geoAddr:'경기 수원시 충부대로 123',geoVersion:2,travel:90,travelKm:50,travelFrom:'start',travelVersion:2}],endTravel:80,endTravelKm:40,endFrom:'a',endTravelVersion:2,plans:{driver:{ids:['a'],legs:[{min:90}],legsKey:'old'},geo:{start:{lat:37,lng:127}},geoVersion:2}};
+  const fixed=invalidateAddress(day,'a',{addr:'경기 수원시 중부대로 123'});
+  assert.equal(fixed.list[0].lat,undefined);
+  assert.equal(fixed.list[0].geoAddr,'');
+  assert.deepEqual(legInfo(fixed,0),{min:30,km:null,state:'default'});
+  assert.equal(fixed.endTravel,30);
+  assert.equal(fixed.plans.driver.legs,null);
+  assert.deepEqual(legInfo(day,0),{min:90,km:50,state:'tmap'});
+});
+
 test('화물차 제원이 모두 유효할 때만 제한 경로를 요청한다',()=>{
   const day={date:'2026-11-16',depart:'06:40'};
   const points=[{lat:37.3,lng:126.8},{lat:37.4,lng:127.1},{lat:37.2,lng:126.9}];
@@ -53,7 +78,7 @@ test('이동 시간을 시간·분으로 쓰고 전체 이동 거리·시간을 
   assert.equal(fmtDuration(52),'52분');
   assert.equal(fmtDuration(72),'1시간 12분');
   assert.equal(fmtDuration(120),'2시간');
-  const day={list:[{id:'a',travel:35,travelKm:28.4,travelFrom:'start'},{id:'b',travel:20,travelKm:15,travelFrom:'a'}],endTravel:25,endTravelKm:21,endFrom:'b'};
+  const day={list:[{id:'a',travel:35,travelKm:28.4,travelFrom:'start',travelVersion:2},{id:'b',travel:20,travelKm:15,travelFrom:'a',travelVersion:2}],endTravel:25,endTravelKm:21,endFrom:'b',endTravelVersion:2};
   assert.deepEqual(routeTotals(day),{km:64.4,min:80,exact:true});
   assert.deepEqual(routeTotals({list:[{id:'a',travel:30}],endTravel:30}),{km:null,min:60,exact:false});
 });
@@ -71,7 +96,7 @@ test('첫 검색어가 실패하면 다음 후보(건물 이름)로 찾는다',a
   const {locate}=await import('./tmapRoute.js');
   const asked=[];
   const fetcher=async url=>{url=decodeURIComponent(String(url));asked.push(url.includes('/pois')?'poi':'addr');
-    if(url.includes('/pois'))return {ok:true,status:200,json:async()=>({searchPoiInfo:{pois:{poi:[{frontLat:'37.36',frontLon:'127.13'}]}}})};
+    if(url.includes('/pois'))return {ok:true,status:200,json:async()=>({searchPoiInfo:{pois:{poi:[{frontLat:'37.36',frontLon:'127.13',name:'동양파크빌',upperAddrName:'경기도',middleAddrName:'성남시 분당구'}]}}})};
     return {ok:true,status:200,json:async()=>({coordinateInfo:{coordinate:[]}})}};
   const point=await locate({addr:'경기도 성남시 분당구 방아로29번길 7 (이매동, 동양파크빌)'},'k',fetcher);
   assert.deepEqual([point.lat,point.lng,point.approx],[37.36,127.13,false]);

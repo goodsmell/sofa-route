@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {driverOrder, customerOrder, applyPlan, planStops, sortByFixed} from './plan.js';
+import {driverOrder, areaDriverOrder, customerOrder, applyPlan, planStops, sortByFixed} from './plan.js';
 
 const start = {lat: 37.30, lng: 126.80}, end = {lat: 37.31, lng: 126.81};
 const pos = {
@@ -14,6 +14,18 @@ test('운전 편한 순서는 가까운 곳부터 이어 한 바퀴를 돈다', 
   const order = driverOrder([stop('far'), stop('near'), stop('mid')], start, end, pos).map(s => s.id);
   assert.deepEqual(order.length, 3);
   assert.ok(order.indexOf('far') === 1, order.join('>'));  // 이천은 가운데: 수원/분당을 지나 다녀온다
+});
+
+test('T맵 위치가 없어도 같은 지역 배송지를 묶어 빠른 이동 순서를 만든다', () => {
+  const stops = [
+    stop('suwon1', {addr: '경기 수원시 영통구 A'}),
+    stop('seongnam', {addr: '경기 성남시 분당구 B'}),
+    stop('suwon2', {addr: '경기 수원시 영통구 C'}),
+  ];
+  assert.deepEqual(
+    areaDriverOrder(stops, '경기 수원시 영통구 출발', '경기 안산시 귀가').map(s => s.id),
+    ['suwon1', 'suwon2', 'seongnam'],
+  );
 });
 
 test('고객 시간 순서는 오전 약속을 앞에, 오후 약속을 뒤에 둔다', () => {

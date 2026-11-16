@@ -18,6 +18,8 @@ test('AI 입력에는 이름, 전화번호, 상세 번지가 없다',()=>{
   for(const secret of ['홍길동','김철수','010-1234-5678','103동','301호','202동','123호'])assert.ok(!input.includes(secret),secret);
   assert.ok(input.includes('이매동'));
   assert.ok(input.includes('영통동'));
+  assert.deepEqual(routeInput(day).stops.map(stop=>stop.workMinutes),[20,30]);
+  assert.ok(routeInput(day).stops.every(stop=>!('minutesWithTravel' in stop)));
 });
 
 test('AI가 일부 고객을 빼거나 중복하면 코스를 바꾸지 않는다',()=>{

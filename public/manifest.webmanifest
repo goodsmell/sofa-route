@@ -1,6 +1,6 @@
 {
-  "name": "소파 배송 동선표",
-  "short_name": "소파 동선",
+  "name": "아빠 화이팅",
+  "short_name": "아빠 화이팅",
   "description": "출고의뢰서로 소파 배송 순서를 만들고 현장에서 조정합니다.",
   "start_url": "./",
   "scope": "./",

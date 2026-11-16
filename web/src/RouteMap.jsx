@@ -1,113 +1,634 @@
-import React,{useEffect,useRef,useState} from 'react';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import {fetchTmapRoute,validTruck} from './tmapRoute.js';
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { fetchTmapRoute, validTruck, GEO_VERSION } from "./tmapRoute.js";
+import { loadTmapSdk } from "./tmapSdk.js";
+import { compute, fmt, shortArea, digits, normalizePhone } from "./logic.js";
 
-const KEY='sofa-route-tmap-key-v1';
-const PROFILE='sofa-route-truck-v1';
-const DEFAULT_PROFILE={height:'340',weight:'3500',width:'',totalWeight:'',length:''};
+const KEY = "sofa-route-tmap-key-v1";
+const PROFILE = "sofa-route-truck-v1";
+const DEFAULT_PROFILE = {
+  height: "340",
+  weight: "3500",
+  width: "",
+  totalWeight: "",
+  length: "",
+};
+const HOME = [37.32, 126.95]; // 좌표가 하나도 없을 때 보여 줄 곳
+const tmapNavi = (s) => "tmap://search?name=" + encodeURIComponent(s);
 
-function customerPopup(stop,index) {
-  const popup=document.createElement('div');
-  popup.className='map-customer';
-  const title=document.createElement('strong');
-  title.className='map-customer-title';
-  title.textContent=`${index+1}. ${stop.name||'고객'}`;
-  popup.append(title);
-  const add=(label,value)=>{
-    if(!value)return;
-    const row=document.createElement('div');
-    row.className='map-customer-row';
-    const name=document.createElement('span');
-    name.textContent=label;
-    const detail=document.createElement('span');
-    detail.textContent=String(value);
-    row.append(name,detail);
-    popup.append(row);
-  };
-  add('주소',stop.addr);
-  add('제품',stop.prod);
-  add('무게',stop.weight?`${stop.weight}kg`:'');
-  add('방문 시간',stop.promiseTime||({am:'오전',pm:'오후',any:'지정불가'}[stop.slot]));
-  add('엘리베이터',stop.noelev?'없음':stop.elevSize?`${stop.elevSize}인승`:'');
-  add('소파 수거',stop.bs?'있음':'');
-  add('배송 상태',stop.done?'완료':'');
-  add('특이사항',stop.memo);
-  const phones=[['전화',stop.phone],['안심번호',stop.safePhone],['2차 번호',stop.phone2]];
-  for(const [label,number] of phones){
-    if(!number)continue;
-    const link=document.createElement('a');
-    link.href=`tel:${String(number).replace(/\D/g,'')}`;
-    link.textContent=`${label} ${number}`;
-    popup.append(link);
-  }
-  return popup;
-}
+const pin = (label, state) => `<div class="pin ${state}"><span>${String(label).replace(/[&<>"']/g, "")}</span></div>`;
 
-function drawMap(node,route,day) {
-  const {points,lines}=route;
-  const map=L.map(node,{scrollWheelZoom:true});
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    attribution:'&copy; OpenStreetMap contributors',maxZoom:19,
-  }).addTo(map);
-  for(const line of lines) L.polyline(line.map(point=>[point.lat,point.lng]),{color:'#285b6b',weight:5}).addTo(map);
-  const places=new Map();
-  points.forEach(point=>{
-    const location=`${point.lat.toFixed(6)},${point.lng.toFixed(6)}`;
-    if(!places.has(location))places.set(location,[]);
-    places.get(location).push(point);
-  });
-  for(const group of places.values()){
-    const point=group[0];
-    const label=group.map(item=>item.label).join('·');
-    const marker=L.circleMarker([point.lat,point.lng],{radius:group.length>1?19:15,color:'#fff',weight:2,fillColor:'#285b6b',fillOpacity:1})
-      .bindTooltip(label,{permanent:true,direction:'center',className:'route-map-label'})
-      .addTo(map);
-    const customers=group.filter(item=>item.index>=0&&item.index<day.list.length);
-    if(customers.length){
-      const content=document.createElement('div');
-      content.className='map-customer-group';
-      customers.forEach(item=>content.append(customerPopup(day.list[item.index],item.index)));
-      marker.bindPopup(content,{maxWidth:320,minWidth:240});
+const Icon = ({ d }) => (
+  <svg
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.9"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {d}
+  </svg>
+);
+const ICONS = {
+  fit: <Icon d={<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />} />,
+  me: (
+    <Icon
+      d={
+        <>
+          <circle cx="12" cy="12" r="3.5" />
+          <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+        </>
+      }
+    />
+  ),
+  gear: (
+    <Icon
+      d={
+        <>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+        </>
+      }
+    />
+  ),
+  phone: (
+    <Icon
+      d={
+        <path d="M6.6 3.5h2.6l1.4 4-2 1.6a12 12 0 0 0 6.3 6.3l1.6-2 4 1.4v2.6c0 1-.8 1.8-1.8 1.8C10.4 19.2 4.8 13.6 4.8 5.3c0-1 .8-1.8 1.8-1.8z" />
+      }
+    />
+  ),
+  navi: (
+    <Icon
+      d={
+        <>
+          <path d="M12 21s-6.5-6.1-6.5-11a6.5 6.5 0 0 1 13 0c0 4.9-6.5 11-6.5 11z" />
+          <circle cx="12" cy="10" r="2.3" />
+        </>
+      }
+    />
+  ),
+  prev: <Icon d={<path d="m15 6-6 6 6 6" />} />,
+  next: <Icon d={<path d="m9 6 6 6-6 6" />} />,
+  route: (
+    <Icon
+      d={
+        <>
+          <circle cx="6" cy="18" r="2" />
+          <circle cx="18" cy="6" r="2" />
+          <path d="M8 18h6a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8h6" />
+        </>
+      }
+    />
+  ),
+  search: <Icon d={<><circle cx="10.8" cy="10.8" r="6.8" /><path d="m16 16 4.5 4.5" /></>} />,
+  close: <Icon d={<path d="M5 5 19 19M19 5 5 19" />} />,
+};
+
+export default function RouteMap({ day, onOpenCourse, onLocated }) {
+  const node = useRef(null),
+    mapRef = useRef(null),
+    sdkRef = useRef(null),
+    overlaysRef = useRef([]),
+    meRef = useRef(null),
+    markersRef = useRef({});
+  const [key, setKey] = useState(() => localStorage.getItem(KEY) || "");
+  const [draft, setDraft] = useState(key);
+  const [profile, setProfile] = useState(() => {
+    try {
+      return {
+        ...DEFAULT_PROFILE,
+        ...JSON.parse(localStorage.getItem(PROFILE) || "{}"),
+      };
+    } catch {
+      return DEFAULT_PROFILE;
     }
-    marker.getElement()?.setAttribute('aria-label',`${label}번 배송 정보`);
-  }
-  const bounds=L.latLngBounds(points.map(point=>[point.lat,point.lng]));
-  const fit=()=>{map.invalidateSize();map.fitBounds(bounds,{padding:[24,24],maxZoom:15})};
-  fit();
-  const observer=new ResizeObserver(fit);
-  observer.observe(node);
-  return ()=>{observer.disconnect();map.remove()};
-}
+  });
+  const [status, setStatus] = useState("");
+  const [mapError, setMapError] = useState("");
+  const [mapReady, setMapReady] = useState(false);
+  const [route, setRoute] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [selected, setSelected] = useState(null); // 고객 index
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [sheet, setSheet] = useState("peek"); // peek | list
+  const [settings, setSettings] = useState(false);
+  const { rows, home } = useMemo(() => compute(day), [day]);
 
-export default function RouteMap({day}) {
-  const node=useRef(null);
-  const [key,setKey]=useState(()=>localStorage.getItem(KEY)||'');
-  const [draft,setDraft]=useState(key);
-  const [profile,setProfile]=useState(()=>{try{return {...DEFAULT_PROFILE,...JSON.parse(localStorage.getItem(PROFILE)||'{}')}}catch{return DEFAULT_PROFILE}});
-  const [status,setStatus]=useState('');
-  const [route,setRoute]=useState(null);
-  const [version,setVersion]=useState(0);
-  useEffect(()=>{
-    if(!key||!day.list.length||!version)return;
-    let active=true;
-    setRoute(null);setStatus('지도 경로 불러오는 중…');
-    fetchTmapRoute(day,key,profile,fetch,{useCache:false}).then(result=>{
-      if(!active)return;
-      setRoute(result);setStatus('');
-    }).catch(error=>{if(active)setStatus(error.message||'지도를 불러오지 못했습니다.')});
-    return ()=>{active=false};
-  },[version]);
-  useEffect(()=>{
-    if(!route||!node.current)return;
-    try{return drawMap(node.current,route,day)}catch(error){console.error('지도 표시 실패',error);setStatus('지도 표시 중 오류가 났습니다. 새로고침을 눌러 주세요.');return undefined}
-  },[route,day]);
-  const saveKey=()=>{const value=draft.trim();if(!value)return;localStorage.setItem(KEY,value);if(value!==key){window.location.reload();return}setVersion(v=>v+1)};
-  const changeProfile=(field,value)=>setProfile(previous=>{const next={...previous,[field]:value};localStorage.setItem(PROFILE,JSON.stringify(next));return next});
-  return <section className="view map-view"><div className="wrap">
-    <div className="panel map-panel"><div className="route-title"><h2>배송 지도</h2>{key&&day.list.length>0&&<button type="button" onClick={()=>setVersion(v=>v+1)}>{route?'지도 새로고침':'지도 경로 보기'}</button>}</div>
-      {!key?<div className="map-setup"><p className="hint">T맵 앱키를 넣으면 방문 순서대로 도로 경로를 표시합니다.</p><label className="field"><span>T맵 앱키</span><input type="text" value={draft} onChange={e=>setDraft(e.target.value)} autoComplete="off"/></label><button className="primary big" onClick={saveKey} disabled={!draft.trim()}>지도 연결</button><a className="map-help" href="https://openapi.sk.com/" target="_blank" rel="noreferrer">T맵 앱키 만들기</a></div>:day.list.length===0?<p className="hint">배송지를 추가하면 지도에 경로가 표시됩니다.</p>:<>{route?<div id="tmap-route-map" ref={node} className="route-map" aria-label="방문 순서 지도" role="img"/>:<p className="hint">현재 순서의 지도를 보려면 ‘지도 경로 보기’를 누르세요.</p>}{status&&<p className="hint" role="status">{status}</p>}{route?.missing?.length>0&&<p className="hint" role="status">지도에 못 올린 곳: {route.missing.map(m=>m.name).join(', ')} · 카드에서 "T맵 검색용 주소"를 넣어 주세요.</p>}{route&&<p className="hint">출발 → {day.list.map((stop,i)=>`${i+1} ${stop.name||'고객'}`).join(' → ')} → 귀가</p>}{route&&<p className="hint">{route.truck?`높이 ${(Number(profile.height)/100).toFixed(2)}m 등 입력한 화물차 제원 반영`:'차량 높이·폭 등 제한 미반영 · T맵 운전 경로에서 확인'}</p>}</>}
-    </div>
-    {key&&<details className="panel"><summary>화물차 제원 · 앱키</summary><p className="hint">제원을 모두 입력하면 화물차 경로를 요청합니다. 차량 등록 정보를 확인해 적어 주세요.</p><div className="two">{[['height','높이 (cm)'],['width','폭 (cm)'],['length','길이 (cm)'],['weight','적재중량 (kg)'],['totalWeight','총중량 (kg)']].map(([field,label])=><label className="field" key={field}><span>{label}</span><input type="number" inputMode="numeric" value={profile[field]} onChange={e=>changeProfile(field,e.target.value)}/></label>)}</div>{validTruck(profile)&&<p className="hint">제원 저장됨 · 지도 새로고침을 누르면 반영됩니다.</p>}<label className="field"><span>T맵 앱키 변경</span><input type="text" value={draft} onChange={e=>setDraft(e.target.value)} autoComplete="off"/></label><button onClick={saveKey}>앱키 저장</button><button onClick={()=>{localStorage.removeItem(KEY);setKey('');setDraft('');setRoute(null)}}>앱키 지우기</button></details>}
-  </div></section>;
+  // 지도에 찍을 점: 경로를 받았으면 그 점, 아니면 고객에 저장된 좌표
+  const points = useMemo(() => {
+    if (route) return route.points;
+    return day.list
+      .map((c, i) =>
+        c.geoVersion === GEO_VERSION && c.geoAddr === (c.mapAddr || c.addr) && Number.isFinite(c.lat) && Number.isFinite(c.lng)
+          ? { lat: c.lat, lng: c.lng, index: i, label: String(i + 1) }
+          : null,
+      )
+      .filter(Boolean);
+  }, [route, day]);
+  const located = new Set(
+    points
+      .filter((p) => p.index >= 0 && p.index < day.list.length)
+      .map((p) => p.index),
+  );
+  const unplaced = day.list.map((c, i) => i).filter((i) => !located.has(i));
+  const searchResults = query.trim()
+    ? day.list.map((c, i) => ({ c, i })).filter(({ c, i }) =>
+        `${i + 1} ${c.name || ""} ${c.addr || ""}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+      )
+    : [];
+
+  // 앱키가 준비되면 T맵 SDK 지도를 만든다.
+  useEffect(() => {
+    if (!key || !node.current) return;
+    let cancelled = false;
+    let observer;
+    setMapError("");
+    setMapReady(false);
+    loadTmapSdk().then((Tmapv2) => {
+      if (cancelled || !node.current) return;
+      sdkRef.current = Tmapv2;
+      const map = new Tmapv2.Map("delivery-tmap", {
+        center: new Tmapv2.LatLng(...HOME),
+        zoom: 10,
+        width: `${node.current.clientWidth}px`,
+        height: `${node.current.clientHeight}px`,
+      });
+      mapRef.current = map;
+      observer = new ResizeObserver(() => map.resize());
+      observer.observe(node.current);
+      setMapReady(true);
+    }).catch((error) => {
+      if (!cancelled) setMapError(error.message);
+    });
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      overlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      overlaysRef.current = [];
+      meRef.current?.setMap(null);
+      meRef.current = null;
+      mapRef.current?.destroy();
+      mapRef.current = null;
+      sdkRef.current = null;
+    };
+  }, [key]);
+
+  const fitAll = () => {
+    const map = mapRef.current, Tmapv2 = sdkRef.current;
+    if (!map || !Tmapv2 || !points.length) return;
+    const bounds = new Tmapv2.LatLngBounds();
+    points.forEach((p) => bounds.extend(new Tmapv2.LatLng(p.lat, p.lng)));
+    map.fitBounds(bounds);
+    if (points.length === 1) map.setZoom(15);
+  };
+
+  // 핀과 경로 다시 그리기
+  useEffect(() => {
+    const map = mapRef.current, Tmapv2 = sdkRef.current;
+    if (!map || !Tmapv2) return;
+    overlaysRef.current.forEach((overlay) => overlay.setMap(null));
+    overlaysRef.current = [];
+    markersRef.current = {};
+    for (const line of route?.lines || []) {
+      const path = line.map((p) => new Tmapv2.LatLng(p.lat, p.lng));
+      overlaysRef.current.push(new Tmapv2.Polyline({ path, strokeColor: "#ffffff", strokeWeight: 9, map }));
+      overlaysRef.current.push(new Tmapv2.Polyline({ path, strokeColor: "#285b6b", strokeWeight: 5, map }));
+    }
+    for (const p of points) {
+      const isStop = p.index >= 0 && p.index < day.list.length;
+      const stop = isStop ? day.list[p.index] : null;
+      const state = !isStop
+        ? "end"
+        : stop?.done
+          ? "done"
+          : selected === p.index
+            ? "on"
+            : "";
+      const marker = new Tmapv2.Marker({
+        position: new Tmapv2.LatLng(p.lat, p.lng),
+        iconHTML: pin(p.label, state),
+        title: isStop ? `${p.label}번 ${stop?.name || ""}` : p.label,
+        map,
+      });
+      overlaysRef.current.push(marker);
+      if (isStop) {
+        marker.addListener("click", () => {
+          setSelected(p.index);
+          setSheet("peek");
+        });
+        markersRef.current[p.index] = marker;
+      }
+    }
+  }, [points, selected, day, route, mapReady]);
+
+  // 처음 그릴 때 모든 핀이 보이게
+  const fitted = useRef("");
+  useEffect(() => {
+    if (!mapReady) return;
+    const sig = points.map((p) => `${p.label}:${p.lat}:${p.lng}`).join();
+    if (sig && fitted.current !== sig) {
+      fitted.current = sig;
+      fitAll();
+    }
+  }, [points, mapReady]);
+
+  const focus = (i) => {
+    setSelected(i);
+    setSheet("peek");
+    setSearchOpen(false);
+    setQuery("");
+    const marker = markersRef.current[i];
+    if (marker && mapRef.current)
+      mapRef.current.setCenter(marker.getPosition());
+    if (marker && mapRef.current)
+      mapRef.current.setZoom(Math.max(mapRef.current.getZoom(), 13));
+  };
+
+  const loadRoute = () => {
+    if (!key || !day.list.length) return;
+    setBusy(true);
+    setStatus("도로 경로를 불러오는 중…");
+    fetchTmapRoute(day, key, profile, fetch, { useCache: false })
+      .then((result) => {
+        setRoute(result);
+        setStatus("");
+        if (onLocated) onLocated(result);
+      })
+      .catch((error) => setStatus(error.message || "경로를 불러오지 못했어요."))
+      .finally(() => setBusy(false));
+  };
+
+  const showMe = () => {
+    if (!navigator.geolocation) {
+      setStatus("이 기기에서는 현재 위치를 쓸 수 없어요.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const map = mapRef.current;
+        if (!map) return;
+        const Tmapv2 = sdkRef.current;
+        const here = new Tmapv2.LatLng(pos.coords.latitude, pos.coords.longitude);
+        if (meRef.current) meRef.current.setPosition(here);
+        else
+          meRef.current = new Tmapv2.Marker({
+            position: here,
+            iconHTML: '<div class="me"></div>',
+            title: "내 위치",
+            map,
+          });
+        map.setCenter(here);
+        map.setZoom(14);
+      },
+      () => setStatus("위치 권한을 허용해야 내 위치를 볼 수 있어요."),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
+  };
+
+  const saveKey = () => {
+    const value = draft.trim();
+    if (!value) return;
+    localStorage.setItem(KEY, value);
+    window.location.reload();
+  };
+  const changeProfile = (field, value) =>
+    setProfile((previous) => {
+      const next = { ...previous, [field]: value };
+      localStorage.setItem(PROFILE, JSON.stringify(next));
+      return next;
+    });
+
+  const row = selected != null ? rows[selected] : null;
+  const c = row?.c;
+  const phone = c && (c.phone || c.safePhone);
+  const done = day.list.filter((x) => x.done).length;
+
+  return (
+    <section className="map-full">
+      <div
+        id="delivery-tmap"
+        ref={node}
+        className="map-canvas"
+        role="application"
+        aria-label="배송 지도"
+      />
+      {(!key || mapError) && <div className="map-load-message" role="status">
+        <strong>{mapError ? "T맵 지도를 표시할 수 없어요" : "T맵 지도 연결하기"}</strong>
+        <span>{mapError || "지도 설정에서 T맵 앱키를 입력해 주세요."}</span>
+        <button type="button" onClick={() => setSettings(true)}>지도 설정 열기</button>
+      </div>}
+
+      <div className="map-top">
+        <form className="map-search" role="search" onSubmit={(e) => {
+          e.preventDefault();
+          if (searchResults.length) focus(searchResults[0].i);
+        }}>
+          {ICONS.search}
+          <input
+            type="search"
+            aria-label="배송지 검색"
+            placeholder="고객명 또는 배송지 검색"
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setSearchOpen(true); }}
+            onFocus={() => setSearchOpen(true)}
+            onKeyDown={(e) => { if (e.key === "Escape") setSearchOpen(false); }}
+          />
+          {query && <button type="button" className="map-search-clear" aria-label="검색어 지우기" onClick={() => { setQuery(""); setSearchOpen(false); }}>{ICONS.close}</button>}
+        </form>
+        {searchOpen && query.trim() && <div className="map-search-results">
+          {searchResults.length ? searchResults.map(({ c, i }) => <button type="button" key={c.id || i} onClick={() => focus(i)}>
+            <span className="stop-no">{i + 1}</span><span><strong>{c.name || "고객"}</strong><small>{c.addr || "주소 없음"}</small></span>
+          </button>) : <p>일치하는 배송지가 없어요.</p>}
+        </div>}
+        <div className="map-top-actions">
+          <button type="button" className="map-chip map-course-chip" onClick={onOpenCourse}>
+            <strong>오늘 배송 {day.list.length}곳</strong>
+            <span>귀가 {fmt(home)}{done ? ` · ${done}곳 완료` : ""}</span>
+          </button>
+          <div className="map-top-right">
+          {key && day.list.length > 0 && (
+            <button
+              type="button"
+              className={"map-chip route-chip" + (route ? " on" : "")}
+              disabled={busy}
+              onClick={loadRoute}
+            >
+              {ICONS.route}
+              <span>
+                {busy ? "불러오는 중" : route ? "경로 새로" : "도로 경로"}
+              </span>
+            </button>
+          )}
+          <button
+            type="button"
+            className="map-fab small"
+            aria-label="지도 설정"
+            onClick={() => setSettings(true)}
+          >
+            {ICONS.gear}
+          </button>
+          </div>
+        </div>
+      </div>
+
+      {status && (
+        <p className="map-toast" role="status">
+          {status}
+        </p>
+      )}
+
+      <div className={"map-side" + (sheet === "list" ? " up" : "")}>
+        <button
+          type="button"
+          className="map-fab"
+          aria-label="내 위치"
+          onClick={showMe}
+          disabled={!mapReady}
+        >
+          {ICONS.me}
+        </button>
+        <button
+          type="button"
+          className="map-fab"
+          aria-label="모든 배송지 보기"
+          onClick={fitAll}
+          disabled={!mapReady || !points.length}
+        >
+          {ICONS.fit}
+        </button>
+      </div>
+
+      <div className={"map-sheet " + sheet}>
+        <button
+          type="button"
+          className="sheet-handle"
+          aria-label={sheet === "list" ? "목록 접기" : "목록 펼치기"}
+          onClick={() => setSheet(sheet === "list" ? "peek" : "list")}
+        >
+          <span />
+        </button>
+
+        {sheet === "peek" &&
+          (c ? (
+            <div className="sheet-stop">
+              <div className="sheet-stop-head">
+                <button
+                  type="button"
+                  className="map-fab small"
+                  aria-label="이전 배송지"
+                  disabled={selected === 0}
+                  onClick={() => focus(selected - 1)}
+                >
+                  {ICONS.prev}
+                </button>
+                <div className="sheet-stop-title">
+                  <span className={"stop-no" + (c.done ? " done" : "")}>
+                    {selected + 1}
+                  </span>
+                  <div>
+                    <strong>{c.name || "고객"}</strong>
+                    <span>{shortArea(c.addr)}</span>
+                  </div>
+                </div>
+                <div className="sheet-eta">
+                  <strong>
+                    {c.done && c.doneAt ? c.doneAt : fmt(row.start)}
+                  </strong>
+                  <small>{c.done ? "완료" : "도착 예정"}</small>
+                </div>
+                <button
+                  type="button"
+                  className="map-fab small"
+                  aria-label="다음 배송지"
+                  disabled={selected === day.list.length - 1}
+                  onClick={() => focus(selected + 1)}
+                >
+                  {ICONS.next}
+                </button>
+              </div>
+              {!located.has(selected) && (
+                <p className="note warn">
+                  이 고객은 지도에 위치가 없어요. 오늘 코스 카드에서 "T맵 검색용
+                  주소"를 넣어 주세요.
+                </p>
+              )}
+              <div className="sheet-actions">
+                {phone && (
+                  <a className="btn" href={"tel:" + digits(phone)}>
+                    {ICONS.phone}
+                    {normalizePhone(phone)}
+                  </a>
+                )}
+                <a className="btn primary" href={tmapNavi(c.addr)}>
+                  {ICONS.navi}T맵 길안내
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className="sheet-summary">
+              {points.length ? (
+                <p>핀을 누르면 고객 정보가 나와요.</p>
+              ) : (
+                <p>
+                  {key
+                    ? "도로 경로를 누르면 고객 위치가 지도에 나와요."
+                    : "오른쪽 위 설정에서 T맵 키를 넣으면 고객 위치가 지도에 나와요."}
+                </p>
+              )}
+              {unplaced.length > 0 && points.length > 0 && (
+                <p className="note warn">
+                  지도에 없는 곳 {unplaced.length}곳:{" "}
+                  {unplaced
+                    .slice(0, 3)
+                    .map((i) => `${i + 1}번 ${day.list[i].name || ""}`)
+                    .join(", ")}
+                  {unplaced.length > 3 ? " …" : ""}
+                </p>
+              )}
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setSheet("list")}
+              >
+                배송지 목록 보기
+              </button>
+            </div>
+          ))}
+
+        {sheet === "list" && (
+          <ol className="sheet-list">
+            <li className="sheet-end">
+              <span>출발</span>
+              <strong>{day.depart}</strong>
+              <em>{day.start.split("(")[0].trim()}</em>
+            </li>
+            {rows.map((r, i) => (
+              <li key={r.c.id}>
+                <button
+                  type="button"
+                  onClick={() => focus(i)}
+                  className={selected === i ? "on" : ""}
+                >
+                  <span className={"stop-no" + (r.c.done ? " done" : "")}>
+                    {i + 1}
+                  </span>
+                  <span className="sheet-list-text">
+                    <strong>{r.c.name || "고객"}</strong>
+                    <span>
+                      {shortArea(r.c.addr)}
+                      {!located.has(i) ? " · 지도에 없음" : ""}
+                    </span>
+                  </span>
+                  <time>
+                    {r.c.done && r.c.doneAt ? r.c.doneAt : fmt(r.start)}
+                  </time>
+                </button>
+              </li>
+            ))}
+            <li className="sheet-end">
+              <span>귀가</span>
+              <strong>{fmt(home)}</strong>
+              <em>{day.end.split("(")[0].trim()}</em>
+            </li>
+          </ol>
+        )}
+      </div>
+
+      {settings && createPortal(
+        <div
+          className="map-settings"
+          role="dialog"
+          aria-modal="true"
+          aria-label="지도 설정"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setSettings(false);
+          }}
+        >
+          <div className="map-settings-card">
+            <div className="map-settings-head">
+              <h2>지도 설정</h2>
+              <button type="button" onClick={() => setSettings(false)}>
+                닫기
+              </button>
+            </div>
+            <label className="field">
+              <span>T맵 앱키</span>
+              <input
+                type="text"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                autoComplete="off"
+                placeholder="SK open API에서 받은 App Key"
+              />
+            </label>
+            <p className="note">T맵 지도보기 상품을 사용할 수 있는 앱키가 필요해요.</p>
+            <button
+              type="button"
+              className="btn primary"
+              disabled={!draft.trim()}
+              onClick={saveKey}
+            >
+              앱키 저장
+            </button>
+            {!key && (
+              <a
+                className="map-help"
+                href="https://openapi.sk.com/products/calc?svcSeq=4&menuSeq=5"
+                target="_blank"
+                rel="noreferrer"
+              >
+                T맵 무료 앱키 만들기 ↗
+              </a>
+            )}
+            {key && (
+              <>
+                <p className="note">
+                  화물차 제원을 5칸 모두 넣으면 높이·무게 제한을 지키는 화물차
+                  경로로 받아요.
+                </p>
+                <div className="two">
+                  {[
+                    ["height", "높이 (cm)"],
+                    ["width", "폭 (cm)"],
+                    ["length", "길이 (cm)"],
+                    ["weight", "적재중량 (kg)"],
+                    ["totalWeight", "총중량 (kg)"],
+                  ].map(([field, label]) => (
+                    <label className="field" key={field}>
+                      <span>{label}</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={profile[field]}
+                        onChange={(e) => changeProfile(field, e.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <p className="note">
+                  {validTruck(profile)
+                    ? "화물차 제원 저장됨 · 다음 경로부터 반영돼요."
+                    : "아직 일반 차량 경로로 받아요."}
+                </p>
+                <button
+                  type="button"
+                  className="btn danger"
+                  onClick={() => {
+                    localStorage.removeItem(KEY);
+                    window.location.reload();
+                  }}
+                >
+                  앱키 지우기
+                </button>
+              </>
+            )}
+          </div>
+        </div>, document.body
+      )}
+    </section>
+  );
 }

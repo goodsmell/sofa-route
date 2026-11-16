@@ -1,6 +1,7 @@
 const API = 'https://apis.openapi.sk.com/tmap';
-const GEO_CACHE = 'sofa-route-geo-v1';
-const LEG_CACHE = 'sofa-route-legs-v1';
+export const GEO_VERSION = 2;
+const GEO_CACHE = 'sofa-route-geo-v2';
+const LEG_CACHE = 'sofa-route-legs-v2';
 
 export function mapAddress(value) {
   const raw = String(value || '').trim();
@@ -34,8 +35,8 @@ export function searchCandidates(stopOrAddress) {
     stop.mapAddr && {kind: 'addr', q: stop.mapAddr.trim()},
     {kind: 'addr', q: roadAddress(stop.addr)},
     {kind: 'addr', q: mapAddress(stop.addr)},
-    building && {kind: 'poi', q: [dong || city, building].filter(Boolean).join(' ')},
-    building && city && dong && {kind: 'poi', q: city + ' ' + building},
+    building && {kind: 'poi', q: [dong || city, building].filter(Boolean).join(' '), expected: building, region: stop.addr},
+    building && city && dong && {kind: 'poi', q: city + ' ' + building, expected: building, region: stop.addr},
     dong && {kind: 'addr', q: [city, dong].filter(Boolean).join(' '), approx: true},
   ].filter(c => c && c.q);
   const seen = new Set();
@@ -53,6 +54,49 @@ export function parsePoi(data) {
   const poi = data?.searchPoiInfo?.pois?.poi?.[0];
   const lat = Number(poi?.frontLat || poi?.noorLat), lng = Number(poi?.frontLon || poi?.noorLon);
   return Number.isFinite(lat) && Number.isFinite(lng) && lat > 30 && lat < 40 && lng > 120 && lng < 135 ? {lat, lng} : null;
+}
+
+const compact = value => String(value || '').replace(/\s+/g, '').replace(/^(경기도|서울특별시|서울시|인천광역시|경기|서울|인천)/, '');
+const provinceName = value => {
+  const name = String(value || '').trim();
+  if (/^경기(?:도)?$/.test(name)) return '경기';
+  if (/^서울(?:특별시|시)?$/.test(name)) return '서울';
+  if (/^인천(?:광역시)?$/.test(name)) return '인천';
+  return name;
+};
+const roadParts = value => {
+  const match = String(value || '').match(/([가-힣0-9]+(?:대로|로|길)(?:\d+번길)?)\s*(\d+(?:-\d+)?)/);
+  return match ? {road: match[1], number: match[2]} : null;
+};
+const sameRegion = (query, item) => {
+  const text = compact(query);
+  const province = String(query || '').match(/^(경기(?:도)?|서울(?:특별시|시)?|인천(?:광역시)?)/)?.[1];
+  if (province && (!item.city_do || provinceName(province) !== provinceName(item.city_do))) return false;
+  const district = String(query || '').match(/([가-힣]+(?:구|군))(?=\s|$)/)?.[1];
+  if (district && (!item.gu_gun || !compact(item.gu_gun).includes(district))) return false;
+  return !!text;
+};
+
+// T맵은 주소 일부만 맞아도 근처 좌표를 돌려준다. 도로명과 건물 번호가 모두 일치한 결과만 자동 경로에 쓴다.
+export function exactGeocode(data, query) {
+  const item = data?.coordinateInfo?.coordinate?.[0];
+  const point = parseGeocode(data);
+  if (!item || !point || !sameRegion(query, item)) return null;
+  const road = roadParts(query);
+  if (road) {
+    if (item.newMatchFlag !== 'N51' || compact(item.newRoadName) !== compact(road.road)) return null;
+    if (String(item.newBuildingIndex || '') !== road.number) return null;
+    return point;
+  }
+  return ['M11', 'M21'].includes(item.matchFlag) ? point : null;
+}
+
+export function exactPoi(data, candidate) {
+  const item = data?.searchPoiInfo?.pois?.poi?.[0];
+  const point = parsePoi(data);
+  if (!item || !point || !candidate.expected || compact(item.name) !== compact(candidate.expected)) return null;
+  if (!sameRegion(candidate.region, {city_do: item.upperAddrName, gu_gun: item.middleAddrName})) return null;
+  return point;
 }
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -87,7 +131,7 @@ const storage = {
 
 async function lookup(candidate, key, fetcher) {
   const cache = typeof localStorage === 'undefined' ? {} : storage.get(GEO_CACHE);
-  const id = candidate.kind + ':' + candidate.q;
+  const id = candidate.kind + ':' + candidate.q + ':' + (candidate.region || '');
   if (cache[id]) return cache[id];
   const url = candidate.kind === 'poi'
     ? `${API}/pois?${new URLSearchParams({version: '1', searchKeyword: candidate.q, count: '1', resCoordType: 'WGS84GEO', reqCoordType: 'WGS84GEO'})}`
@@ -95,7 +139,7 @@ async function lookup(candidate, key, fetcher) {
   const response = await request(url, {headers: {appKey: key, Accept: 'application/json'}}, fetcher);
   if (!response.ok) return null;
   const data = await response.json().catch(() => null);
-  const point = candidate.kind === 'poi' ? parsePoi(data) : parseGeocode(data);
+  const point = candidate.kind === 'poi' ? exactPoi(data, candidate) : exactGeocode(data, candidate.q);
   if (point && typeof localStorage !== 'undefined') {cache[id] = point; storage.set(GEO_CACHE, cache, 400)}
   return point;
 }
@@ -103,6 +147,7 @@ async function lookup(candidate, key, fetcher) {
 // 후보를 차례로 찾아보고 처음 찾은 좌표를 쓴다.
 export async function locate(stopOrAddress, key, fetcher = fetch) {
   for (const candidate of searchCandidates(stopOrAddress)) {
+    if (candidate.approx) continue;
     const point = await lookup(candidate, key, fetcher);
     if (point) return {...point, approx: !!candidate.approx, query: candidate.q};
   }
@@ -200,7 +245,7 @@ export async function resolvePoints(day, key, fetcher = fetch) {
   const stops = [], missing = [];
   for (let i = 0; i < day.list.length; i++) {
     const stop = day.list[i];
-    const cached = stop.geoAddr === (stop.mapAddr || stop.addr) && Number.isFinite(stop.lat) ? {lat: stop.lat, lng: stop.lng, approx: !!stop.geoApprox} : null;
+    const cached = stop.geoVersion === GEO_VERSION && stop.geoAddr === (stop.mapAddr || stop.addr) && Number.isFinite(stop.lat) && Number.isFinite(stop.lng) ? {lat: stop.lat, lng: stop.lng, approx: false} : null;
     const point = cached || await locate(stop, key, fetcher);
     if (point) stops.push({...point, index: i, id: stop.id, label: String(i + 1)});
     else missing.push({index: i, id: stop.id, name: place(i, day.list.length, stop)});
@@ -216,7 +261,7 @@ export async function fetchTmapRoute(day, key, profile, fetcher = fetch, {useCac
   const found = await resolvePoints(day, key, fetcher);
   const points = [found.start, ...found.stops, found.end];
   const order = points.map(p => p.index);
-  const located = Object.fromEntries(found.stops.map(p => [p.id, {lat: p.lat, lng: p.lng, geoApprox: p.approx, geoAddr: day.list[p.index].mapAddr || day.list[p.index].addr}]));
+  const located = Object.fromEntries(found.stops.map(p => [p.id, {lat: p.lat, lng: p.lng, geoApprox: false, geoVersion: GEO_VERSION, geoAddr: day.list[p.index].mapAddr || day.list[p.index].addr}]));
   const cacheKey = legKey(day, points, profile);
   const cache = useCache && typeof localStorage !== 'undefined' ? storage.get(LEG_CACHE) : {};
   if (useCache && cache[cacheKey]) {
@@ -240,19 +285,35 @@ export async function fetchTmapRoute(day, key, profile, fetcher = fetch, {useCac
 export function applyLegs(day, legs) {
   if (!legs || legs.length !== day.list.length + 1) return day;
   const list = day.list.map((stop, i) => legs[i]
-    ? {...stop, travel: legs[i].min, travelKm: legs[i].km, travelFrom: i ? day.list[i - 1].id : 'start'}
-    : {...stop, travelKm: undefined, travelFrom: undefined});
+    ? {...stop, travel: legs[i].min, travelKm: legs[i].km, travelFrom: i ? day.list[i - 1].id : 'start', travelVersion: GEO_VERSION}
+    : {...stop, travel: 30, travelKm: undefined, travelFrom: undefined, travelVersion: undefined});
   const last = legs.at(-1);
   return last
-    ? {...day, list, endTravel: last.min, endTravelKm: last.km, endFrom: day.list.at(-1)?.id || 'start'}
-    : {...day, list, endTravelKm: undefined, endFrom: undefined};
+    ? {...day, list, endTravel: last.min, endTravelKm: last.km, endFrom: day.list.at(-1)?.id || 'start', endTravelVersion: GEO_VERSION}
+    : {...day, list, endTravel: 30, endTravelKm: undefined, endFrom: undefined, endTravelVersion: undefined};
+}
+
+export function invalidateAddress(day, id, patch) {
+  const current = day.list.find(stop => stop.id === id);
+  if (!current) return day;
+  const changed = ('addr' in patch && patch.addr !== current.addr) || ('mapAddr' in patch && patch.mapAddr !== current.mapAddr) || (current.verified === false && patch.verified === true);
+  if (!changed) return {...day, list: day.list.map(stop => stop.id === id ? {...stop, ...patch} : stop)};
+  const list = day.list.map(stop => ({
+    ...stop, ...(stop.id === id ? {...patch, lat: undefined, lng: undefined, geoAddr: '', geoVersion: undefined, geoMissing: false} : {}),
+    travel: 30, travelKm: undefined, travelFrom: undefined, travelVersion: undefined,
+  }));
+  const plans = day.plans && {...day.plans, geo: null, geoVersion: undefined};
+  if (plans) for (const kind of ['customer', 'driver', 'balanced']) if (plans[kind]) plans[kind] = {...plans[kind], legs: null, legsKey: ''};
+  return {...day, list, endTravel: 30, endTravelKm: undefined, endFrom: undefined, endTravelVersion: undefined, plans};
 }
 
 export function legInfo(day, i) {
   const stop = i < day.list.length ? day.list[i] : null, prev = i ? day.list[i - 1].id : 'start';
   const km = stop ? stop.travelKm : day.endTravelKm, from = stop ? stop.travelFrom : day.endFrom, min = stop ? (stop.travel ?? 30) : (day.endTravel ?? 30);
+  const version = stop ? stop.travelVersion : day.endTravelVersion;
   if (km == null) return {min, km: null, state: 'default'};
-  return {min, km, state: from === prev ? 'tmap' : 'stale'};
+  if (version !== GEO_VERSION) return {min: 30, km: null, state: 'default'};
+  return from === prev ? {min, km, state: 'tmap'} : {min: 30, km: null, state: 'stale'};
 }
 
 export const fmtDuration = min => {min = Math.max(0, Math.round(min)); const h = Math.floor(min / 60), m = min % 60; return h ? (m ? `${h}시간 ${m}분` : `${h}시간`) : `${m}분`};
@@ -271,7 +332,7 @@ export async function geocodeDay(day, key, fetcher = fetch) {
   for (const p of found.stops) {
     pos[p.id] = {lat: p.lat, lng: p.lng};
     const stop = day.list[p.index];
-    cache[p.id] = {lat: p.lat, lng: p.lng, geoApprox: p.approx, geoAddr: stop.mapAddr || stop.addr};
+    cache[p.id] = {lat: p.lat, lng: p.lng, geoApprox: false, geoVersion: GEO_VERSION, geoAddr: stop.mapAddr || stop.addr};
   }
   return {start: found.start, end: found.end, pos, cache, missing: found.missing};
 }

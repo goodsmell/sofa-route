@@ -10,9 +10,18 @@
   <link rel="apple-touch-icon" href="/sofa-route/icon-192.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
-  <title>소파 배송 동선표</title>
-  <script type="module" crossorigin src="/sofa-route/assets/index-DYykWTOa.js"></script>
-  <link rel="stylesheet" crossorigin href="/sofa-route/assets/index-CKDkcLOn.css">
+  <script>
+    // T맵 Raster SDK는 내부 스크립트를 document.write로 읽으므로 파싱 중에 로드해야 한다.
+    try {
+      const tmapKey = localStorage.getItem('sofa-route-tmap-key-v1');
+      if (tmapKey) {
+        document.write('<script id="tmap-sdk" src="https://apis.openapi.sk.com/tmap/jsv2?version=1&amp;appKey=' + encodeURIComponent(tmapKey) + '" onerror="window.__tmapSdkLoadError=true"><\/script>');
+      }
+    } catch (_) {}
+  </script>
+  <title>아빠 화이팅</title>
+  <script type="module" crossorigin src="/sofa-route/assets/index-C3iASBlE.js"></script>
+  <link rel="stylesheet" crossorigin href="/sofa-route/assets/index-BA-BML9U.css">
 </head>
 <body>
   <div id="root"></div>

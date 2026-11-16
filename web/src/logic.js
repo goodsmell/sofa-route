@@ -1,4 +1,6 @@
-import { legInfo, fmtDuration, routeTotals } from "./tmapRoute.js";
+import { legInfo, fmtDuration, routeTotals, GEO_VERSION, invalidateAddress } from "./tmapRoute.js";
+import { workMin } from "./timeRules.js";
+export { workMin } from "./timeRules.js";
 export const KEY = "sofa-route-v1",
   HISTORY_KEY = "sofa-route-history-v1",
   TABKEY = "sofa-route-tab";
@@ -38,20 +40,51 @@ export const emptyDay = (date) => ({
   date,
   depart: "06:40",
   start: "그레이박스 (경기 안산시 단원구 해봉로 232)",
-  end: "팔곡화물차고지 (경기 안산시 팔곡산단1길 13)",
+  end: "팔곡화물차고지 (경기 안산시 상록구 팔곡산단1길 13)",
   endTravel: 30,
   list: [],
   contacts: [],
+  imports: [],
 });
-export function restoreDay(stored, storedHistory = {}, current = today()) {
+export function deleteCustomer(day, id) {
+  const customer = day.list.find((item) => item.id === id);
+  if (!customer) return day;
+  const imports = (day.imports || day.list.filter((item) => item.source === "form"))
+    .filter((item) => item.id !== id && !(customer.imageId && item.imageId === customer.imageId && item.name === customer.name));
+  return {
+    ...day,
+    list: day.list.filter((item) => item.id !== id).map((item) => ({
+      ...item, travel: 30, travelKm: undefined, travelFrom: undefined, travelVersion: undefined,
+    })),
+    imports,
+    plans: null,
+    phase: day.list.length === 1 ? "draft" : day.phase,
+    endTravel: 30, endTravelKm: undefined, endFrom: undefined, endTravelVersion: undefined,
+  };
+}
+export function deleteDayCustomers(day) {
+  return { ...day, list: [], contacts: [], imports: [], plans: null, phase: "draft",
+    endTravel: 30, endTravelKm: undefined, endFrom: undefined, endTravelVersion: undefined };
+}
+export function restoreDay(stored, storedHistory = {}, current = shiftDate(today(), 1)) {
   const history = { ...storedHistory };
-  let day = stored && Array.isArray(stored.list) ? stored : emptyDay(current);
-  if (day.date) history[day.date] = structuredClone(day);
+  const staleEmptyDay = stored?.date < current &&
+    Array.isArray(stored.list) && !stored.list.length &&
+    !stored.imports?.length && !stored.contacts?.length;
+  let day = stored && Array.isArray(stored.list) && !staleEmptyDay ? stored : emptyDay(current);
   day = {
     ...emptyDay(day.date || current),
     ...day,
     contacts: day.contacts || [],
+    imports: day.imports || day.list.filter((customer) => customer.source === "form"),
   };
+  if (day.end === "팔곡화물차고지 (경기 안산시 팔곡산단1길 13)") {
+    day.end = "팔곡화물차고지 (경기 안산시 상록구 팔곡산단1길 13)";
+    day.plans = null;
+    day.endTravelKm = undefined;
+    day.endFrom = undefined;
+    day.endTravelVersion = undefined;
+  }
   day.list = day.list.map((customer) =>
     /^0508/.test(digits(customer.phone))
       ? {
@@ -62,6 +95,12 @@ export function restoreDay(stored, storedHistory = {}, current = today()) {
         }
       : { ...customer, verified: customer.verified !== false },
   );
+  for (const customer of day.list) {
+    if (customer.source === 'manual') continue;
+    const corrected = normalizeOcrAddress(customer.addr);
+    if (corrected !== customer.addr) day = invalidateAddress(day, customer.id, {addr: corrected});
+  }
+  if (day.date) history[day.date] = structuredClone(day);
   return { d: day, h: history };
 }
 export const normalizePhone = (s) => {
@@ -72,6 +111,7 @@ export const normalizePhone = (s) => {
       ? d.replace(/^(\d{4})(\d{4})(\d{4})$/, "$1-$2-$3")
       : d;
 };
+export const normalizeOcrAddress = (value) => String(value || '').replace(/충부대로/g, '중부대로');
 export function baseCustomer(x = {}) {
   return {
     id: crypto.randomUUID(),
@@ -82,6 +122,7 @@ export function baseCustomer(x = {}) {
     phone: x.phone || "",
     safePhone: x.safePhone || "",
     phone2: x.phone2 || "",
+    installDate: x.installDate || "",
     slot: x.slot || "any",
     promiseTime: x.promiseTime || "",
     callMemo: x.callMemo || "",
@@ -89,11 +130,14 @@ export function baseCustomer(x = {}) {
     noelev: !!x.noelev,
     elevSize: x.elevSize || "",
     elevatorKnown: !!x.elevatorKnown,
+    ladderNeeded: !!x.ladderNeeded,
+    ladderKnown: !!x.ladderKnown,
     bs: !!x.bs,
     single: !!x.single,
     call: !!x.call,
     sorry: !!x.sorry,
     prod: x.prod || "",
+    productRows: x.productRows || [],
     weight: x.weight || "",
     mapAddr: x.mapAddr || "",
     memo: x.memo || "",
@@ -107,25 +151,8 @@ export function baseCustomer(x = {}) {
 }
 // 물건 무게(kg). 모르면 null
 export const weightKg = (c) => (+c.weight > 0 ? +c.weight : null);
-// 한 집에 잡는 시간(이동+작업): 50kg 미만 30분, 50kg 이상이나 무게를 모르면 1시간
-export const blockMin = (c) => {
-  const w = weightKg(c);
-  return w != null && w < 50 ? 30 : 60;
-};
-// 이동 20분까지는 무게별 기본 시간에 포함한다. 계단·수거·복잡한 제품은 별도 여유를 더한다.
-export const serviceMin = (c, travel) => {
-  const base = blockMin(c) - Math.min(Math.max(+travel || 0, 0), 20);
-  return +c.work > 0 ? Math.max(base, +c.work) : base + workMin(c) - 15;
-};
-export function workMin(c) {
-  if (+c.work > 0) return +c.work;
-  let n = /리클라이너|전동/.test(c.prod || "") ? 30 : 15;
-  if (c.noelev) n += 15;
-  if (c.bs) n += 15;
-  if (/스툴/.test(c.prod || "")) n += 5;
-  if (/멀티|모듈|유닛/.test(c.prod || "")) n += 10;
-  return n;
-}
+// 현장 작업 시간만 반환한다. 이동은 방문 시각을 계산할 때 따로 더한다.
+export const serviceMin = (c) => workMin(c);
 export function softUnmet(c, start) {
   const m = c.memo || "";
   return /가능하면\s*늦게|가장\s*늦게|늦은\s*시간/.test(m) && start < 900
@@ -144,12 +171,13 @@ export function visitWindow(c) {
 export function compute(day) {
   let t = toMin(day.depart),
     rows = [];
-  for (const c of day.list) {
+  for (const [index, c] of day.list.entries()) {
+    const travel = legInfo(day, index).min;
     const sl = visitWindow(c),
-      reach = t + (+c.travel || 0),
+      reach = t + travel,
       start = c.arrivedAt ? toMin(c.arrivedAt) : Math.max(reach, sl.s),
       wait = start - reach,
-      end = start + serviceMin(c, +c.travel || 0),
+      end = start + serviceMin(c, travel),
       flags = [];
     if (start >= sl.e && (c.slot === "am" || c.slot === "pm" || c.promiseTime)) flags.push(["bad", sl.label + " 시간 넘김"]);
     else if (start >= 1020) flags.push(["warn", "17시 넘어 도착"]);
@@ -160,13 +188,13 @@ export function compute(day) {
     if (c.sorry) flags.push(["call", "양해 전화"]);
     if (softUnmet(c, start)) flags.push(["call", "방문 순서 요청 확인"]);
     if (c.verified === false) flags.push(["warn", "사진 글자 확인"]);
-    rows.push({ c, start, end, wait, flags, sl });
+    rows.push({ c, start, end, wait, flags, sl, travel });
     t =
       c.done && /^\d{2}:\d{2}$/.test(c.doneAt || "")
         ? Math.max(toMin(day.depart), toMin(c.doneAt))
         : end;
   }
-  return { rows, home: t + (+day.endTravel || 0), last: t };
+  return { rows, home: t + legInfo(day, day.list.length).min, last: t };
 }
 export function precallList(rows) {
   return rows
@@ -205,7 +233,8 @@ function score(day, list) {
   for (const c of list) {
     const area = areaKey(c.addr),
       sl = visitWindow(c),
-      reach = t + (+c.travel || 30),
+      travel = c.travelKm != null && c.travelVersion !== GEO_VERSION ? 30 : (+c.travel || 30),
+      reach = t + travel,
       start = Math.max(reach, sl.s);
     if (start >= sl.e && (c.slot === "am" || c.slot === "pm" || c.promiseTime)) score += 10000 + (start - sl.e + 1) * 100;
     score += Math.max(0, start - reach) * 0.3;
@@ -218,7 +247,7 @@ function score(day, list) {
     t =
       c.done && /^\d{2}:\d{2}$/.test(c.doneAt || "")
         ? toMin(c.doneAt)
-        : start + serviceMin(c, +c.travel || 30);
+        : start + serviceMin(c, travel);
   }
   if (list.length) {
     const last = list.at(-1).addr || "";
@@ -294,9 +323,11 @@ export function mergeCustomer(day, c) {
     next.list.push(person);
     return next;
   }
-  for (const f of ["phone", "safePhone", "phone2", "prod", "elevSize", "weight"])
+  for (const f of ["phone", "safePhone", "phone2", "installDate", "prod", "elevSize", "weight"])
     if (c[f] && !found[f]) found[f] = c[f];
+  if (c.productRows?.length && !found.productRows?.length) found.productRows = c.productRows;
   if (c.elevatorKnown) found.elevatorKnown = true;
+  if (c.ladderKnown && !found.ladderKnown) { found.ladderKnown = true; found.ladderNeeded = !!c.ladderNeeded; }
   if (c.imageId) found.imageId = c.imageId;
   if (c.addr && c.addr.length > (found.addr || "").length) found.addr = c.addr;
   if (c.slot && (c.source === "form" || c.slot !== "any")) found.slot = c.slot;
@@ -307,9 +338,50 @@ export function mergeCustomer(day, c) {
   found.verified = found.verified && c.verified !== false;
   return next;
 }
+export function applyPhotoImports(day, items) {
+  const forms = items.filter((item) => item.source === "form");
+  const contacts = items.filter((item) => item.source === "list");
+  let next = structuredClone(day);
+  next.imports = (next.imports || next.list.filter((item) => item.source === "form"))
+    .filter((item) => item.source === "form");
+  for (const form of forms) next = mergeCustomer(next, { ...form, verified: true });
+  const clean = (name) => String(name || "").replace(/\s/g, "");
+  const unmatched = [];
+  let matched = 0;
+  const contactNumbers = new Map();
+  for (const contact of contacts) {
+    const name = clean(contact.name);
+    const numbers = contactNumbers.get(name) || new Set();
+    numbers.add(digits(normalizePhone(contact.phone)));
+    contactNumbers.set(name, numbers);
+  }
+  for (const contact of contacts) {
+    const phone = normalizePhone(contact.phone);
+    const candidates = next.list.filter((item) => item.source === "form" && clean(item.name) === clean(contact.name));
+    if (candidates.length !== 1 || contactNumbers.get(clean(contact.name)).size !== 1 || !/^010\d{8}$/.test(digits(phone))) {
+      unmatched.push(contact);
+      continue;
+    }
+    candidates[0].phone = phone;
+    matched++;
+    next.imports = next.imports.map((item) =>
+      clean(item.name) === clean(candidates[0].name) && item.addr === candidates[0].addr
+        ? { ...item, phone }
+        : item,
+    );
+  }
+  next.imports.push(...forms.map((form) => {
+    const customer = next.list.find((item) => item.source === "form" && clean(item.name) === clean(form.name) && item.addr === form.addr);
+    return { ...form, phone: customer?.phone || form.phone, verified: true };
+  }));
+  return { day: next, matched, unmatched, formsAdded: forms.length };
+}
 export function fillMissingFormFields(current, read) {
   const next = {...current};
   if (!next.prod && read.prod) next.prod = read.prod;
+  if (!next.productRows?.length && read.productRows?.length) next.productRows = read.productRows;
+  if (!next.installDate && read.installDate) next.installDate = read.installDate;
+  if (!next.ladderKnown && read.ladderKnown) { next.ladderKnown = true; next.ladderNeeded = !!read.ladderNeeded; }
   if (weightKg(next) == null && weightKg(read) != null) next.weight = read.weight;
   if (!next.noelev && !next.elevSize && !next.elevatorKnown && read.elevatorKnown) {
     next.noelev = !!read.noelev;
@@ -320,7 +392,7 @@ export function fillMissingFormFields(current, read) {
 }
 export function stopFacts(c) {
   return [
-    ["제품", c.prod || "확인 필요"],
+    ["제품", c.productRows?.length ? c.productRows.join(" · ") : c.prod || "확인 필요"],
     [
       "엘리베이터",
       c.noelev
@@ -332,6 +404,8 @@ export function stopFacts(c) {
           : "확인 필요",
     ],
     ["무게", weightKg(c) != null ? weightKg(c) + "kg" : "확인 필요"],
+    ["시공일", c.installDate || "확인 필요"],
+    ["사다리차", c.ladderKnown ? c.ladderNeeded ? "필요" : "불필요" : "확인 필요"],
     ["기존 소파 수거", c.bs ? "있음" : "없음"],
     ["특이사항", c.memo || "없음"],
   ];

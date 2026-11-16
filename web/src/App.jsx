@@ -11,27 +11,32 @@ import {
   compute,
   precallList,
   recommendOrder,
-  mergeCustomer,
+  applyPhotoImports,
   fillMissingFormFields,
   courseText,
+  deleteCustomer,
+  deleteDayCustomers,
 } from "./logic.js";
-import {
-  loadOCR,
-  parseFormOCR,
-  readFormFields,
-  parseTableOCR,
-  imageCanvas,
-} from "./ocr.js";
+import { imageCanvas } from "./ocr.js";
 import { saveDocument, loadDocument, deleteDocuments } from "./imageStore.js";
 import DocumentViewer from "./DocumentViewer.jsx";
 import AiSetup from "./AiSetup.jsx";
 import RouteMap from "./RouteMap.jsx";
 import { planWithGemini } from "./routeAI.js";
+import { analyzePhoto } from "./photoAI.js";
 import RouteView from "./RouteView.jsx";
 import DriveView from "./DriveView.jsx";
-import { fetchTmapRoute, applyLegs, legInfo, geocodeDay } from "./tmapRoute.js";
+import {
+  fetchTmapRoute,
+  applyLegs,
+  legInfo,
+  geocodeDay,
+  invalidateAddress,
+  GEO_VERSION,
+} from "./tmapRoute.js";
 import {
   driverOrder,
+  areaDriverOrder,
   customerOrder,
   balancedOrder,
   applyPlan,
@@ -115,6 +120,144 @@ const Field = ({ label, value, onChange, type = "text", placeholder = "" }) => (
   </label>
 );
 
+function DocumentPreview({ imageId }) {
+  const [url, setUrl] = useState("");
+  useEffect(() => {
+    if (!imageId) return;
+    let active = true;
+    let objectUrl = "";
+    loadDocument(imageId)
+      .then((record) => {
+        if (!active || !record?.image) return;
+        objectUrl = URL.createObjectURL(record.image);
+        setUrl(objectUrl);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [imageId]);
+  return url ? (
+    <img className="review-preview" src={url} alt="선택한 출고의뢰서 원본" />
+  ) : null;
+}
+
+function ConfirmedDocuments({ imports, onOpen }) {
+  if (!imports.length) return null;
+  const slotLabel = { am: "오전", pm: "오후", any: "지정 없음" };
+  return (
+    <div className="panel review-panel">
+      <div className="review-heading">
+        <h3>확정한 출고표 · {imports.length}건</h3>
+        <p className="hint">
+          코스로 넘어간 뒤에도 이 날짜의 추출 내용을 확인할 수 있어요.
+        </p>
+      </div>
+      {imports.map((c, i) => (
+        <details className="review-item" key={c.id || i}>
+          <summary className="review-summary">
+            <span className="review-number">{i + 1}</span>
+            <span className="review-summary-text">
+              <strong>{c.name || "고객명 없음"}</strong>
+              <small>{c.addr || "주소 없음"}</small>
+            </span>
+          </summary>
+          <div className="review-fields">
+            {c.file && <p className="review-source">{c.file}</p>}
+            {c.imageId && (
+              <button type="button" onClick={() => onOpen(c)}>
+                원본 출고표 보기
+              </button>
+            )}
+            <dl className="confirmed-facts">
+              {[
+                ["시공일", c.installDate],
+                ["고객명", c.name],
+                ["주소", c.addr],
+                ["연락처 1", c.safePhone || c.phone],
+                ["연락처 2", c.phone2],
+                ["고객지정시간", slotLabel[c.slot]],
+                [
+                  "엘리베이터",
+                  c.elevatorKnown ? (c.noelev ? "없음" : "있음") : "확인 필요",
+                ],
+                [
+                  "사다리차",
+                  c.ladderKnown
+                    ? c.ladderNeeded
+                      ? "필요"
+                      : "불필요"
+                    : "확인 필요",
+                ],
+              ].map(([label, value]) => (
+                <React.Fragment key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value || "—"}</dd>
+                </React.Fragment>
+              ))}
+            </dl>
+            <table className="review-product-table">
+              <thead>
+                <tr>
+                  <th>제품명</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(c.productRows?.length ? c.productRows : [c.prod || "—"]).map(
+                  (name, j) => (
+                    <tr key={j}>
+                      <td>{name || "—"}</td>
+                    </tr>
+                  ),
+                )}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th>
+                    오더별 수량 합계 · 총 무게{" "}
+                    {c.weight ? `${c.weight} kg` : "확인 필요"}
+                  </th>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function FlowSteps({ stage, availableStage, onSelect }) {
+  const labels = ["출고표", "추천 선택", "코스 확정", "배송 시작"];
+  return (
+    <div className="flow-steps" data-stage={stage} aria-label="업무 순서">
+      {labels.map((label, index) => {
+        const number = index + 1;
+        const complete = number < stage;
+        const active = number === stage;
+        return (
+          <button
+            type="button"
+            className={
+              "flow-step" +
+              (active ? " active" : "") +
+              (complete ? " complete" : "")
+            }
+            aria-current={active ? "step" : undefined}
+            disabled={number > availableStage}
+            onClick={() => onSelect(number)}
+            key={label}
+          >
+            <span className="flow-marker">{complete ? "✓" : number}</span>
+            <span className="flow-label">{label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function App() {
   const initial = useRef(null);
   if (!initial.current) initial.current = init();
@@ -122,15 +265,21 @@ export default function App() {
     [history, setHistory] = useState(initial.current.h);
   const [tab, setTab] = useState(() => {
     const t = localStorage.getItem(TABKEY);
+    if (t === "order" && ["ready", "driving"].includes(initial.current.d.phase))
+      return "drive";
     return ["add", "order", "drive", "map", "calendar"].includes(t)
       ? t
       : initial.current.d.list.length
         ? "order"
         : "add";
   });
+  const [viewStage, setViewStage] = useState(null);
   const [draft, setDraft] = useState(blank),
     [editing, setEditing] = useState(null),
+    [addMode, setAddMode] = useState("document"),
     [pending, setPending] = useState([]),
+    [phoneCandidates, setPhoneCandidates] = useState([]),
+    [aiSetupMode, setAiSetupMode] = useState("route"),
     [status, setStatus] = useState(""),
     [busy, setBusy] = useState(false),
     [rereadId, setRereadId] = useState(null),
@@ -239,14 +388,18 @@ export default function App() {
     }
     flash(label + " 복사됨");
   }
-  const change = (k, v) => setDraft((c) => ({ ...c, [k]: v }));
-  const update = (id, patch) =>
-    setDay((d) => ({
-      ...d,
-      list: d.list.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+  const change = (k, v) =>
+    setDraft((c) => ({
+      ...c,
+      [k]: v,
+      ...(k === "prod" && c.productRows?.length
+        ? { productRows: [v, ...c.productRows.slice(1)] }
+        : {}),
     }));
+  const update = (id, patch) => setDay((d) => invalidateAddress(d, id, patch));
   const switchTab = (t) => {
     setTab(t);
+    if (["map", "calendar"].includes(t)) setViewStage(null);
     window.scrollTo(0, 0);
   };
   const openDocument = (c) =>
@@ -265,7 +418,14 @@ export default function App() {
       route.located?.[c.id]
         ? { ...c, ...route.located[c.id], geoMissing: false }
         : route.missing?.some((m) => m.id === c.id)
-          ? { ...c, geoMissing: true }
+          ? {
+              ...c,
+              lat: undefined,
+              lng: undefined,
+              geoAddr: "",
+              geoVersion: undefined,
+              geoMissing: true,
+            }
           : c,
     );
   const missingNote = (route) =>
@@ -277,7 +437,7 @@ export default function App() {
         (route.missing.length > 3
           ? " 외 " + (route.missing.length - 3) + "곳"
           : "") +
-        ' 주소를 T맵에서 못 찾았어요. 카드에서 "T맵 검색용 주소"를 넣어 주세요.'
+        ' 주소와 위치가 정확히 일치하지 않아요. 카드에서 주소를 확인하거나 "T맵 검색용 주소"를 넣어 주세요.'
       : "";
   const signature = (d) =>
     JSON.stringify({
@@ -315,6 +475,7 @@ export default function App() {
           if (!quiet) flash(error.message);
         }
       }
+      if (geo && !rest.some((c) => geo.pos[c.id])) geo = null;
       const lastDone = baseDay.list.filter((c) => c.done).at(-1),
         from = geo && ((lastDone && geo.pos[lastDone.id]) || geo.start);
       const driver = geo
@@ -322,7 +483,12 @@ export default function App() {
             ids: driverOrder(rest, from, geo.end, geo.pos).map((c) => c.id),
             by: "map",
           }
-        : null;
+        : {
+            ids: areaDriverOrder(rest, baseDay.start, baseDay.end).map(
+              (c) => c.id,
+            ),
+            by: "area",
+          };
       const balanced = geo
         ? {
             ids: balancedOrder(baseDay, rest, from, geo.end, geo.pos).map(
@@ -330,7 +496,12 @@ export default function App() {
             ),
             by: "map",
           }
-        : null;
+        : {
+            ids: recommendOrder(baseDay)
+              .list.filter((c) => !c.done)
+              .map((c) => c.id),
+            by: "area",
+          };
       let customer = null;
       if (aiKey) {
         try {
@@ -358,17 +529,30 @@ export default function App() {
               by: "rule",
             };
       const cache = geo?.cache || {};
+      const missingIds = new Set((geo?.missing || []).map((item) => item.id));
       const plans = {
         customer,
         driver,
         balanced,
         at: new Date().toTimeString().slice(0, 5),
         geo: geo ? { start: from, end: geo.end } : null,
+        geoVersion: GEO_VERSION,
       };
       const next = {
         ...baseDay,
         list: baseDay.list.map((c) =>
-          cache[c.id] ? { ...c, ...cache[c.id] } : c,
+          cache[c.id]
+            ? { ...c, ...cache[c.id], geoMissing: false }
+            : missingIds.has(c.id)
+              ? {
+                  ...c,
+                  lat: undefined,
+                  lng: undefined,
+                  geoAddr: "",
+                  geoVersion: undefined,
+                  geoMissing: true,
+                }
+              : c,
         ),
         plans,
       };
@@ -377,7 +561,10 @@ export default function App() {
       if (key) {
         let profile = { height: "340", weight: "3500" };
         try {
-          profile = { ...profile, ...JSON.parse(localStorage.getItem(TRUCK_KEY) || "{}") };
+          profile = {
+            ...profile,
+            ...JSON.parse(localStorage.getItem(TRUCK_KEY) || "{}"),
+          };
         } catch {}
         setLegBusy(true);
         try {
@@ -391,16 +578,36 @@ export default function App() {
           setLegBusy(false);
         }
       }
-      setDay((d) => routeSig(d) === routeSig(baseDay) ? ({
-        ...d,
-        list: d.list.map((c) => ({
-          ...c,
-          ...(cache[c.id] || {}),
-          ...(located[c.id] || {}),
-        })),
-        plans,
-      }) : d);
-      if (!quiet) flash(!key ? "추천을 만들었어요. 구간 시간은 T맵 연결 후 계산할 수 있어요." : failed ? `추천은 만들었지만 ${failed}개 코스의 구간 시간을 받지 못했어요.` : "세 코스의 추천과 구간 시간을 만들었어요.");
+      setDay((d) =>
+        routeSig(d) === routeSig(baseDay)
+          ? {
+              ...d,
+              list: d.list.map((c) => ({
+                ...c,
+                ...(cache[c.id] ||
+                  (missingIds.has(c.id)
+                    ? {
+                        lat: undefined,
+                        lng: undefined,
+                        geoAddr: "",
+                        geoVersion: undefined,
+                        geoMissing: true,
+                      }
+                    : {})),
+                ...(located[c.id] || {}),
+              })),
+              plans,
+            }
+          : d,
+      );
+      if (!quiet)
+        flash(
+          !geo
+            ? "세 코스를 만들었어요. 빠른 이동과 균형 추천은 지역 기준의 대략 순서예요."
+            : failed
+              ? `추천은 만들었지만 ${failed}개 코스의 구간 시간을 받지 못했어요.`
+              : "세 코스의 추천과 구간 시간을 만들었어요.",
+        );
     } finally {
       setAiBusy(false);
     }
@@ -432,7 +639,12 @@ export default function App() {
         if (routeSig(d) !== routeSig(baseDay)) return d;
         const p = d.plans?.[kind];
         const next = { ...d, list: markLocated(d.list, route) };
-        if (!p || planKey(applyPlan(d, p.ids)) !== wanted || routeSig(applyPlan(d, p.ids)) !== routeSig(ordered)) return next;
+        if (
+          !p ||
+          planKey(applyPlan(d, p.ids)) !== wanted ||
+          routeSig(applyPlan(d, p.ids)) !== routeSig(ordered)
+        )
+          return next;
         return {
           ...next,
           plans: {
@@ -442,7 +654,20 @@ export default function App() {
         };
       });
     } catch (error) {
-      setDay((d) => routeSig(d) === routeSig(baseDay) && d.plans?.[kind] ? ({...d, plans: {...d.plans, [kind]: {...d.plans[kind], timeError: error.message || "T맵 이동 시간을 받지 못했어요."}}}) : d);
+      setDay((d) =>
+        routeSig(d) === routeSig(baseDay) && d.plans?.[kind]
+          ? {
+              ...d,
+              plans: {
+                ...d.plans,
+                [kind]: {
+                  ...d.plans[kind],
+                  timeError: error.message || "T맵 이동 시간을 받지 못했어요.",
+                },
+              },
+            }
+          : d,
+      );
       flash(error.message || "T맵 이동 시간을 받지 못했어요.");
     } finally {
       setLegBusy(false);
@@ -516,15 +741,21 @@ export default function App() {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
     setHistory((h) => ({ ...h, [day.date]: day }));
     setDay(
-      structuredClone(
-        date === day.date ? day : history[date] || emptyDay(date),
-      ),
+      restoreDay(
+        structuredClone(
+          date === day.date ? day : history[date] || emptyDay(date),
+        ),
+        {},
+        date,
+      ).d,
     );
     setSelected(date);
     setMonth(date.slice(0, 7));
     setPending([]);
+    setPhoneCandidates([]);
     setEditing(null);
     setDraft(blank());
+    setViewStage(null);
     switchTab(nextTab);
   }
   async function deletePastDates(dates) {
@@ -548,11 +779,13 @@ export default function App() {
       : day;
     const remainingImages = new Set(
       [nextDay, ...Object.values(nextHistory)].flatMap((record) =>
-        record.list.map((stop) => stop.imageId).filter(Boolean),
+        [...record.list, ...(record.imports || [])]
+          .map((stop) => stop.imageId)
+          .filter(Boolean),
       ),
     );
     const removedImages = targets.flatMap((date) =>
-      records[date].list
+      [...records[date].list, ...(records[date].imports || [])]
         .map((stop) => stop.imageId)
         .filter((id) => id && !remainingImages.has(id)),
     );
@@ -574,6 +807,52 @@ export default function App() {
         : "지난 배송 기록을 모두 삭제했어요.",
     );
   }
+  async function deleteForDate(date, id = null) {
+    const records = { ...history, [day.date]: day };
+    const record = records[date];
+    const customer = id ? record?.list.find((item) => item.id === id) : null;
+    if (
+      !record ||
+      (id && !customer) ||
+      (!id && !record.list.length && !record.imports?.length)
+    )
+      return;
+    const message = customer
+      ? `${labelDate(date)} ${customer.name || "이 고객"}의 기록을 삭제할까요?`
+      : `${labelDate(date)} 고객 기록 전체를 삭제할까요?`;
+    if (!confirm(message)) return;
+    const updated = id
+      ? deleteCustomer(record, id)
+      : deleteDayCustomers(record);
+    const nextRecords = { ...records, [date]: updated };
+    const imageIds = (item) =>
+      [...item.list, ...(item.imports || [])]
+        .map((stop) => stop.imageId)
+        .filter(Boolean);
+    const remainingImages = new Set(
+      Object.values(nextRecords).flatMap(imageIds),
+    );
+    const removedImages = imageIds(record).filter(
+      (imageId) => !remainingImages.has(imageId),
+    );
+    setHistory(nextRecords);
+    if (date === day.date) {
+      setDay(updated);
+      if (!id) {
+        setEditing(null);
+        setDraft(blank());
+        switchTab("add");
+      }
+    }
+    try {
+      await deleteDocuments(removedImages);
+      flash(
+        id ? "고객 기록을 삭제했어요." : "이 날짜 고객 기록을 모두 삭제했어요.",
+      );
+    } catch {
+      flash("기록은 삭제됐지만 일부 사진은 기기에 남아 있을 수 있어요.");
+    }
+  }
   function save() {
     if (!draft.name.trim() || !draft.addr.trim()) {
       flash("고객 이름과 주소를 적어 주세요.");
@@ -589,130 +868,154 @@ export default function App() {
       verified: true,
     };
     const next = editing
-      ? { ...day, list: day.list.map((x) => (x.id === editing ? c : x)) }
+      ? invalidateAddress(day, editing, c)
       : recommendOrder({ ...day, list: [...day.list, c] });
     setDay(next);
     setDraft(blank());
     setEditing(null);
+    setViewStage(null);
     switchTab("order");
     flash("고객 정보를 저장했어요.");
   }
   function edit(c) {
     setDraft({ ...c });
     setEditing(c.id);
+    setAddMode("manual");
     switchTab("add");
-    setTimeout(
-      () =>
-        document
-          .getElementById("add-panel")
-          ?.scrollIntoView({ behavior: "smooth" }),
-      30,
-    );
+  }
+  function previewExcelPhone(name) {
+    const clean = (value) => String(value || "").replace(/\s/g, "");
+    const forms = [...day.list.filter((item) => item.source === "form"), ...pending];
+    if (forms.filter((item) => clean(item.name) === clean(name)).length !== 1) return "";
+    const phones = new Set(phoneCandidates.filter((item) => clean(item.name) === clean(name)).map((item) => normalizePhone(item.phone)));
+    return phones.size === 1 ? [...phones][0] : "";
   }
   function commit(items) {
     const ready = items.filter(
-        (c) => c.name.trim() && (c.source === "list" || c.addr.trim()),
+        (c) => c.name.trim() && c.addr.trim(),
       ),
       missing = items.filter(
-        (c) => !c.name.trim() || (c.source !== "list" && !c.addr.trim()),
+        (c) => !c.name.trim() || !c.addr.trim(),
       );
-    ready.sort((a, b) => (a.source === "list") - (b.source === "list"));
-    let next = structuredClone(day);
-    for (const c of ready) next = mergeCustomer(next, c);
-    next = recommendOrder(next);
+    if (missing.length) {
+      setPending(items);
+      flash("고객명과 설치주소를 확인해 주세요.");
+      return;
+    }
+    const imported = applyPhotoImports(day, [...ready, ...phoneCandidates]);
+    const next = recommendOrder(imported.day);
     setDay(next);
-    setPending(missing);
+    setPending([]);
+    setPhoneCandidates(imported.unmatched);
+    setStatus(imported.unmatched.length
+      ? `선택한 날짜 의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결. 나머지 번호는 의뢰서와 일치하지 않아 저장하지 않았어요.`
+      : "");
+    setViewStage(null);
     if (next.list.length) switchTab("order");
-    flash(ready.length + "건을 읽었어요. 주소와 번호를 확인해 주세요.");
-    return { next, missing };
+    flash(`의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결`);
   }
   async function importImages(files) {
     if (!files.length) return;
+    if (!aiKey) {
+      setStatus("AI 사진 분석을 사용하려면 Gemini API 키를 연결해 주세요.");
+      setAiSetupMode("photo");
+      setKeyDraft("");
+      setAiSetup(true);
+      return;
+    }
     setBusy(true);
-    setStatus("글자 읽기 도구 준비 중…");
-    let worker;
+    setStatus("AI 사진 분석 준비 중…");
     try {
-      const OCR = await loadOCR();
-      worker = await OCR.createWorker(["kor", "eng"], 1, {
-        logger: (m) => {
-          if (m.status === "recognizing text")
-            setStatus(
-              "사진 글자 읽는 중… " + Math.round((m.progress || 0) * 100) + "%",
-            );
-        },
-      });
       const results = [];
+      const failures = [];
       let imageSaveFailed = false;
       for (let i = 0; i < files.length; i++) {
         setStatus("사진 " + (i + 1) + "/" + files.length + " 읽는 중…");
-        const canvas = await imageCanvas(files[i]),
-          { data } = await worker.recognize(canvas);
-        if (canvas.isForm) {
-          let c = parseFormOCR(
-            data,
-            canvas.width,
-            canvas.fullHeight,
-            files[i].name,
-          );
-          c = await readFormFields(worker, canvas, c);
-          try {
-            c.imageId = await saveDocument(files[i]);
-          } catch {
-            imageSaveFailed = true;
+        try {
+          const canvas = await imageCanvas(files[i]);
+          const customers = await analyzePhoto(files[i], canvas, aiKey, fetch, day.date);
+          const forms = customers.filter((c) => c.source === "form");
+          if (forms.length) {
+            try {
+              const imageId = await saveDocument(files[i]);
+              forms.forEach((c) => { c.imageId = imageId; });
+            } catch {
+              imageSaveFailed = true;
+            }
           }
-          results.push(c);
-        } else
-          results.push(
-            ...parseTableOCR(
-              data,
-              canvas.width,
-              canvas.fullHeight,
-              files[i].name,
-            ),
-          );
+          results.push(...customers);
+        } catch (error) {
+          failures.push(`${files[i].name}: ${error.message || error}`);
+        }
       }
-      const { next, missing } = commit([...pending, ...results]);
+      const forms = results.filter((customer) => customer.source === "form");
+      const contacts = results.filter((customer) => customer.source === "list");
+      setPending((current) => [...current, ...forms]);
+      if (contacts.length && !forms.length && !pending.length) {
+        const imported = applyPhotoImports(day, [...phoneCandidates, ...contacts]);
+        setDay(imported.day);
+        setPhoneCandidates((current) => [...current, ...imported.unmatched]);
+        if (imported.matched) flash(`고객 번호 ${imported.matched}건을 의뢰서 고객에게 연결했어요.`);
+      } else if (contacts.length) {
+        setPhoneCandidates((current) => [...current, ...contacts]);
+      }
       setStatus(
-        files.length +
-          "장 읽음 · " +
-          next.list.length +
-          "곳 코스 · 확인 필요 " +
-          missing.length +
-          "건" +
-          (imageSaveFailed ? " · 출고표 사진 저장 실패" : ""),
+        forms.length || contacts.length
+          ? `${files.length - failures.length}장 AI 분석 · ${day.date} 의뢰서 고객 ${forms.length}건${contacts.length ? ` · 엑셀 번호 ${contacts.length}건은 이름 매칭에만 사용` : ""}${imageSaveFailed ? " 원본 사진 저장에 실패했어요." : ""}${failures.length ? ` 실패: ${failures.join(" / ")}` : ""}`
+          : failures.length
+            ? `사진 분석 실패: ${failures.join(" / ")}`
+            : "고객 정보를 찾지 못했어요. 더 선명한 사진을 넣거나 직접 입력해 주세요.",
       );
     } catch (e) {
       setStatus(
         "읽기 실패: " +
           (e.message || e) +
-          " 사진을 다시 찍거나 직접 입력해 주세요.",
+          " Gemini 키와 인터넷 연결을 확인해 주세요.",
       );
     } finally {
-      if (worker) await worker.terminate();
       setBusy(false);
     }
   }
   async function rereadDocument(c) {
     if (!c.imageId || rereadId) return;
+    if (!aiKey) {
+      setAiSetupMode("photo");
+      setKeyDraft("");
+      setAiSetup(true);
+      flash("다시 읽으려면 Gemini 키를 연결해 주세요.");
+      return;
+    }
     setRereadId(c.id);
-    let worker;
     try {
       const record = await loadDocument(c.imageId);
-      if (!record?.image) throw new Error("저장된 출고표가 없습니다. 사진을 다시 넣어 주세요.");
-      const OCR = await loadOCR();
-      worker = await OCR.createWorker(["kor", "eng"]);
+      if (!record?.image)
+        throw new Error("저장된 출고표가 없습니다. 사진을 다시 넣어 주세요.");
       const canvas = await imageCanvas(record.image);
-      const {data} = await worker.recognize(canvas);
-      let read = parseFormOCR(data, canvas.width, canvas.fullHeight, record.name || "출고표");
-      read = await readFormFields(worker, canvas, read);
+      const customers = await analyzePhoto({ name: record.name || "의뢰서" }, canvas, aiKey);
+      const clean = (value) => String(value || "").replace(/\s/g, "");
+      const read = customers.find((item) => item.source === "form" && clean(item.name) === clean(c.name))
+        || (customers.length === 1 && customers[0].source === "form" ? customers[0] : null);
+      if (!read) throw new Error("사진에서 해당 고객을 찾지 못했습니다. 원본을 확인해 주세요.");
       const filled = fillMissingFormFields(c, read);
-      const gained = ["prod", "weight", "elevatorKnown"].filter(k => !c[k] && filled[k]);
-      setDay(d => ({...d, list:d.list.map(x => x.id === c.id && x.imageId === c.imageId ? fillMissingFormFields(x, read) : x)}));
-      flash(gained.length ? "출고표에서 " + gained.length + "개 정보를 다시 읽었어요." : "출고표를 다시 읽었지만 빈 정보를 찾지 못했어요. 사진을 확인해 주세요.");
+      const gained = ["prod", "weight", "elevatorKnown"].filter(
+        (k) => !c[k] && filled[k],
+      );
+      setDay((d) => ({
+        ...d,
+        list: d.list.map((x) =>
+          x.id === c.id && x.imageId === c.imageId
+            ? fillMissingFormFields(x, read)
+            : x,
+        ),
+      }));
+      flash(
+        gained.length
+          ? "출고표에서 " + gained.length + "개 정보를 다시 읽었어요."
+          : "출고표를 다시 읽었지만 빈 정보를 찾지 못했어요. 사진을 확인해 주세요.",
+      );
     } catch (error) {
       flash(error.message || "출고표를 다시 읽지 못했어요.");
     } finally {
-      if (worker) await worker.terminate();
       setRereadId(null);
     }
   }
@@ -739,26 +1042,71 @@ export default function App() {
     const d = new Date(year, mon + n, 1);
     setMonth(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0"));
   };
+  const availableStage = !day.list.length
+    ? 1
+    : day.phase === "ready" || day.phase === "driving"
+      ? 4
+      : day.phase === "calling"
+        ? 3
+        : 2;
+  const flowStage =
+    tab === "add" ? 1 : tab === "drive" ? 4 : viewStage || availableStage;
+  const selectStage = (stage) => {
+    if (stage > availableStage) return;
+    setViewStage(stage);
+    switchTab(stage === 1 ? "add" : stage === 4 ? "drive" : "order");
+  };
+  const openWorkflow = () => {
+    setViewStage(null);
+    switchTab(
+      availableStage === 1 ? "add" : availableStage === 4 ? "drive" : "order",
+    );
+  };
+  const datePicker = (className) => (
+    <label className={"header-date-picker " + className}>
+      <span>{labelDate(day.date)} ▾</span>
+      <input
+        type="date"
+        aria-label="배송 날짜 바꾸기"
+        value={day.date}
+        onChange={(e) => openDay(e.target.value, tab)}
+      />
+    </label>
+  );
   return (
     <>
       <div className="wrap">
-        <header>
-          <label className="header-date-picker">
-            <h1>{labelDate(day.date)}</h1>
-            <span aria-hidden="true">날짜 변경 ▾</span>
-            <input
-              type="date"
-              aria-label="배송 날짜 바꾸기"
-              value={day.date}
-              onChange={(e) => openDay(e.target.value, tab)}
-            />
-          </label>
-          <p className="lead">
-            {day.list.length
-              ? day.list.length + "곳 배송 · " + day.depart + " 출발"
-              : "소파 배송"}
-          </p>
-        </header>
+        {tab !== "map" && (
+          <header
+            className={
+              tab === "add" || tab === "order" ? "workflow-header" : ""
+            }
+          >
+            {tab === "add" ? (
+              <>
+                <span className="header-eyebrow">소파 배송 동선표</span>
+                <h1>코스 짜기</h1>
+              </>
+            ) : tab === "order" ? (
+              <>
+                {datePicker("header-eyebrow")}
+                <h1>코스 짜기</h1>
+              </>
+            ) : (
+              <>
+                {datePicker("header-eyebrow")}
+                <h1>{tab === "drive" ? "코스 짜기" : "배송 기록"}</h1>
+              </>
+            )}
+          </header>
+        )}
+        {["add", "order", "drive"].includes(tab) && (
+          <FlowSteps
+            stage={flowStage}
+            availableStage={availableStage}
+            onSelect={selectStage}
+          />
+        )}
         {storageError && (
           <p className="example" role="alert">
             {storageError}
@@ -767,265 +1115,466 @@ export default function App() {
         {tab === "add" && (
           <section className="view">
             <div className="wrap">
-              <div className="panel">
-                <Field
-                  label="출발 시간"
-                  type="time"
-                  value={day.depart}
-                  onChange={(v) => setDay((d) => ({ ...d, depart: v }))}
-                />
-              </div>
-              <div className="panel">
-                <h2>출고표 넣기</h2>
-                <p className="hint">
-                  담당자에게 받은 출고표와 고객 목록 사진을 넣으세요. 확인 후
-                  코스 화면에서 추천을 만듭니다.
-                </p>
-                <label className="upload-label">
-                  {busy ? "읽는 중…" : "사진 선택"}
+              <div className="panel delivery-date-panel">
+                <label className="field">
+                  <span>배송 날짜</span>
                   <input
-                    id="import-images"
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    disabled={busy}
-                    onChange={(e) => {
-                      importImages([...e.target.files]);
-                      e.target.value = "";
-                    }}
+                    type="date"
+                    value={day.date}
+                    onChange={(e) => openDay(e.target.value, "add")}
                   />
                 </label>
-                {status && (
-                  <p className="import-status" role="status">
-                    {status}
+              </div>
+              <div
+                className="add-mode-tabs"
+                role="tablist"
+                aria-label="고객 정보 입력 방법"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={addMode === "document"}
+                  onClick={() => setAddMode("document")}
+                >
+                  출고의뢰서 사진
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={addMode === "manual"}
+                  onClick={() => setAddMode("manual")}
+                >
+                  고객 정보 직접 입력
+                </button>
+              </div>
+              {addMode === "document" && (
+                <div className="panel">
+                  <h2>의뢰서와 고객 목록 사진 넣기</h2>
+                  <p className="hint">
+                    {day.date} 방문 고객의 출고·반품의뢰서와 고객명·전화번호 엑셀 사진을 넣어주세요. 엑셀은 이름에 맞는 010 번호를 연결하는 데만 사용합니다.
                   </p>
-                )}
-                {pending.length > 0 && (
+                  <p className="hint">사진 속 고객 이름·전화번호·주소가 Google Gemini로 전송됩니다. 추출 결과를 확인한 뒤 저장하세요.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiSetupMode("photo");
+                      setKeyDraft(aiKey);
+                      setRememberKey(!!localStorage.getItem(AI_KEY));
+                      setAiSetup(true);
+                    }}
+                  >
+                    {aiKey ? "Gemini 키 변경" : "Gemini 키 연결"}
+                  </button>
+                  <label className="upload-label">
+                    {busy ? "읽는 중…" : "+ 사진 선택하기"}
+                    <input
+                      id="import-images"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      disabled={busy || !aiKey}
+                      onChange={(e) => {
+                        importImages([...e.target.files]);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {status && (
+                    <p className="import-status" role="status">
+                      {status}
+                    </p>
+                  )}
+                </div>
+              )}
+              {addMode === "document" && (
+                <div className="panel trip-fields" id="trip-settings">
+                  <h2>출발과 귀가</h2>
+                  <Field
+                    label="출발 장소"
+                    value={day.start}
+                    onChange={(v) => setDay((d) => ({ ...d, start: v }))}
+                  />
+                  <Field
+                    label="출발 시간"
+                    type="time"
+                    value={day.depart}
+                    onChange={(v) => setDay((d) => ({ ...d, depart: v }))}
+                  />
+                  <Field
+                    label="귀가 장소"
+                    value={day.end}
+                    onChange={(v) => setDay((d) => ({ ...d, end: v }))}
+                  />
+                </div>
+              )}
+              {addMode === "document" && pending.length > 0 && (
+                <div className="panel review-panel">
                   <div className="review">
+                    <div className="review-heading">
+                      <h3>추출 결과 확인 · {day.date} 방문 고객 {pending.length}건</h3>
+                      <p className="hint">
+                        원본 사진과 비교해 잘못 읽힌 내용을 고쳐주세요.
+                      </p>
+                    </div>
                     {pending.map((c, i) => (
-                      <div className="review-item" key={c.id || i}>
-                        <strong>
-                          {c.file || "사진"} · {i + 1}번
-                        </strong>
-                        {[
-                          ["name", "고객명"],
-                          ["addr", "설치주소"],
-                          ["phone", "실제 010 번호"],
-                          ["safePhone", "안심 0508 번호"],
-                          ["prod", "제품명"],
-                          ["weight", "총 무게 (kg)"],
-                        ].map(([k, l]) => (
-                          <Field
-                            key={k}
-                            label={l}
-                            value={c[k]}
-                            onChange={(v) =>
-                              setPending((p) =>
-                                p.map((x, j) =>
-                                  j === i ? { ...x, [k]: v } : x,
-                                ),
-                              )
-                            }
-                          />
-                        ))}
-                        <label className="field">
-                          <span>방문 시간</span>
-                          <select
-                            value={c.slot}
-                            onChange={(e) =>
-                              setPending((p) =>
-                                p.map((x, j) =>
-                                  j === i ? { ...x, slot: e.target.value } : x,
-                                ),
-                              )
+                      <details
+                        className={
+                          "review-item" +
+                          (!c.name.trim() ||
+                          (c.source !== "list" && !c.addr.trim())
+                            ? " bad"
+                            : "")
+                        }
+                        key={c.id || i}
+                        open={i === 0 ? true : undefined}
+                      >
+                        <summary className="review-summary">
+                          <span className="review-number">{i + 1}</span>
+                          <span className="review-summary-text">
+                            <strong>{c.name || "고객명 확인 필요"}</strong>
+                            <small>
+                              {c.addr || "주소 확인 필요"}
+                            </small>
+                          </span>
+                        </summary>
+                        <div className="review-fields">
+                          <p className="review-source">{c.file || "사진"}</p>
+                          {c.imageId && (
+                            <>
+                              <DocumentPreview imageId={c.imageId} />
+                              <button
+                                type="button"
+                                onClick={() => openDocument(c)}
+                              >
+                                원본 사진 크게 보기
+                              </button>
+                            </>
+                          )}
+                          {[
+                            ["installDate", "시공일"],
+                            ["name", "고객명"],
+                            ["addr", "고객 주소"],
+                            ["safePhone", "연락처 1"],
+                            ["phone2", "연락처 2"],
+                          ].map(([k, l]) => (
+                            <Field
+                              key={k}
+                              label={l}
+                              value={c[k]}
+                              onChange={(v) =>
+                                setPending((p) =>
+                                  p.map((x, j) =>
+                                    j === i ? { ...x, [k]: v } : x,
+                                  ),
+                                )
+                              }
+                            />
+                          ))}
+                          <p className="hint">엑셀 고객 번호: {previewExcelPhone(c.name) || "일치하는 번호 없음"}</p>
+                          <label className="field">
+                            <span>고객지정시간</span>
+                            <select
+                              value={c.slot}
+                              onChange={(e) =>
+                                setPending((p) =>
+                                  p.map((x, j) =>
+                                    j === i
+                                      ? { ...x, slot: e.target.value }
+                                      : x,
+                                  ),
+                                )
+                              }
+                            >
+                              <option value="any">지정불가</option>
+                              <option value="am">오전</option>
+                              <option value="pm">오후</option>
+                            </select>
+                          </label>
+                          <label className="field">
+                            <span>엘리베이터 여부</span>
+                            <select
+                              value={
+                                c.elevatorKnown
+                                  ? c.noelev
+                                    ? "no"
+                                    : "yes"
+                                  : "unknown"
+                              }
+                              onChange={(e) =>
+                                setPending((p) =>
+                                  p.map((x, j) =>
+                                    j === i
+                                      ? {
+                                          ...x,
+                                          elevatorKnown:
+                                            e.target.value !== "unknown",
+                                          noelev: e.target.value === "no",
+                                        }
+                                      : x,
+                                  ),
+                                )
+                              }
+                            >
+                              <option value="unknown">확인 필요</option>
+                              <option value="yes">있음</option>
+                              <option value="no">없음</option>
+                            </select>
+                          </label>
+                          <label className="field">
+                            <span>사다리차 필요여부</span>
+                            <select
+                              value={
+                                c.ladderKnown
+                                  ? c.ladderNeeded
+                                    ? "yes"
+                                    : "no"
+                                  : "unknown"
+                              }
+                              onChange={(e) =>
+                                setPending((p) =>
+                                  p.map((x, j) =>
+                                    j === i
+                                      ? {
+                                          ...x,
+                                          ladderKnown:
+                                            e.target.value !== "unknown",
+                                          ladderNeeded:
+                                            e.target.value === "yes",
+                                        }
+                                      : x,
+                                  ),
+                                )
+                              }
+                            >
+                              <option value="unknown">확인 필요</option>
+                              <option value="yes">필요</option>
+                              <option value="no">불필요</option>
+                            </select>
+                          </label>
+                          <table className="review-product-table">
+                            <thead>
+                              <tr>
+                                <th>제품명</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(c.productRows?.length
+                                ? c.productRows
+                                : [c.prod || ""]
+                              ).map((product, rowIndex) => (
+                                <tr key={rowIndex}>
+                                  <td>
+                                    <input
+                                      aria-label={`제품명 ${rowIndex + 1}`}
+                                      value={product}
+                                      onChange={(e) =>
+                                        setPending((p) =>
+                                          p.map((x, j) => {
+                                            if (j !== i) return x;
+                                            const productRows = x.productRows
+                                              ?.length
+                                              ? [...x.productRows]
+                                              : [x.prod || ""];
+                                            productRows[rowIndex] =
+                                              e.target.value;
+                                            return {
+                                              ...x,
+                                              productRows,
+                                              prod: productRows[0],
+                                            };
+                                          }),
+                                        )
+                                      }
+                                    />
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                            <tfoot>
+                              <tr>
+                                <th>
+                                  <label>
+                                    오더별 수량 합계 · 총 무게 (kg)
+                                    <input
+                                      inputMode="decimal"
+                                      value={c.weight || ""}
+                                      onChange={(e) =>
+                                        setPending((p) =>
+                                          p.map((x, j) =>
+                                            j === i
+                                              ? { ...x, weight: e.target.value }
+                                              : x,
+                                          ),
+                                        )
+                                      }
+                                    />
+                                  </label>
+                                </th>
+                              </tr>
+                            </tfoot>
+                          </table>
+                          <button
+                            onClick={() =>
+                              setPending((p) => p.filter((_, j) => j !== i))
                             }
                           >
-                            <option value="any">지정불가</option>
-                            <option value="am">오전</option>
-                            <option value="pm">오후</option>
-                          </select>
-                        </label>
-                        <label className="field">
-                          <span>메모</span>
-                          <textarea
-                            value={c.memo || ""}
-                            onChange={(e) =>
-                              setPending((p) =>
-                                p.map((x, j) =>
-                                  j === i ? { ...x, memo: e.target.value } : x,
-                                ),
-                              )
-                            }
-                          />
-                        </label>
-                        <button
-                          onClick={() =>
-                            setPending((p) => p.filter((_, j) => j !== i))
-                          }
-                        >
-                          이 항목 빼기
-                        </button>
-                      </div>
+                            이 항목 빼기
+                          </button>
+                        </div>
+                      </details>
                     ))}
                     <button
                       className="primary big"
                       onClick={() => commit(pending)}
                     >
-                      고친 고객 코스에 추가
+                      방문 고객 {pending.length}건 저장 · 엑셀 번호 연결
                     </button>
                   </div>
-                )}
-              </div>
-              <details className="panel" id="trip-settings">
-                <summary>출발·귀가 장소</summary>
-                <p className="hint">3.5톤 · 높이 3.40m</p>
-                <Field
-                  label="출발하는 곳"
-                  value={day.start}
-                  onChange={(v) => setDay((d) => ({ ...d, start: v }))}
+                </div>
+              )}
+              {addMode === "document" && (
+                <ConfirmedDocuments
+                  imports={
+                    (day.imports || day.list.filter((customer) => customer.source === "form"))
+                      .filter((customer) => customer.source === "form")
+                  }
+                  onOpen={openDocument}
                 />
-                <Field
-                  label="마지막 귀가"
-                  value={day.end}
-                  onChange={(v) => setDay((d) => ({ ...d, end: v }))}
-                />
-              </details>
-              <details
-                className="panel"
-                id="add-panel"
-                open={!!editing || undefined}
-              >
-                <summary>
-                  {editing ? "고객 정보 수정" : "직접 고객 추가"}
-                </summary>
-                <div className="form-fields">
-                  <Field
-                    label="고객 이름"
-                    value={draft.name}
-                    onChange={(v) => change("name", v)}
-                    placeholder="예: 홍길동"
-                  />
-                  <Field
-                    label="실제 연락처 (010 · 고객 목록)"
-                    type="tel"
-                    value={draft.phone}
-                    onChange={(v) => change("phone", v)}
-                  />
-                  <Field
-                    label="주소"
-                    value={draft.addr}
-                    onChange={(v) => change("addr", v)}
-                    placeholder="경기 수원시 영통구 ..."
-                  />
-                  <div className="field">
-                    <span>고객이 원하는 시간</span>
-                    <div className="seg">
-                      {[
-                        ["am", "오전", "9~13시"],
-                        ["pm", "오후", "13~17시"],
-                        ["any", "지정불가", "9~17시"],
-                      ].map(([v, l, s]) => (
-                        <label key={v}>
-                          <input
-                            type="radio"
-                            checked={draft.slot === v}
-                            onChange={() => change("slot", v)}
-                          />
-                          {l}
-                          <small>{s}</small>
-                        </label>
-                      ))}
+              )}
+              {addMode === "manual" && (
+                <div className="panel" id="add-panel">
+                  <h2>{editing ? "고객 정보 수정" : "고객 정보 직접 입력"}</h2>
+                  <div className="form-fields">
+                    <Field
+                      label="고객 이름"
+                      value={draft.name}
+                      onChange={(v) => change("name", v)}
+                      placeholder="예: 홍길동"
+                    />
+                    <Field
+                      label="실제 연락처 (010 · 고객 목록)"
+                      type="tel"
+                      value={draft.phone}
+                      onChange={(v) => change("phone", v)}
+                    />
+                    <Field
+                      label="주소"
+                      value={draft.addr}
+                      onChange={(v) => change("addr", v)}
+                      placeholder="경기 수원시 영통구 ..."
+                    />
+                    <div className="field">
+                      <span>고객이 원하는 시간</span>
+                      <div className="seg">
+                        {[
+                          ["am", "오전", "9~13시"],
+                          ["pm", "오후", "13~17시"],
+                          ["any", "지정불가", "9~17시"],
+                        ].map(([v, l, s]) => (
+                          <label key={v}>
+                            <input
+                              type="radio"
+                              checked={draft.slot === v}
+                              onChange={() => change("slot", v)}
+                            />
+                            {l}
+                            <small>{s}</small>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div className="field">
-                    <span>해당되는 것 누르기</span>
-                    <div className="chips">
-                      {[
-                        ["noelev", "엘리베이터 없음"],
-                        ["bs", "기존 소파 수거"],
-                        ["single", "단품 (암체어 등)"],
-                        ["call", "전날 전화 요청"],
-                      ].map(([k, l]) => (
-                        <label className="chip" key={k}>
+                    <div className="field">
+                      <span>해당되는 것 누르기</span>
+                      <div className="chips">
+                        {[
+                          ["noelev", "엘리베이터 없음"],
+                          ["bs", "기존 소파 수거"],
+                          ["single", "단품 (암체어 등)"],
+                          ["call", "전날 전화 요청"],
+                        ].map(([k, l]) => (
+                          <label className="chip" key={k}>
+                            <input
+                              type="checkbox"
+                              checked={!!draft[k]}
+                              onChange={(e) => change(k, e.target.checked)}
+                            />
+                            {l}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    <details>
+                      <summary>더 적을 것 (제품, 특이사항, 2차 번호)</summary>
+                      <div className="form-fields">
+                        {[
+                          ["prod", "제품"],
+                          ["weight", "총 무게 (kg)"],
+                          ["safePhone", "안심번호 (0508)"],
+                          ["phone2", "2차 연락처"],
+                          ["elevSize", "엘리베이터 인승"],
+                        ].map(([k, l]) => (
+                          <Field
+                            key={k}
+                            label={l}
+                            value={draft[k]}
+                            onChange={(v) => change(k, v)}
+                          />
+                        ))}
+                        <label className="field">
+                          <span>특이사항</span>
+                          <textarea
+                            value={draft.memo || ""}
+                            onChange={(e) => change("memo", e.target.value)}
+                          />
+                        </label>
+                        {["calling", "ready", "driving"].includes(
+                          day.phase,
+                        ) && (
+                          <Field
+                            label="정확한 방문 약속 시각"
+                            type="time"
+                            value={draft.promiseTime}
+                            onChange={(v) => change("promiseTime", v)}
+                          />
+                        )}
+                        <Field
+                          label="작업 시간 (분) · 비우면 자동 · 이동 제외"
+                          type="number"
+                          value={draft.work}
+                          onChange={(v) => change("work", v)}
+                        />
+                        <label className="chip">
                           <input
                             type="checkbox"
-                            checked={!!draft[k]}
-                            onChange={(e) => change(k, e.target.checked)}
+                            checked={!!draft.sorry}
+                            onChange={(e) => change("sorry", e.target.checked)}
                           />
-                          {l}
+                          시간 조율·양해 전화 필요
                         </label>
-                      ))}
-                    </div>
-                  </div>
-                  <details>
-                    <summary>더 적을 것 (제품, 특이사항, 2차 번호)</summary>
-                    <div className="form-fields">
-                      {[
-                        ["prod", "제품"],
-                        [
-                          "weight",
-                          "총 무게 (kg) · 50kg 미만은 30분, 이상은 1시간",
-                        ],
-                        ["safePhone", "안심번호 (0508)"],
-                        ["phone2", "2차 연락처"],
-                        ["elevSize", "엘리베이터 인승"],
-                      ].map(([k, l]) => (
-                        <Field
-                          key={k}
-                          label={l}
-                          value={draft[k]}
-                          onChange={(v) => change(k, v)}
-                        />
-                      ))}
-                      <label className="field">
-                        <span>특이사항</span>
-                        <textarea
-                          value={draft.memo || ""}
-                          onChange={(e) => change("memo", e.target.value)}
-                        />
-                      </label>
-                      {["calling", "ready", "driving"].includes(day.phase) && <Field
-                        label="정확한 방문 약속 시각"
-                        type="time"
-                        value={draft.promiseTime}
-                        onChange={(v) => change("promiseTime", v)}
-                      />}
-                      <Field
-                        label="설치 시간 (분) · 비우면 자동"
-                        type="number"
-                        value={draft.work}
-                        onChange={(v) => change("work", v)}
-                      />
-                      <label className="chip">
-                        <input
-                          type="checkbox"
-                          checked={!!draft.sorry}
-                          onChange={(e) => change("sorry", e.target.checked)}
-                        />
-                        시간 조율·양해 전화 필요
-                      </label>
-                    </div>
-                  </details>
-                  <button className="primary big" onClick={save}>
-                    {editing ? "수정 저장" : "＋ 이 고객 추가"}
-                  </button>
-                  {editing && (
-                    <button
-                      onClick={() => {
-                        setEditing(null);
-                        setDraft(blank());
-                      }}
-                    >
-                      수정 그만두기
+                      </div>
+                    </details>
+                    <button className="primary big" onClick={save}>
+                      {editing ? "수정 저장" : "＋ 이 고객 추가"}
                     </button>
-                  )}
+                    {editing && (
+                      <button
+                        onClick={() => {
+                          setEditing(null);
+                          setDraft(blank());
+                        }}
+                      >
+                        수정 그만두기
+                      </button>
+                    )}
+                  </div>
                 </div>
-              </details>
+              )}
             </div>
           </section>
         )}
         {tab === "order" && (
           <RouteView
+            stage={flowStage}
             day={day}
             history={history}
             calc={calc}
@@ -1039,11 +1588,19 @@ export default function App() {
               switchTab,
               fetchLegs: () => fetchLegs(),
               makePlans: () => makePlans(),
-              usePlan: (kind) =>
-                setDay((d) => d.plans?.[kind]
-                  ? ({ ...planDay(d, d.plans[kind]), phase: "calling" })
-                  : d),
-              ready: () => setDay((d) => ({ ...d, phase: "ready" })),
+              usePlan: (kind) => {
+                setDay((d) =>
+                  d.plans?.[kind]
+                    ? { ...planDay(d, d.plans[kind]), phase: "calling" }
+                    : d,
+                );
+                setViewStage(3);
+              },
+              ready: () => {
+                setDay((d) => ({ ...d, phase: "ready" }));
+                setViewStage(4);
+                switchTab("drive");
+              },
               sortByFixed: () => setDay((d) => sortByFixed(d)),
               copy: copyText,
               courseText: (d) => courseText(d || day),
@@ -1053,31 +1610,19 @@ export default function App() {
               update,
               move,
               edit,
-              remove: (id) =>
-                setDay((d) => ({
-                  ...d,
-                  list: d.list.filter((x) => x.id !== id),
-                })),
+              remove: (id) => deleteForDate(day.date, id),
               openDocument,
               rereadDocument,
               rereadId,
               aiKey,
               aiSettings: () => {
+                setAiSetupMode("route");
                 setKeyDraft(aiKey);
                 setRememberKey(!!localStorage.getItem(AI_KEY));
                 setAiSetup(true);
               },
               forgetAI,
-              clearDay: () => {
-                setDay((d) => ({
-                  ...d,
-                  list: [],
-                  contacts: [],
-                  plans: null,
-                  phase: "draft",
-                }));
-                switchTab("add");
-              },
+              clearDay: () => deleteForDate(day.date),
             }}
           />
         )}
@@ -1092,11 +1637,22 @@ export default function App() {
                 depart: new Date().toTimeString().slice(0, 5),
               }))
             }
-            onBack={() => switchTab("order")}
+            onBack={() => selectStage(availableStage >= 3 ? 3 : availableStage)}
             onUpdate={update}
           />
         )}
-        {tab === "map" && <RouteMap day={day} />}
+        {tab === "map" && (
+          <RouteMap
+            day={day}
+            onOpenCourse={() => switchTab("order")}
+            onLocated={(route) =>
+              setDay((d) => ({
+                ...d,
+                list: markLocated(d.list, route),
+              }))
+            }
+          />
+        )}
         {tab === "calendar" && (
           <section className="view">
             <div className="wrap">
@@ -1202,6 +1758,13 @@ export default function App() {
                               </button>
                             </div>
                           )}
+                          <button
+                            type="button"
+                            className="danger calendar-delete"
+                            onClick={() => deleteForDate(selected, c.id)}
+                          >
+                            이 고객 삭제
+                          </button>
                         </li>
                       ))}
                     </ol>
@@ -1218,12 +1781,12 @@ export default function App() {
                 <button className="big" onClick={() => openDay(today())}>
                   오늘 코스 보기
                 </button>
-                {selected < today() && chosen?.list?.length > 0 && (
+                {(chosen?.list?.length > 0 || chosen?.imports?.length > 0) && (
                   <button
                     className="danger big"
-                    onClick={() => deletePastDates([selected])}
+                    onClick={() => deleteForDate(selected)}
                   >
-                    이 날짜 기록 삭제
+                    이 날짜 고객 전체 삭제
                   </button>
                 )}
                 {pastDates.length > 0 && (
@@ -1242,17 +1805,19 @@ export default function App() {
       <nav className="tabs" aria-label="화면 바꾸기">
         <div className="in" role="tablist">
           {[
-            ["add", "출고표"],
             ["order", "코스 짜기"],
-            ["drive", "배송 시작"],
             ["map", "지도"],
             ["calendar", "기록"],
           ].map(([k, l]) => (
             <button
               key={k}
               role="tab"
-              aria-selected={tab === k}
-              onClick={() => switchTab(k)}
+              aria-selected={
+                k === "order"
+                  ? ["add", "order", "drive"].includes(tab)
+                  : tab === k
+              }
+              onClick={() => (k === "order" ? openWorkflow() : switchTab(k))}
             >
               <TabIcon name={k} />
               {l}
@@ -1262,6 +1827,7 @@ export default function App() {
       </nav>
       <AiSetup
         open={aiSetup}
+        mode={aiSetupMode}
         keyValue={keyDraft}
         onKeyChange={setKeyDraft}
         remember={rememberKey}

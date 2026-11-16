@@ -76,15 +76,19 @@ function WeekStrip({ day, history, onOpenDay }) {
   const extending = useRef(false);
   const syncVisibleMonth = (node) => {
     const center = node.scrollLeft + node.clientWidth / 2;
-    const visible = Array.from(node.children).find((item) => item.offsetLeft + item.offsetWidth > center);
-    if (visible?.dataset.date) setVisibleMonth(visible.dataset.date.slice(0, 7));
+    const visible = Array.from(node.children).find(
+      (item) => item.offsetLeft + item.offsetWidth > center,
+    );
+    if (visible?.dataset.date)
+      setVisibleMonth(visible.dataset.date.slice(0, 7));
   };
   if (previousDate.current !== day.date) {
     previousDate.current = day.date;
     focusSelected.current = true;
   }
   useEffect(() => {
-    if (day.date < range.start || day.date > range.end) setRange(around(day.date));
+    if (day.date < range.start || day.date > range.end)
+      setRange(around(day.date));
   }, [day.date, range.start, range.end]);
   useLayoutEffect(() => {
     const node = strip.current;
@@ -94,7 +98,9 @@ function WeekStrip({ day, history, onOpenDay }) {
       prependedWidth.current = null;
     }
     if (focusSelected.current) {
-      const monday = node.querySelector(`[data-date="${weekMonday(day.date)}"]`);
+      const monday = node.querySelector(
+        `[data-date="${weekMonday(day.date)}"]`,
+      );
       if (monday) {
         node.scrollLeft = monday.offsetLeft;
         focusSelected.current = false;
@@ -104,50 +110,70 @@ function WeekStrip({ day, history, onOpenDay }) {
     extending.current = false;
   }, [day.date, range.start, range.end]);
   const dates = [];
-  for (let date = range.start; date <= range.end; date = shiftDate(date, 1)) dates.push(date);
+  for (let date = range.start; date <= range.end; date = shiftDate(date, 1))
+    dates.push(date);
   const todayIso = iso(new Date());
   return (
     <div className="week-wrap">
-    <div className="week-month"><strong>{visibleMonth.replace('-', '년 ')}월</strong><span>좌우로 밀어 날짜 보기</span></div>
-    <div className="week" ref={strip} role="list" aria-label="날짜별 배송. 좌우로 스크롤해 다른 날짜를 볼 수 있습니다"
-      onScroll={e=>{
-        const node=e.currentTarget;
-        syncVisibleMonth(node);
-        if(extending.current)return;
-        if(node.scrollLeft<node.clientWidth){
-          extending.current=true;
-          prependedWidth.current=node.scrollWidth;
-          setRange(current=>({...current,start:shiftDate(current.start,-28)}));
-        }else if(node.scrollWidth-node.scrollLeft-node.clientWidth<node.clientWidth){
-          extending.current=true;
-          setRange(current=>({...current,end:shiftDate(current.end,28)}));
-        }
-      }}>
-      {dates.map((date) => {
-        const d = new Date(date + "T00:00:00"),
-          record = date === day.date ? day : history[date],
-          count = record?.list?.length || 0;
-        return (
-          <button
-            key={date}
-            data-date={date}
-            role="listitem"
-            type="button"
-            className={
-              "week-day" +
-              (date === day.date ? " on" : "") +
-              (date === todayIso ? " today" : "")
-            }
-            aria-current={date === day.date ? "date" : undefined}
-            onClick={() => onOpenDay(date)}
-          >
-            <span>{d.getDate() === 1 ? `${d.getMonth() + 1}월` : DAY[d.getDay()]}</span>
-            <strong>{d.getDate()}</strong>
-            <small>{count ? count + "곳" : "-"}</small>
-          </button>
-        );
-      })}
-    </div>
+      <div className="week-month">
+        <strong>{visibleMonth.replace("-", "년 ")}월</strong>
+        <span>좌우로 밀어 날짜 보기</span>
+      </div>
+      <div
+        className="week"
+        ref={strip}
+        role="list"
+        aria-label="날짜별 배송. 좌우로 스크롤해 다른 날짜를 볼 수 있습니다"
+        onScroll={(e) => {
+          const node = e.currentTarget;
+          syncVisibleMonth(node);
+          if (extending.current) return;
+          if (node.scrollLeft < node.clientWidth) {
+            extending.current = true;
+            prependedWidth.current = node.scrollWidth;
+            setRange((current) => ({
+              ...current,
+              start: shiftDate(current.start, -28),
+            }));
+          } else if (
+            node.scrollWidth - node.scrollLeft - node.clientWidth <
+            node.clientWidth
+          ) {
+            extending.current = true;
+            setRange((current) => ({
+              ...current,
+              end: shiftDate(current.end, 28),
+            }));
+          }
+        }}
+      >
+        {dates.map((date) => {
+          const d = new Date(date + "T00:00:00"),
+            record = date === day.date ? day : history[date],
+            count = record?.list?.length || 0;
+          return (
+            <button
+              key={date}
+              data-date={date}
+              role="listitem"
+              type="button"
+              className={
+                "week-day" +
+                (date === day.date ? " on" : "") +
+                (date === todayIso ? " today" : "")
+              }
+              aria-current={date === day.date ? "date" : undefined}
+              onClick={() => onOpenDay(date)}
+            >
+              <span>
+                {d.getDate() === 1 ? `${d.getMonth() + 1}월` : DAY[d.getDay()]}
+              </span>
+              <strong>{d.getDate()}</strong>
+              <small>{count ? count + "곳" : "-"}</small>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -163,7 +189,7 @@ function Leg({ day, i, busy }) {
     );
   return (
     <div className="leg muted">
-      <small>{busy ? "이동 시간 계산 중" : "이동 시간 모름"}</small>
+      <small>{busy ? "이동 시간 계산 중" : "..."}</small>
     </div>
   );
 }
@@ -295,8 +321,7 @@ function StopCard({
           {c.geoMissing && (
             <div className="fix-time warn-box">
               <p className="note warn">
-                T맵이 이 주소를 못 찾아서 앞뒤 이동 시간을 모릅니다. 도로명
-                주소나 아파트 이름을 넣어 주세요.
+                주소가 정확히 일치하지 않아 이 고객 앞뒤의 이동 시간을 계산하지 않았어요. 사진의 도로명과 번호를 확인해 고객 주소를 고치거나, 아래에 정확한 검색용 주소를 넣어 주세요.
               </p>
               <label className="field">
                 <span>T맵 검색용 주소 (카드 주소는 그대로)</span>
@@ -376,9 +401,7 @@ function StopCard({
                   actions.update(c.id, { callConfirmed: !c.callConfirmed })
                 }
               >
-                {c.callConfirmed
-                  ? "통화 완료 취소"
-                  : "시간 변경 없이 통화 완료"}
+                {c.callConfirmed ? "통화 완료 취소" : "시간 확정"}
               </button>
             </div>
           )}
@@ -392,7 +415,7 @@ function StopCard({
             <div>
               <dt>한 집 시간</dt>
               <dd>
-                {fmtDuration((+c.travel || 0) + serviceMin(c, c.travel))} (이동+작업)
+                {fmtDuration(serviceMin(c))} (작업만 · 이동 제외)
               </dd>
             </div>
           </dl>
@@ -402,39 +425,45 @@ function StopCard({
               <NaviIcon />
               T맵 길안내
             </a>
-            {deliveryMode && <button
-              type="button"
-              className={"btn" + (c.done ? "" : " ok")}
-              onClick={() =>
-                actions.update(c.id, {
-                  done: !c.done,
-                  doneAt: !c.done ? new Date().toTimeString().slice(0, 5) : "",
-                })
-              }
-            >
-              {c.done ? "완료 취소" : "배송 완료"}
-            </button>}
+            {deliveryMode && (
+              <button
+                type="button"
+                className={"btn" + (c.done ? "" : " ok")}
+                onClick={() =>
+                  actions.update(c.id, {
+                    done: !c.done,
+                    doneAt: !c.done
+                      ? new Date().toTimeString().slice(0, 5)
+                      : "",
+                  })
+                }
+              >
+                {c.done ? "완료 취소" : "배송 완료"}
+              </button>
+            )}
           </div>
-          {callMode && <div className="phones">
-            {c.phone && (
-              <a className="btn" href={"tel:" + digits(c.phone)}>
-                <PhoneIcon />
-                {normalizePhone(c.phone)}
-              </a>
-            )}
-            {c.safePhone && (
-              <a className="btn" href={"tel:" + digits(c.safePhone)}>
-                <PhoneIcon />
-                안심 {normalizePhone(c.safePhone)}
-              </a>
-            )}
-            {c.phone2 && (
-              <a className="btn" href={"tel:" + digits(c.phone2)}>
-                <PhoneIcon />
-                2차 {normalizePhone(c.phone2)}
-              </a>
-            )}
-          </div>}
+          {callMode && (
+            <div className="phones">
+              {c.phone && (
+                <a className="btn" href={"tel:" + digits(c.phone)}>
+                  <PhoneIcon />
+                  {normalizePhone(c.phone)}
+                </a>
+              )}
+              {c.safePhone && (
+                <a className="btn" href={"tel:" + digits(c.safePhone)}>
+                  <PhoneIcon />
+                  안심 {normalizePhone(c.safePhone)}
+                </a>
+              )}
+              {c.phone2 && (
+                <a className="btn" href={"tel:" + digits(c.phone2)}>
+                  <PhoneIcon />
+                  2차 {normalizePhone(c.phone2)}
+                </a>
+              )}
+            </div>
+          )}
           <div className="row-actions">
             <button
               type="button"
@@ -467,11 +496,20 @@ function StopCard({
             <button type="button" onClick={() => actions.openDocument(c)}>
               출고표
             </button>
-            {c.imageId && (!c.prod || !c.weight || (!c.noelev && !c.elevSize && !c.elevatorKnown)) && (
-              <button type="button" disabled={!!actions.rereadId} onClick={() => actions.rereadDocument(c)}>
-                {actions.rereadId === c.id ? "출고표 다시 읽는 중…" : "빈 정보 다시 읽기"}
-              </button>
-            )}
+            {c.imageId &&
+              (!c.prod ||
+                !c.weight ||
+                (!c.noelev && !c.elevSize && !c.elevatorKnown)) && (
+                <button
+                  type="button"
+                  disabled={!!actions.rereadId}
+                  onClick={() => actions.rereadDocument(c)}
+                >
+                  {actions.rereadId === c.id
+                    ? "출고표 다시 읽는 중…"
+                    : "빈 정보 다시 읽기"}
+                </button>
+              )}
           </div>
           <details className="sub">
             <summary>희망 시간대 · 무게 · T맵 주소 · 고객 수정</summary>
@@ -508,7 +546,25 @@ function StopCard({
               </label>
               <label className="field">
                 <span>엘리베이터</span>
-                <select value={c.noelev ? "no" : c.elevSize || c.elevatorKnown ? "yes" : "unknown"} onChange={e=>actions.update(c.id, e.target.value === "unknown" ? {noelev:false,elevatorKnown:false,elevSize:""} : e.target.value === "no" ? {noelev:true,elevatorKnown:true,elevSize:""} : {noelev:false,elevatorKnown:true})}>
+                <select
+                  value={
+                    c.noelev
+                      ? "no"
+                      : c.elevSize || c.elevatorKnown
+                        ? "yes"
+                        : "unknown"
+                  }
+                  onChange={(e) =>
+                    actions.update(
+                      c.id,
+                      e.target.value === "unknown"
+                        ? { noelev: false, elevatorKnown: false, elevSize: "" }
+                        : e.target.value === "no"
+                          ? { noelev: true, elevatorKnown: true, elevSize: "" }
+                          : { noelev: false, elevatorKnown: true },
+                    )
+                  }
+                >
                   <option value="unknown">확인 전</option>
                   <option value="yes">있음</option>
                   <option value="no">없음 · 계단 작업</option>
@@ -526,15 +582,17 @@ function StopCard({
                   }
                 />
               </label>
-              {callMode && <label className="field">
-                <span>통화 메모</span>
-                <textarea
-                  value={c.callMemo || ""}
-                  onChange={(e) =>
-                    actions.update(c.id, { callMemo: e.target.value })
-                  }
-                />
-              </label>}
+              {callMode && (
+                <label className="field">
+                  <span>통화 메모</span>
+                  <textarea
+                    value={c.callMemo || ""}
+                    onChange={(e) =>
+                      actions.update(c.id, { callMemo: e.target.value })
+                    }
+                  />
+                </label>
+              )}
               <div className="row-actions">
                 <button type="button" onClick={() => actions.edit(c)}>
                   고객 정보 수정
@@ -542,14 +600,9 @@ function StopCard({
                 <button
                   type="button"
                   className="danger"
-                  onClick={() => {
-                    if (
-                      confirm((c.name || "이 고객") + "을(를) 코스에서 뺄까요?")
-                    )
-                      actions.remove(c.id);
-                  }}
+                  onClick={() => actions.remove(c.id)}
                 >
-                  코스에서 빼기
+                  이 고객 삭제
                 </button>
               </div>
             </div>
@@ -568,7 +621,15 @@ const legsReadyOf = (day) =>
   ).every((s) => s === "tmap");
 
 // 고객 카드 타임라인. 확정 코스와 추천 코스가 같은 화면을 쓴다.
-function Timeline({ day, calc, calls, legBusy, actions, callMode, deliveryMode }) {
+function Timeline({
+  day,
+  calc,
+  calls,
+  legBusy,
+  actions,
+  callMode,
+  deliveryMode,
+}) {
   const [openId, setOpenId] = useState(null);
   const [drag, setDragState] = useState(null); // {from, to}
   const dragRef = useRef(null);
@@ -641,36 +702,6 @@ function Timeline({ day, calc, calls, legBusy, actions, callMode, deliveryMode }
 
   return (
     <>
-      {callMode && calls.length > 0 && (
-        <section className="calls" aria-label="전날 먼저 전화할 고객">
-          <h3>전날 먼저 전화할 곳 {calls.length}곳</h3>
-          <ul>
-            {calls.map((x) => {
-              const p = x.c.phone || x.c.safePhone;
-              return (
-                <li key={x.c.id}>
-                  <div>
-                    <strong>
-                      {x.i + 1}. {x.c.name || "고객"}
-                    </strong>
-                    <span>{x.why.join(", ")}</span>
-                    {x.c.phone2 && <a href={"tel:" + digits(x.c.phone2)}>2차 연락처 {x.c.phone2}</a>}
-                  </div>
-                  {p && (
-                    <a
-                      className="round"
-                      href={"tel:" + digits(p)}
-                      aria-label={(x.c.name || "고객") + " 전화"}
-                    >
-                      <PhoneIcon />
-                    </a>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
       {drag && (
         <p className="drag-hint" role="status">
           {drag.from + 1}번 {day.list[drag.from]?.name} → {drag.to + 1}번째
@@ -708,7 +739,9 @@ function Timeline({ day, calc, calls, legBusy, actions, callMode, deliveryMode }
                 onToggle={() =>
                   setOpenId(openId === row.c.id ? null : row.c.id)
                 }
-                reminder={callMode ? calls.find((x) => x.c.id === row.c.id) : null}
+                reminder={
+                  callMode ? calls.find((x) => x.c.id === row.c.id) : null
+                }
                 actions={actions}
                 grip={grip(i)}
                 dragging={drag?.from === i}
@@ -746,22 +779,42 @@ function TotalsNote({ day, calc }) {
 }
 
 const PLAN = {
-  customer:
-    "오전·오후 약속을 먼저 지키고, 가능하면 늦게·이르게 요청과 아침 외곽·10시 이후 분당 방문을 고려해요.",
+  customer: `오전/오후 약속, 가능하면 늦게/이르게 요청, 아침 외곽·10시 이후 분당 방문을 고려해요.`,
   driver:
     "지도 좌표로 이동 거리를 줄인 순서예요. 실시간 교통은 반영하지 않습니다.",
-  balanced: "고객 약속을 지키면서 이동 거리와 퇴근 시간대 긴 이동도 함께 고려해요.",
+  balanced:
+    "고객 약속을 지키면서 이동 거리와 퇴근 시간대 긴 이동도 함께 고려해요.",
 };
 const BY = {
   ai: "AI 추천",
   map: "지도 위치로 계산",
+  area: "지역 기준 대략 추천",
   rule: "시간대·지역으로 정렬",
 };
 
+const RECOMMENDATIONS = [
+  ["customer", "고객 시간 우선", "약속 시간을 먼저 맞춰요"],
+  ["driver", "빠른 이동", "동선을 짧게 잡아요"],
+  ["balanced", "균형 추천", "약속과 이동 시간을 함께 봐요"],
+];
+
+function routeArea(address) {
+  const area = shortArea(address);
+  const district = area.match(/\s([가-힣]+구)(?=\s|$)/)?.[1];
+  const city = area.match(/([가-힣]+)시/)?.[1];
+  return (district || city || area.split(" ")[0] || "배송지").replace(/구$/, "");
+}
+
+function recommendationPath(day) {
+  const start = day.start.match(/([가-힣]+)시/)?.[1] || routeArea(day.start);
+  const end = day.end.match(/([가-힣]+)시/)?.[1] || routeArea(day.end);
+  const places = day.list.map((customer) => routeArea(customer.addr));
+  return [`${start} 출발`, ...places.filter((place, index) => place !== places[index - 1]), `${end} 귀가`].join(" → ");
+}
+
 export default function RouteView(props) {
-  const { day, history, calc, calls, legBusy, aiBusy, tmapReady, actions } =
+  const { day, history, calc, calls, legBusy, aiBusy, tmapReady, actions, stage } =
     props;
-  const [armed, setArmed] = useState(false);
   const [selectedMode, setModeState] = useState(() => {
     try {
       return sessionStorage.getItem("sofa-route-mode") || "customer";
@@ -770,7 +823,7 @@ export default function RouteView(props) {
     }
   });
   const canCall = ["calling", "ready", "driving"].includes(day.phase);
-  const mode = !canCall && selectedMode === "fixed" ? "customer" : selectedMode;
+  const mode = stage === 3 ? "fixed" : selectedMode === "fixed" ? "customer" : selectedMode;
   const setMode = (m) => {
     setModeState(m);
     window.scrollTo(0, 0);
@@ -797,28 +850,72 @@ export default function RouteView(props) {
     : actions;
   const ready = legsReadyOf(viewDay);
   const done = day.list.filter((c) => c.done).length;
-  const stage = !day.list.length
-    ? 1
-    : day.phase === "ready" || day.phase === "driving"
-      ? 4
-      : day.phase === "calling"
-        ? 3
-        : 2;
-
+  if (stage === 2 && day.list.length > 0 && day.plans?.customer) {
+    const selectedPlan = day.plans[mode] ? mode : "customer";
+    const selectedDay = planDay(day, day.plans[selectedPlan]);
+    const selectedCalc = compute(selectedDay);
+    return (
+      <section className="view recommendation-view">
+        <div className="wrap">
+          <div className="recommendation-heading">
+            <div>
+              <h2>추천 코스</h2>
+              <p>배송지 {day.list.length}곳 · 출발 {day.depart} · 귀가 {fmt(selectedCalc.home)} 예상</p>
+            </div>
+            <button type="button" className="recommendation-remake" disabled={aiBusy} onClick={actions.makePlans}>
+              {aiBusy ? "만드는 중…" : "다시 만들기"}
+            </button>
+          </div>
+          <div className="recommendation-cards" role="group" aria-label="추천 코스 선택">
+            {RECOMMENDATIONS.map(([kind, title, subtitle]) => {
+              const recommendation = day.plans[kind];
+              const available = Boolean(recommendation);
+              const optionDay = available ? planDay(day, recommendation) : null;
+              const optionCalc = optionDay ? compute(optionDay) : null;
+              const late = optionCalc?.rows.filter((row) => row.flags.some(([level]) => level === "bad")).length ?? 0;
+              const checked = selectedPlan === kind;
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  aria-pressed={checked}
+                  disabled={!available}
+                  className={"recommendation-card" + (checked ? " selected" : "")}
+                  onClick={() => setMode(kind)}
+                >
+                  <span className="recommendation-card-heading">
+                    <span><strong>{title}</strong><small>{available ? (recommendation.by === "area" ? "지역 기준 대략 순서" : subtitle) : "다시 만들기를 눌러 주세요"}</small></span>
+                    <span className="recommendation-radio" aria-hidden="true" />
+                  </span>
+                  {available && <>
+                    <span className="recommendation-stats">
+                      <span><strong>{optionDay.list.length}곳</strong><small>배송지</small></span>
+                      <span><strong>{fmt(optionCalc.home)}</strong><small>귀가 예상</small></span>
+                      <span><strong>{late}곳</strong><small>시간 지연</small></span>
+                    </span>
+                    {checked && <span className="recommendation-path">{recommendationPath(optionDay)}</span>}
+                  </>}
+                </button>
+              );
+            })}
+          </div>
+          <button type="button" className="btn primary recommendation-continue" onClick={() => {
+            actions.usePlan(selectedPlan);
+            setMode("fixed");
+          }}>
+            이 코스로 진행하기
+          </button>
+          {day.plans.driver?.by === "area" && <p className="recommendation-help">T맵 위치를 받지 못해 지역 기준으로 대략 정렬했어요. 정확한 이동 순서와 구간 시간을 보려면 <button type="button" className="text-btn" onClick={() => actions.switchTab("map")}>T맵 확인하기</button></p>}
+          {!actions.aiKey && <p className="recommendation-help">고객 시간 AI 추천을 쓰려면 <button type="button" className="text-btn" onClick={actions.aiSettings}>AI 키 연결</button></p>}
+          {day.plans[selectedPlan]?.timeError && <p className="note warn">{day.plans[selectedPlan].timeError}</p>}
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="view">
       <div className="wrap">
         <WeekStrip day={day} history={history} onOpenDay={actions.openDay} />
-        <div className="flow-steps" aria-label="업무 순서">
-          {["출고표", "추천 선택", "전화 확정", "다음 날 배송"].map(
-            (label, i) => (
-              <span key={label} className={stage === i + 1 ? "active" : ""}>
-                {i + 1}. {label}
-              </span>
-            ),
-          )}
-        </div>
-
         {day.list.length === 0 ? (
           <div className="empty">
             <p>이 날짜에는 배송이 없어요.</p>
@@ -832,16 +929,24 @@ export default function RouteView(props) {
           </div>
         ) : (
           <>
-            <div className={"modes" + (canCall ? " with-calling" : "")} role="tablist" aria-label="코스 보기">
+            <div
+              className={"modes" + (canCall ? " with-calling" : "")}
+              role="tablist"
+              aria-label="코스 보기"
+            >
               {[
                 ["customer", "고객 시간", "추천"],
                 ["driver", "빠른 이동", "추천"],
                 ["balanced", "균형 추천", "추천"],
-                ...(canCall ? [[
-                  "fixed",
-                  "전화 확정",
-                  fixedList.length + "/" + rest.length + " 확정",
-                ]] : []),
+                ...(canCall
+                  ? [
+                      [
+                        "fixed",
+                        "코스 확정",
+                        fixedList.length + "/" + rest.length + " 확정",
+                      ],
+                    ]
+                  : []),
               ].map(([k, label, sub]) => (
                 <button
                   key={k}
@@ -881,41 +986,34 @@ export default function RouteView(props) {
             {mode !== "fixed" && !plan ? (
               <div className="plan">
                 <p className="note">{PLAN[mode]}</p>
-                {!actions.aiKey && <p className="note">고객 시간 AI 추천을 받으려면 <button type="button" className="text-btn" onClick={actions.aiSettings}>AI 키 연결</button>을 해 주세요. 연결 전에는 시간대·지역 기준으로 정렬합니다.</p>}
-                {!tmapReady ? (
-                  <>
-                    <p className="note warn">
-                      세 가지 추천의 구간 시간을 처음부터 계산하려면 T맵을 연결해 주세요.
-                    </p>
+                {!actions.aiKey && (
+                  <p className="note">
+                    고객 시간 AI 추천을 받으려면{" "}
                     <button
                       type="button"
-                      className="btn"
-                      onClick={() => actions.switchTab("map")}
+                      className="text-btn"
+                      onClick={actions.aiSettings}
                     >
-                      T맵 연결하기
+                      AI 키 연결
                     </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn primary"
-                    disabled={aiBusy}
-                    onClick={actions.makePlans}
-                  >
-                    {aiBusy ? "세 코스의 시간 계산 중…" : "추천 코스와 시간 만들기"}
-                  </button>
+                    을 해 주세요. 연결 전에는 시간대·지역 기준으로 정렬합니다.
+                  </p>
                 )}
+                {!tmapReady && <p className="note warn">T맵을 연결하지 않으면 빠른 이동과 균형 추천은 지역 기준의 대략 순서로 만듭니다.</p>}
+                <button
+                  type="button"
+                  className="btn primary"
+                  disabled={aiBusy}
+                  onClick={actions.makePlans}
+                >
+                  {aiBusy ? "추천 만드는 중…" : "추천 코스 만들기"}
+                </button>
               </div>
             ) : (
               <>
                 {plan ? (
                   <div className="plan-head">
-                    <p className="note">
-                      {PLAN[mode]}{" "}
-                      <span className="by">
-                        {BY[plan.by]} · {day.plans.at}
-                      </span>
-                    </p>
+                    <p className="note">{PLAN[mode]} </p>
                     <button
                       type="button"
                       className="btn primary"
@@ -924,7 +1022,7 @@ export default function RouteView(props) {
                         setMode("fixed");
                       }}
                     >
-                      이 순서 선택하고 전화 확정
+                      이 순서로 진행하기
                     </button>
                   </div>
                 ) : (
@@ -959,11 +1057,15 @@ export default function RouteView(props) {
                       disabled={fixedList.length !== rest.length}
                       onClick={actions.ready}
                     >
-                      전화 확정 마치기 · 배송 준비
+                      배송 준비 완료!
                     </button>
                   </div>
                 )}
-                {plan?.timeError && <p className="note warn">{plan.timeError} ‘시간 계산하기’를 눌러 다시 받을 수 있어요.</p>}
+                {plan?.timeError && (
+                  <p className="note warn">
+                    {plan.timeError} ‘시간 계산하기’를 눌러 다시 받을 수 있어요.
+                  </p>
+                )}
 
                 {!tmapReady && (
                   <p className="note">
@@ -994,12 +1096,6 @@ export default function RouteView(props) {
                       ? "현재 순서의 T맵 구간 시간이 반영됐어요."
                       : "순서나 약속 시간을 고친 뒤 이 버튼을 누르면 T맵 구간 시간을 새로 받습니다."}
                 </p>
-                <p className="note">출퇴근길 정체는 날짜에 따라 달라요. 배송 전 내비에서 출발 시간을 설정해 다시 확인해 주세요.</p>
-                {needCheck && (
-                  <p className="note warn">
-                    사진에서 읽은 정보 중 확인할 게 있어요.
-                  </p>
-                )}
 
                 <Timeline
                   key={mode}
@@ -1009,7 +1105,9 @@ export default function RouteView(props) {
                   legBusy={legBusy}
                   actions={viewActions}
                   callMode={mode === "fixed" && canCall}
-                  deliveryMode={mode === "fixed" && ["ready", "driving"].includes(day.phase)}
+                  deliveryMode={
+                    mode === "fixed" && ["ready", "driving"].includes(day.phase)
+                  }
                 />
 
                 <div className="bottom-actions">
@@ -1065,18 +1163,10 @@ export default function RouteView(props) {
             {day.list.length > 0 && (
               <button
                 type="button"
-                className={"btn danger" + (armed ? " armed" : "")}
-                onClick={() => {
-                  if (!armed) {
-                    setArmed(true);
-                    setTimeout(() => setArmed(false), 4000);
-                    return;
-                  }
-                  actions.clearDay();
-                  setArmed(false);
-                }}
+                className="btn danger"
+                onClick={actions.clearDay}
               >
-                {armed ? "한 번 더 누르면 이 날짜를 비워요" : "이 날짜 비우기"}
+                이 날짜 고객 전체 삭제
               </button>
             )}
           </div>

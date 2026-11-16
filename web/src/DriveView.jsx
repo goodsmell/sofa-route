@@ -1,34 +1,155 @@
-import React from 'react';
-import {digits,fmt,normalizePhone,shortArea} from './logic.js';
-import {legInfo,fmtDuration} from './tmapRoute.js';
+import React from "react";
+import { digits, fmt, normalizePhone, shortArea } from "./logic.js";
+import { legInfo, fmtDuration } from "./tmapRoute.js";
 
-const tmap = address => 'tmap://search?name=' + encodeURIComponent(address || '');
-const nowTime = () => new Date().toTimeString().slice(0,5);
+const tmap = (address) =>
+  "tmap://search?name=" + encodeURIComponent(address || "");
+const nowTime = () => new Date().toTimeString().slice(0, 5);
 
-export default function DriveView({day,calc,onStart,onBack,onUpdate}) {
-  const index=day.list.findIndex(stop=>!stop.done);
-  const current=index>=0?day.list[index]:null;
-  const row=index>=0?calc.rows[index]:null;
-  const next=index>=0?day.list[index+1]:null;
-  const phone=current&&(current.phone||current.safePhone);
-  const leg=index>=0?legInfo(day,index):null;
-  return <section className="drive-view" aria-label="배송 운행 화면">
-    <header className="drive-header"><button type="button" onClick={onBack}>‹ 코스 보기</button><div><strong>{day.date} 배송</strong><small>{day.list.filter(s=>s.done).length}/{day.list.length}곳 완료</small></div></header>
-    {!day.list.length?<div className="drive-empty"><h2>출고표를 먼저 넣어 주세요</h2><button className="primary big" onClick={onBack}>코스 짜기로 가기</button></div>
-    :day.phase!=='driving'&&day.phase!=='ready'?<div className="drive-empty"><span className="drive-eyebrow">전화 확정</span><h2>고객 통화와 코스 확정을 마쳐 주세요</h2><p>코스 화면에서 각 고객의 시간대를 정하거나 통화 완료를 표시한 뒤 배송 준비를 마칠 수 있어요.</p><button className="primary big" onClick={onBack}>코스 확정하러 가기</button></div>
-    :day.phase!=='driving'?<div className="drive-empty"><span className="drive-eyebrow">다음 날 배송</span><h2>확정한 코스로 출발할 준비가 됐나요?</h2><p>출발을 누른 시각부터 예상 방문 시간이 계산됩니다. 고객과 아직 통화 중이라면 코스 화면에서 수정할 수 있어요.</p><button className="primary big" onClick={onStart}>일 시작 · 지금 출발</button><button className="big" onClick={onBack}>코스 다시 확인</button></div>
-    :!current?<div className="drive-empty"><span className="drive-eyebrow">배송 완료</span><h2>오늘 {day.list.length}곳을 모두 마쳤어요</h2><p>마지막 배송 완료 {day.list.at(-1)?.doneAt || ''}</p><a className="btn primary" href={tmap(day.end)}>귀가 길안내</a><button className="big" onClick={onBack}>전체 기록 보기</button></div>
-    :<>
-      <div className="drive-progress">{day.list.map((stop,i)=><span key={stop.id} className={stop.done?'done':i===index?'current':''}/>)}</div>
-      <div className="drive-main"><span className="drive-eyebrow">{index+1}번째 배송 · {current.arrivedAt?'도착 기록 '+current.arrivedAt:'이동 중'}</span><h1>{current.name||'고객'}</h1><p className="drive-address">{current.addr}</p>
-      <div className="drive-eta"><span>{current.arrivedAt?'실제 도착':'예상 도착'}</span><strong>{current.arrivedAt||fmt(row.start)}</strong><small>{current.promiseTime?current.promiseTime+' 고객 약속':current.slot==='am'?'오전 희망':current.slot==='pm'?'오후 희망':'시간 지정 없음'}</small></div>
-      <div className="drive-info"><span>이동 {leg?.state==='tmap'?fmtDuration(leg.min):'예상 '+fmtDuration(leg?.min||30)}</span><span>주소 {shortArea(current.addr)}</span></div>
-      {(current.memo||current.callMemo)&&<p className="drive-memo">{current.memo}{current.callMemo&&' · 통화: '+current.callMemo}</p>}
-      </div>
-      <div className="drive-actions"><div className="drive-links"><a className="btn" href={tmap(current.addr)}>길안내</a>{phone&&<a className="btn" href={'tel:'+digits(phone)}>전화 {normalizePhone(phone)}</a>}</div>
-      {!current.arrivedAt?<button className="primary drive-big" onClick={()=>onUpdate(current.id,{arrivedAt:nowTime()})}>도착</button>:<button className="primary drive-big" onClick={()=>onUpdate(current.id,{done:true,doneAt:nowTime()})}>{next?'다음 집 출발':'배송 마치기'}</button>}
-      {next&&<p>다음: {next.name} · {shortArea(next.addr)} · 예상 {fmt(calc.rows[index+1].start)}</p>}
-      </div>
-    </>}
-  </section>;
+export default function DriveView({ day, calc, onStart, onBack, onUpdate }) {
+  const index = day.list.findIndex((stop) => !stop.done);
+  const current = index >= 0 ? day.list[index] : null;
+  const row = index >= 0 ? calc.rows[index] : null;
+  const next = index >= 0 ? day.list[index + 1] : null;
+  const phone = current && (current.phone || current.safePhone);
+  const leg = index >= 0 ? legInfo(day, index) : null;
+  return (
+    <section className="drive-view" aria-label="배송 운행 화면">
+      <header className="drive-header">
+        <button type="button" onClick={onBack}>
+          ‹ 코스 보기
+        </button>
+        <div>
+          <strong>{day.date} 배송</strong>
+          <small>
+            {day.list.filter((s) => s.done).length}/{day.list.length}곳 완료
+          </small>
+        </div>
+      </header>
+      {!day.list.length ? (
+        <div className="drive-empty">
+          <h2>출고표를 먼저 넣어 주세요</h2>
+          <button className="primary big" onClick={onBack}>
+            코스 짜기로 가기
+          </button>
+        </div>
+      ) : day.phase !== "driving" && day.phase !== "ready" ? (
+        <div className="drive-empty">
+          <h2>고객 통화와 코스 확정을 마쳐 주세요</h2>
+          <button className="primary big" onClick={onBack}>
+            코스 확정하러 가기
+          </button>
+        </div>
+      ) : day.phase !== "driving" ? (
+        <div className="drive-empty">
+          <span className="drive-eyebrow">다음 날 배송</span>
+          <h2>확정한 코스로 출발할 준비가 됐나요?</h2>
+          <p>
+            출발을 누른 시각부터 예상 방문 시간이 계산됩니다. 고객과 아직 통화
+            중이라면 코스 화면에서 수정할 수 있어요.
+          </p>
+          <button className="primary big" onClick={onStart}>
+            일 시작 · 지금 출발
+          </button>
+          <button className="big" onClick={onBack}>
+            코스 다시 확인
+          </button>
+        </div>
+      ) : !current ? (
+        <div className="drive-empty">
+          <span className="drive-eyebrow">배송 완료</span>
+          <h2>오늘 {day.list.length}곳을 모두 마쳤어요</h2>
+          <p>마지막 배송 완료 {day.list.at(-1)?.doneAt || ""}</p>
+          <a className="btn primary" href={tmap(day.end)}>
+            귀가 길안내
+          </a>
+          <button className="big" onClick={onBack}>
+            전체 기록 보기
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="drive-progress">
+            {day.list.map((stop, i) => (
+              <span
+                key={stop.id}
+                className={stop.done ? "done" : i === index ? "current" : ""}
+              />
+            ))}
+          </div>
+          <div className="drive-main">
+            <span className="drive-eyebrow">
+              {index + 1}번째 배송 ·{" "}
+              {current.arrivedAt ? "도착 기록 " + current.arrivedAt : "이동 중"}
+            </span>
+            <h1>{current.name || "고객"}</h1>
+            <p className="drive-address">{current.addr}</p>
+            <div className="drive-eta">
+              <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
+              <strong>{current.arrivedAt || fmt(row.start)}</strong>
+              <small>
+                {current.promiseTime
+                  ? current.promiseTime + " 고객 약속"
+                  : current.slot === "am"
+                    ? "오전 희망"
+                    : current.slot === "pm"
+                      ? "오후 희망"
+                      : "시간 지정 없음"}
+              </small>
+            </div>
+            <div className="drive-info">
+              <span>
+                이동{" "}
+                {leg?.state === "tmap"
+                  ? fmtDuration(leg.min)
+                  : "예상 " + fmtDuration(leg?.min || 30)}
+              </span>
+              <span>주소 {shortArea(current.addr)}</span>
+            </div>
+            {(current.memo || current.callMemo) && (
+              <p className="drive-memo">
+                {current.memo}
+                {current.callMemo && " · 통화: " + current.callMemo}
+              </p>
+            )}
+          </div>
+          <div className="drive-actions">
+            <div className="drive-links">
+              <a className="btn" href={tmap(current.addr)}>
+                길안내
+              </a>
+              {phone && (
+                <a className="btn" href={"tel:" + digits(phone)}>
+                  전화 {normalizePhone(phone)}
+                </a>
+              )}
+            </div>
+            {!current.arrivedAt ? (
+              <button
+                className="primary drive-big"
+                onClick={() => onUpdate(current.id, { arrivedAt: nowTime() })}
+              >
+                도착
+              </button>
+            ) : (
+              <button
+                className="primary drive-big"
+                onClick={() =>
+                  onUpdate(current.id, { done: true, doneAt: nowTime() })
+                }
+              >
+                {next ? "다음 집 출발" : "배송 마치기"}
+              </button>
+            )}
+            {next && (
+              <p>
+                다음: {next.name} · {shortArea(next.addr)} · 예상{" "}
+                {fmt(calc.rows[index + 1].start)}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  );
 }
