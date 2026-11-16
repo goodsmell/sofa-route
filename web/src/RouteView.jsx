@@ -14,6 +14,7 @@ import {
 } from "./logic.js";
 import { legInfo, fmtDuration, routeTotals } from "./tmapRoute.js";
 import { isFixed, planDay } from "./plan.js";
+import {documentTypeLabel, needsDocumentReread} from './documentTypes.js';
 
 const tmap = (s) => "tmap://search?name=" + encodeURIComponent(s);
 const DAY = "일월화수목금토";
@@ -212,6 +213,7 @@ function StopCard({
   const phone = c.phone || c.safePhone;
   const late = row.flags.some(([k]) => k === "bad");
   const badges = [
+    c.documentType ? documentTypeLabel(c.documentType) : null,
     c.promiseTime
       ? c.promiseTime + " 확정"
       : c.slot === "am"
@@ -221,7 +223,7 @@ function StopCard({
           : null,
     c.noelev ? "엘리베이터 없음" : null,
     c.bs ? "기존 소파 수거" : null,
-    weightKg(c) == null ? "무게 확인" : null,
+    (!c.documentType || c.documentType === 'dispatch') && weightKg(c) == null ? "무게 확인" : null,
     c.geoMissing ? "T맵 주소 확인" : c.geoApprox ? "위치 대략" : null,
   ].filter(Boolean);
   return (
@@ -438,7 +440,7 @@ function StopCard({
                   })
                 }
               >
-                {c.done ? "완료 취소" : "배송 완료"}
+                {c.done ? "완료 취소" : c.documentType && c.documentType !== 'dispatch' ? "작업 완료" : "배송 완료"}
               </button>
             )}
           </div>
@@ -494,25 +496,23 @@ function StopCard({
               </select>
             </label>
             <button type="button" onClick={() => actions.openDocument(c)}>
-              출고표
+              {documentTypeLabel(c.documentType)} 원본
             </button>
             {c.imageId &&
-              (!c.prod ||
-                !c.weight ||
-                (!c.noelev && !c.elevSize && !c.elevatorKnown)) && (
+              needsDocumentReread(c) && (
                 <button
                   type="button"
                   disabled={!!actions.rereadId}
                   onClick={() => actions.rereadDocument(c)}
                 >
                   {actions.rereadId === c.id
-                    ? "출고표 다시 읽는 중…"
+                    ? "의뢰서 다시 읽는 중…"
                     : "빈 정보 다시 읽기"}
                 </button>
               )}
           </div>
           <details className="sub">
-            <summary>희망 시간대 · 무게 · T맵 주소 · 고객 수정</summary>
+            <summary>희망 시간대 · {c.documentType === 'dispatch' || !c.documentType ? '무게 · ' : ''}T맵 주소 · 고객 수정</summary>
             <div className="sub-body">
               <label className="field">
                 <span>약속 시간대</span>
@@ -544,7 +544,7 @@ function StopCard({
                   }
                 />
               </label>
-              <label className="field">
+              {(!c.documentType || c.documentType === 'dispatch') && <><label className="field">
                 <span>엘리베이터</span>
                 <select
                   value={
@@ -582,6 +582,7 @@ function StopCard({
                   }
                 />
               </label>
+              </>}
               {callMode && (
                 <label className="field">
                   <span>통화 메모</span>
@@ -924,7 +925,7 @@ export default function RouteView(props) {
               className="btn primary"
               onClick={() => actions.switchTab("add")}
             >
-              출고표 사진 넣기
+              의뢰서 사진 넣기
             </button>
           </div>
         ) : (

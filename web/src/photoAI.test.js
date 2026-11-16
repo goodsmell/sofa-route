@@ -23,13 +23,35 @@ test('AI가 읽은 고객 목록은 행별 010 번호만 연결하고 잘린 주
   ]);
 });
 
-test('AI 반품의뢰서는 회수 작업과 원본 확인 대상으로 만든다',()=>{
-  const [row]=normalizePhotoResult({kind:'return',customers:[{name:'박정수',addr:'서울 강서구 공항대로 20',safePhone:'0508-1234-5678',productRows:['3인 소파'],elevatorKnown:false}]},'반품.jpg');
-  assert.equal(row.bs,true);
+test('AI 반품의뢰서는 회수 방문지와 반품 사유를 보관한다',()=>{
+  const [row]=normalizePhotoResult({kind:'return',customers:[{name:'박정수',addr:'서울 강서구 공항대로 20',safePhone:'0508-1234-5678',productRows:['3인 소파'],requestReason:'오주문',installDate:'20261117',elevatorKnown:false}]},'반품.jpg','2026-11-17');
+  assert.equal(row.documentType,'return');
+  assert.equal(row.bs,false);
+  assert.equal(row.requestReason,'오주문');
+  assert.equal(row.installDate,'2026-11-17');
   assert.equal(row.source,'form');
   assert.equal(row.prod,'3인 소파');
   assert.equal(row.safePhone,'0508-1234-5678');
   assert.equal(row.elevatorKnown,false);
+});
+
+test('여섯 의뢰서의 제목과 방문 주소를 구분하고 날짜가 다른 건은 제외한다',()=>{
+  const target='2026-11-17';
+  const examples=[
+    ['dispatch',{addr:'경기 수원시 설치로 1',installDate:'2026-11-17'},'경기 수원시 설치로 1'],
+    ['return',{addr:'서울 송파구 회수로 2',installDate:'20261117',requestReason:'오주문'},'서울 송파구 회수로 2'],
+    ['incident',{addr:'경기 고양시 방문로 3',installDate:'2026.11.17',requestReason:'포장 불량',requestDetails:'부품 교체'},'경기 고양시 방문로 3'],
+    ['measurement',{addr:'서울 강동구 실측로 4',installDate:'2026년 11월 17일',requestDetails:'출입문 크기 확인'},'서울 강동구 실측로 4'],
+    ['move_install',{fromAddr:'경기 성남시 해체로 5',toAddr:'경기 성남시 설치로 6',installDate:'20261117'},'경기 성남시 설치로 6'],
+    ['move_dismantle',{fromAddr:'경기 성남시 해체로 5',toAddr:'경기 성남시 설치로 6',installDate:'20261117'},'경기 성남시 해체로 5'],
+  ];
+  for(const [kind,values,visit] of examples){
+    const [row]=normalizePhotoResult({kind,customers:[{name:'홍길동',...values}]},`${kind}.jpg`,target);
+    assert.equal(row.documentType,kind);
+    assert.equal(row.addr,visit);
+    assert.equal(row.installDate,target);
+    assert.equal(normalizePhotoResult({kind,customers:[{name:'홍길동',addr:visit,installDate:'20261118'}]},'다른날.jpg',target).length,0);
+  }
 });
 
 test('사진 요청에는 이미지와 JSON 형식이 들어가고 결과를 검증한다',async()=>{

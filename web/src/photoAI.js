@@ -1,19 +1,22 @@
 import {baseCustomer, normalizePhone, normalizeOcrAddress} from './logic.js';
+import {DOCUMENT_TYPES} from './documentTypes.js';
 
 const MODEL='gemini-3.5-flash-lite';
 const ENDPOINT=`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
-const fields=['name','addr','phone','safePhone','phone2','installDate','slot','prod','weight','elevSize','memo'];
+const fields=['name','addr','phone','safePhone','phone2','installDate','slot','prod','weight','elevSize','memo','fromAddr','toAddr','requestReason','requestDetails','orderNo','siteNo'];
 const stringProperties=Object.fromEntries(fields.map(key=>[key,{type:'string'}]));
 const schema={
   type:'object',
   properties:{
-    kind:{type:'string',enum:['dispatch','return','contacts']},
-    customers:{type:'array',items:{type:'object',properties:{...stringProperties,slot:{type:'string',enum:['am','pm','any']},productRows:{type:'array',items:{type:'string'}},elevatorKnown:{type:'boolean'},noelev:{type:'boolean'},ladderKnown:{type:'boolean'},ladderNeeded:{type:'boolean'},call:{type:'boolean'}},required:['name','addr','phone','safePhone','phone2','installDate','slot','prod','weight','elevSize','memo','productRows','elevatorKnown','noelev','ladderKnown','ladderNeeded','call']}},
+    kind:{type:'string',enum:[...Object.keys(DOCUMENT_TYPES),'contacts']},
+    customers:{type:'array',items:{type:'object',properties:{...stringProperties,slot:{type:'string',enum:['am','pm','any']},productRows:{type:'array',items:{type:'string'}},elevatorKnown:{type:'boolean'},noelev:{type:'boolean'},ladderKnown:{type:'boolean'},ladderNeeded:{type:'boolean'},call:{type:'boolean'}},required:['name','addr','phone','safePhone','phone2','installDate','slot','prod','weight','elevSize','memo','fromAddr','toAddr','requestReason','requestDetails','orderNo','siteNo','productRows','elevatorKnown','noelev','ladderKnown','ladderNeeded','call']}},
   },
   required:['kind','customers'],
 };
 
 export function normalizePhotoDate(value,targetDate=''){
+  const raw=String(value||'').trim();
+  if(/^\d{8}$/.test(raw))value=`${raw.slice(0,4)}-${raw.slice(4,6)}-${raw.slice(6)}`;
   const numbers=String(value||'').match(/\d+/g)||[];
   if(numbers.length<2)return '';
   const year=numbers.length>=3?(numbers[0].length===2?2000+Number(numbers[0]):Number(numbers[0])):Number(targetDate.slice(0,4));
@@ -25,7 +28,7 @@ export function normalizePhotoDate(value,targetDate=''){
 }
 
 export function normalizePhotoResult(result,file,targetDate=''){
-  if(!result||!['dispatch','return','contacts'].includes(result.kind)||!Array.isArray(result.customers))throw new Error('AI 사진 분석 결과의 형식이 올바르지 않습니다.');
+  if(!result||![...Object.keys(DOCUMENT_TYPES),'contacts'].includes(result.kind)||!Array.isArray(result.customers))throw new Error('AI 사진 분석 결과의 형식이 올바르지 않습니다.');
   return result.customers.filter(row=>row&&typeof row==='object').map(row=>{
     const value=key=>typeof row[key]==='string'?row[key].trim():'';
     const isList=result.kind==='contacts';
@@ -34,9 +37,18 @@ export function normalizePhotoResult(result,file,targetDate=''){
     const phone2=normalizePhone(value('phone2'));
     const validPhone=p=>/^0\d{9,11}$/.test(p.replace(/\D/g,''));
     const productRows=Array.isArray(row.productRows)?row.productRows.filter(x=>typeof x==='string'&&x.trim()).map(x=>x.trim()):[];
+    const fromAddr=normalizeOcrAddress(value('fromAddr'));
+    const toAddr=normalizeOcrAddress(value('toAddr'));
+    const visitAddr=result.kind==='move_install'?toAddr||normalizeOcrAddress(value('addr'))
+      :result.kind==='move_dismantle'?fromAddr||normalizeOcrAddress(value('addr'))
+      :normalizeOcrAddress(value('addr'));
     return {...baseCustomer({
       source:isList?'list':'form',verified:false,name:value('name'),
-      addr:isList?'':normalizeOcrAddress(value('addr')),
+      documentType:isList?'':result.kind,
+      addr:isList?'':visitAddr,
+      fromAddr:isList?'':fromAddr,toAddr:isList?'':toAddr,
+      requestReason:isList?'':value('requestReason'),requestDetails:isList?'':value('requestDetails'),
+      orderNo:isList?'':value('orderNo'),siteNo:isList?'':value('siteNo'),
       phone:isList&&validPhone(phone)&&phone.startsWith('010')?phone:'',
       safePhone:!isList&&validPhone(safePhone)?safePhone:'',
       phone2:!isList&&validPhone(phone2)?phone2:'',
@@ -44,8 +56,7 @@ export function normalizePhotoResult(result,file,targetDate=''){
       prod:value('prod')||productRows[0]||'',productRows,weight:value('weight'),elevSize:value('elevSize'),
       elevatorKnown:row.elevatorKnown===true,noelev:row.elevatorKnown===true&&row.noelev===true,
       ladderKnown:row.ladderKnown===true,ladderNeeded:row.ladderKnown===true&&row.ladderNeeded===true,
-      call:row.call===true,bs:result.kind==='return',
-      memo:[result.kind==='return'?'반품의뢰서':'',value('memo')].filter(Boolean).join(' · '),
+      call:row.call===true,bs:false,memo:value('memo'),
     }),file};
   }).filter(row=>row.source==='list'?row.name&&row.phone:(!targetDate||row.installDate===targetDate)&&(row.name||row.addr||row.phone||row.safePhone));
 }
@@ -54,15 +65,20 @@ function canvasData(canvas){return canvas.toDataURL('image/jpeg',.88).split(',')
 
 export async function analyzePhoto(file,canvas,key,fetcher=fetch,targetDate=''){
   const prompt=[
-    '이 사진은 소파 배송 업무의 출고의뢰서, 반품의뢰서, 또는 고객명과 전화번호가 있는 엑셀 화면이다.',
+    '이 사진은 소파 업무의 출고의뢰서, 반품의뢰서, 1회 사고조치 요청서, 실측 요청서, 이동(설치), 이동(해체), 또는 고객명·전화번호 엑셀 표 중 하나다.',
     '사진에 실제로 보이는 글자만 추출한다. 추측하거나 누락된 값을 만들어내지 않는다. 불명확한 값은 빈 문자열로 둔다.',
-    'kind는 출고의뢰서 dispatch, 반품·회수의뢰서 return, 고객 전화번호 표 contacts 중 하나다.',
-    '의뢰서는 고객별로 한 객체를 만든다. 반품의뢰서의 addr는 회수지/반품지 주소다.',
-    targetDate?`배송 날짜는 ${targetDate}이다. 의뢰서에서는 시공일 또는 회수 예정일이 이 날짜인 고객만 추출한다. 날짜가 보이지 않거나 다른 날짜면 추출하지 않는다.`:'',
+    'kind는 제목을 기준으로 dispatch=출고의뢰서, return=반품의뢰서, incident=1회 사고조치 요청서, measurement=실측, move_install=이동(설치), move_dismantle=이동(해체), contacts=엑셀 고객 번호 표 중 하나다. 비슷해 보여도 제목이 다르면 섞지 않는다.',
+    '의뢰서 사진은 작업 방문 건마다 한 객체를 만든다. 엑셀 표만 여러 고객 행을 만든다.',
+    'name은 실제 방문지의 고객명이다. 사업소, 담당자, 기사 이름을 고객명으로 쓰지 않는다. 고객명이 관계 표현(예: 어머님)뿐이거나 불분명하면 빈 문자열로 두어 확인받는다.',
+    'dispatch는 시공일과 고객 주소, 제품정보를 읽는다. return은 배송요청일과 배송지주소(회수할 곳), 반품사유, 제품정보를 읽는다.',
+    'incident는 요청일, 고객 주소, 요청사유, 요청사항을 읽는다. measurement는 요청일, 설치주소(실측 방문지), 요청사항을 읽는다.',
+    'move_install과 move_dismantle은 해체/철거주소를 fromAddr, 설치주소를 toAddr에 각각 적는다. move_install의 addr는 설치주소, move_dismantle의 addr는 해체/철거주소다. 두 주소를 합치지 않는다.',
+    'installDate에는 문서 유형에 맞는 실제 방문 날짜만 YYYY-MM-DD로 적는다. 출고=시공일, 반품=배송요청일, 사고조치·실측·이동=요청일이다. 원시공일, 작성일, 사진 촬영일은 방문 날짜가 아니다.',
+    targetDate?`선택한 방문 날짜는 ${targetDate}이다. 의뢰서는 방문 날짜가 정확히 이 날짜인 작업만 추출한다. 날짜가 보이지 않거나 다른 날짜면 추출하지 않는다.`:'',
     '엑셀 화면은 표의 모든 고객 행을 각각 한 객체로 만든다. 이름과 전화번호가 같은 행인지 확인한다. 표의 주소는 잘릴 수 있으므로 addr는 비운다.',
     '실제 고객 번호(010)는 의뢰서에서 추출하지 않는다. phone은 엑셀 고객 목록의 010 번호만 적는다. safePhone은 의뢰서의 0508 안심번호, phone2는 의뢰서의 두 번째 연락처다.',
-    'installDate는 YYYY-MM-DD, slot은 오전 am/오후 pm/지정 없음 any다. 제품이 여러 줄이면 productRows에 각각 넣고 prod는 첫 제품이다.',
-    '엘리베이터와 사다리차의 여부가 보이지 않으면 Known은 false다. 무게는 kg 숫자만 적는다. 특이사항은 memo에 적는다.',
+    'slot은 오전 am/오후 pm/지정 없음 any다. 제품이 여러 줄이면 productRows에 각각 넣고 prod는 첫 제품이다. 총 무게가 없으면 weight는 빈 문자열이다.',
+    '엘리베이터와 사다리차 여부가 보이지 않으면 Known은 false다. 반품사유/사고 요청사유는 requestReason, 조치·실측·이동 요청 내용은 requestDetails, 주문·요청번호는 orderNo, 현장번호는 siteNo, 그 외 특이사항은 memo에 적는다.',
     '오직 지정된 JSON 형식으로 답한다.',
   ].join('\n');
   const controller=new AbortController();

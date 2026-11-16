@@ -1,5 +1,6 @@
 import { legInfo, fmtDuration, routeTotals, GEO_VERSION, invalidateAddress } from "./tmapRoute.js";
 import { workMin } from "./timeRules.js";
+import {documentTypeLabel, documentDateLabel, documentAddressLabel, documentSpecificFields} from './documentTypes.js';
 export { workMin } from "./timeRules.js";
 export const KEY = "sofa-route-v1",
   HISTORY_KEY = "sofa-route-history-v1",
@@ -116,9 +117,16 @@ export function baseCustomer(x = {}) {
   return {
     id: crypto.randomUUID(),
     source: x.source || "manual",
+    documentType: x.documentType || "",
     imageId: x.imageId || "",
     name: x.name || "",
     addr: x.addr || "",
+    fromAddr: x.fromAddr || "",
+    toAddr: x.toAddr || "",
+    requestReason: x.requestReason || "",
+    requestDetails: x.requestDetails || "",
+    orderNo: x.orderNo || "",
+    siteNo: x.siteNo || "",
     phone: x.phone || "",
     safePhone: x.safePhone || "",
     phone2: x.phone2 || "",
@@ -295,6 +303,7 @@ const same = (a, b) => {
   return (
     clean(a.name) &&
     clean(a.name) === clean(b.name) &&
+    (!a.documentType || !b.documentType || a.documentType === b.documentType) &&
     (clean(a.addr) === clean(b.addr) || a.source !== b.source)
   );
 };
@@ -323,7 +332,7 @@ export function mergeCustomer(day, c) {
     next.list.push(person);
     return next;
   }
-  for (const f of ["phone", "safePhone", "phone2", "installDate", "prod", "elevSize", "weight"])
+  for (const f of ["phone", "safePhone", "phone2", "installDate", "prod", "elevSize", "weight", "documentType", "fromAddr", "toAddr", "requestReason", "requestDetails", "orderNo", "siteNo"])
     if (c[f] && !found[f]) found[f] = c[f];
   if (c.productRows?.length && !found.productRows?.length) found.productRows = c.productRows;
   if (c.elevatorKnown) found.elevatorKnown = true;
@@ -371,13 +380,15 @@ export function applyPhotoImports(day, items) {
     );
   }
   next.imports.push(...forms.map((form) => {
-    const customer = next.list.find((item) => item.source === "form" && clean(item.name) === clean(form.name) && item.addr === form.addr);
+    const customer = next.list.find((item) => item.source === "form" && clean(item.name) === clean(form.name) && item.addr === form.addr && item.documentType === form.documentType);
     return { ...form, phone: customer?.phone || form.phone, verified: true };
   }));
   return { day: next, matched, unmatched, formsAdded: forms.length };
 }
 export function fillMissingFormFields(current, read) {
   const next = {...current};
+  for (const field of ['documentType','fromAddr','toAddr','requestReason','requestDetails','orderNo','siteNo'])
+    if (!next[field] && read[field]) next[field] = read[field];
   if (!next.prod && read.prod) next.prod = read.prod;
   if (!next.productRows?.length && read.productRows?.length) next.productRows = read.productRows;
   if (!next.installDate && read.installDate) next.installDate = read.installDate;
@@ -391,8 +402,16 @@ export function fillMissingFormFields(current, read) {
   return next;
 }
 export function stopFacts(c) {
-  return [
-    ["제품", c.productRows?.length ? c.productRows.join(" · ") : c.prod || "확인 필요"],
+  const type = c.documentType || 'dispatch';
+  const facts = [
+    ['문서', documentTypeLabel(type)],
+    [documentDateLabel(type), c.installDate || '확인 필요'],
+    [documentAddressLabel(type), c.addr || '확인 필요'],
+    ...documentSpecificFields(c),
+  ];
+  if (['dispatch','return','incident'].includes(type) && (c.productRows?.length || c.prod || type === 'dispatch'))
+    facts.push(["제품", c.productRows?.length ? c.productRows.join(" · ") : c.prod || "확인 필요"]);
+  if (type === 'dispatch') facts.push(
     [
       "엘리베이터",
       c.noelev
@@ -404,11 +423,11 @@ export function stopFacts(c) {
           : "확인 필요",
     ],
     ["무게", weightKg(c) != null ? weightKg(c) + "kg" : "확인 필요"],
-    ["시공일", c.installDate || "확인 필요"],
     ["사다리차", c.ladderKnown ? c.ladderNeeded ? "필요" : "불필요" : "확인 필요"],
     ["기존 소파 수거", c.bs ? "있음" : "없음"],
-    ["특이사항", c.memo || "없음"],
-  ];
+  );
+  if (c.memo) facts.push(["특이사항", c.memo]);
+  return facts;
 }
 const legText = (day, i) => {
   const leg = legInfo(day, i);

@@ -13,6 +13,7 @@ import {
   recommendOrder,
   applyPhotoImports,
   fillMissingFormFields,
+  stopFacts,
   courseText,
   deleteCustomer,
   deleteDayCustomers,
@@ -24,6 +25,12 @@ import AiSetup from "./AiSetup.jsx";
 import RouteMap from "./RouteMap.jsx";
 import { planWithGemini } from "./routeAI.js";
 import { analyzePhoto } from "./photoAI.js";
+import {
+  DOCUMENT_TYPES,
+  documentTypeLabel,
+  documentReviewFields,
+  showsProductTable,
+} from "./documentTypes.js";
 import RouteView from "./RouteView.jsx";
 import DriveView from "./DriveView.jsx";
 import {
@@ -139,17 +146,16 @@ function DocumentPreview({ imageId }) {
     };
   }, [imageId]);
   return url ? (
-    <img className="review-preview" src={url} alt="선택한 출고의뢰서 원본" />
+    <img className="review-preview" src={url} alt="선택한 의뢰서 원본" />
   ) : null;
 }
 
 function ConfirmedDocuments({ imports, onOpen }) {
   if (!imports.length) return null;
-  const slotLabel = { am: "오전", pm: "오후", any: "지정 없음" };
   return (
     <div className="panel review-panel">
       <div className="review-heading">
-        <h3>확정한 출고표 · {imports.length}건</h3>
+        <h3>확정한 의뢰서 · {imports.length}건</h3>
         <p className="hint">
           코스로 넘어간 뒤에도 이 날짜의 추출 내용을 확인할 수 있어요.
         </p>
@@ -159,7 +165,9 @@ function ConfirmedDocuments({ imports, onOpen }) {
           <summary className="review-summary">
             <span className="review-number">{i + 1}</span>
             <span className="review-summary-text">
-              <strong>{c.name || "고객명 없음"}</strong>
+              <strong>
+                {documentTypeLabel(c.documentType)} · {c.name || "고객명 없음"}
+              </strong>
               <small>{c.addr || "주소 없음"}</small>
             </span>
           </summary>
@@ -167,29 +175,15 @@ function ConfirmedDocuments({ imports, onOpen }) {
             {c.file && <p className="review-source">{c.file}</p>}
             {c.imageId && (
               <button type="button" onClick={() => onOpen(c)}>
-                원본 출고표 보기
+                원본 의뢰서 보기
               </button>
             )}
             <dl className="confirmed-facts">
               {[
-                ["시공일", c.installDate],
                 ["고객명", c.name],
-                ["주소", c.addr],
-                ["연락처 1", c.safePhone || c.phone],
-                ["연락처 2", c.phone2],
-                ["고객지정시간", slotLabel[c.slot]],
-                [
-                  "엘리베이터",
-                  c.elevatorKnown ? (c.noelev ? "없음" : "있음") : "확인 필요",
-                ],
-                [
-                  "사다리차",
-                  c.ladderKnown
-                    ? c.ladderNeeded
-                      ? "필요"
-                      : "불필요"
-                    : "확인 필요",
-                ],
+                ["실제 연락처", c.phone],
+                ["안심번호", c.safePhone],
+                ...stopFacts(c),
               ].map(([label, value]) => (
                 <React.Fragment key={label}>
                   <dt>{label}</dt>
@@ -197,30 +191,35 @@ function ConfirmedDocuments({ imports, onOpen }) {
                 </React.Fragment>
               ))}
             </dl>
-            <table className="review-product-table">
-              <thead>
-                <tr>
-                  <th>제품명</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(c.productRows?.length ? c.productRows : [c.prod || "—"]).map(
-                  (name, j) => (
+            {showsProductTable(c.documentType) && (
+              <table className="review-product-table">
+                <thead>
+                  <tr>
+                    <th>제품명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(c.productRows?.length
+                    ? c.productRows
+                    : [c.prod || "—"]
+                  ).map((name, j) => (
                     <tr key={j}>
                       <td>{name || "—"}</td>
                     </tr>
-                  ),
+                  ))}
+                </tbody>
+                {(!c.documentType || c.documentType === "dispatch") && (
+                  <tfoot>
+                    <tr>
+                      <th>
+                        오더별 수량 합계 · 총 무게{" "}
+                        {c.weight ? `${c.weight} kg` : "확인 필요"}
+                      </th>
+                    </tr>
+                  </tfoot>
                 )}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th>
-                    오더별 수량 합계 · 총 무게{" "}
-                    {c.weight ? `${c.weight} kg` : "확인 필요"}
-                  </th>
-                </tr>
-              </tfoot>
-            </table>
+              </table>
+            )}
           </div>
         </details>
       ))}
@@ -229,7 +228,7 @@ function ConfirmedDocuments({ imports, onOpen }) {
 }
 
 function FlowSteps({ stage, availableStage, onSelect }) {
-  const labels = ["출고표", "추천 선택", "코스 확정", "배송 시작"];
+  const labels = ["의뢰서", "추천 선택", "코스 확정", "배송 시작"];
   return (
     <div className="flow-steps" data-stage={stage} aria-label="업무 순서">
       {labels.map((label, index) => {
@@ -330,7 +329,7 @@ export default function App() {
     setDocumentStatus(
       viewer.imageId
         ? "불러오는 중…"
-        : "저장된 출고표가 없습니다. 사진을 다시 넣어 주세요.",
+        : "저장된 의뢰서가 없습니다. 사진을 다시 넣어 주세요.",
     );
     setZoom(100);
     if (viewer.imageId)
@@ -339,7 +338,7 @@ export default function App() {
           if (!active) return;
           if (!record?.image) {
             setDocumentStatus(
-              "저장된 출고표가 없습니다. 사진을 다시 넣어 주세요.",
+              "저장된 의뢰서가 없습니다. 사진을 다시 넣어 주세요.",
             );
             return;
           }
@@ -348,7 +347,7 @@ export default function App() {
           setDocumentStatus("");
         })
         .catch(() => {
-          if (active) setDocumentStatus("출고표를 열지 못했습니다.");
+          if (active) setDocumentStatus("의뢰서를 열지 못했습니다.");
         });
     return () => {
       active = false;
@@ -394,6 +393,10 @@ export default function App() {
       [k]: v,
       ...(k === "prod" && c.productRows?.length
         ? { productRows: [v, ...c.productRows.slice(1)] }
+        : {}),
+      ...((k === "fromAddr" && c.documentType === "move_dismantle") ||
+      (k === "toAddr" && c.documentType === "move_install")
+        ? { addr: v }
         : {}),
     }));
   const update = (id, patch) => setDay((d) => invalidateAddress(d, id, patch));
@@ -885,18 +888,22 @@ export default function App() {
   }
   function previewExcelPhone(name) {
     const clean = (value) => String(value || "").replace(/\s/g, "");
-    const forms = [...day.list.filter((item) => item.source === "form"), ...pending];
-    if (forms.filter((item) => clean(item.name) === clean(name)).length !== 1) return "";
-    const phones = new Set(phoneCandidates.filter((item) => clean(item.name) === clean(name)).map((item) => normalizePhone(item.phone)));
+    const forms = [
+      ...day.list.filter((item) => item.source === "form"),
+      ...pending,
+    ];
+    if (forms.filter((item) => clean(item.name) === clean(name)).length !== 1)
+      return "";
+    const phones = new Set(
+      phoneCandidates
+        .filter((item) => clean(item.name) === clean(name))
+        .map((item) => normalizePhone(item.phone)),
+    );
     return phones.size === 1 ? [...phones][0] : "";
   }
   function commit(items) {
-    const ready = items.filter(
-        (c) => c.name.trim() && c.addr.trim(),
-      ),
-      missing = items.filter(
-        (c) => !c.name.trim() || !c.addr.trim(),
-      );
+    const ready = items.filter((c) => c.name.trim() && c.addr.trim()),
+      missing = items.filter((c) => !c.name.trim() || !c.addr.trim());
     if (missing.length) {
       setPending(items);
       flash("고객명과 설치주소를 확인해 주세요.");
@@ -907,12 +914,16 @@ export default function App() {
     setDay(next);
     setPending([]);
     setPhoneCandidates(imported.unmatched);
-    setStatus(imported.unmatched.length
-      ? `선택한 날짜 의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결. 나머지 번호는 의뢰서와 일치하지 않아 저장하지 않았어요.`
-      : "");
+    setStatus(
+      imported.unmatched.length
+        ? `선택한 날짜 의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결. 나머지 번호는 의뢰서와 일치하지 않아 저장하지 않았어요.`
+        : "",
+    );
     setViewStage(null);
     if (next.list.length) switchTab("order");
-    flash(`의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결`);
+    flash(
+      `의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결`,
+    );
   }
   async function importImages(files) {
     if (!files.length) return;
@@ -933,12 +944,20 @@ export default function App() {
         setStatus("사진 " + (i + 1) + "/" + files.length + " 읽는 중…");
         try {
           const canvas = await imageCanvas(files[i]);
-          const customers = await analyzePhoto(files[i], canvas, aiKey, fetch, day.date);
+          const customers = await analyzePhoto(
+            files[i],
+            canvas,
+            aiKey,
+            fetch,
+            day.date,
+          );
           const forms = customers.filter((c) => c.source === "form");
           if (forms.length) {
             try {
               const imageId = await saveDocument(files[i]);
-              forms.forEach((c) => { c.imageId = imageId; });
+              forms.forEach((c) => {
+                c.imageId = imageId;
+              });
             } catch {
               imageSaveFailed = true;
             }
@@ -952,10 +971,16 @@ export default function App() {
       const contacts = results.filter((customer) => customer.source === "list");
       setPending((current) => [...current, ...forms]);
       if (contacts.length && !forms.length && !pending.length) {
-        const imported = applyPhotoImports(day, [...phoneCandidates, ...contacts]);
+        const imported = applyPhotoImports(day, [
+          ...phoneCandidates,
+          ...contacts,
+        ]);
         setDay(imported.day);
         setPhoneCandidates((current) => [...current, ...imported.unmatched]);
-        if (imported.matched) flash(`고객 번호 ${imported.matched}건을 의뢰서 고객에게 연결했어요.`);
+        if (imported.matched)
+          flash(
+            `고객 번호 ${imported.matched}건을 의뢰서 고객에게 연결했어요.`,
+          );
       } else if (contacts.length) {
         setPhoneCandidates((current) => [...current, ...contacts]);
       }
@@ -989,17 +1014,38 @@ export default function App() {
     try {
       const record = await loadDocument(c.imageId);
       if (!record?.image)
-        throw new Error("저장된 출고표가 없습니다. 사진을 다시 넣어 주세요.");
+        throw new Error("저장된 의뢰서가 없습니다. 사진을 다시 넣어 주세요.");
       const canvas = await imageCanvas(record.image);
-      const customers = await analyzePhoto({ name: record.name || "의뢰서" }, canvas, aiKey);
-      const clean = (value) => String(value || "").replace(/\s/g, "");
-      const read = customers.find((item) => item.source === "form" && clean(item.name) === clean(c.name))
-        || (customers.length === 1 && customers[0].source === "form" ? customers[0] : null);
-      if (!read) throw new Error("사진에서 해당 고객을 찾지 못했습니다. 원본을 확인해 주세요.");
-      const filled = fillMissingFormFields(c, read);
-      const gained = ["prod", "weight", "elevatorKnown"].filter(
-        (k) => !c[k] && filled[k],
+      const customers = await analyzePhoto(
+        { name: record.name || "의뢰서" },
+        canvas,
+        aiKey,
       );
+      const clean = (value) => String(value || "").replace(/\s/g, "");
+      const read =
+        customers.find(
+          (item) =>
+            item.source === "form" && clean(item.name) === clean(c.name),
+        ) ||
+        (customers.length === 1 && customers[0].source === "form"
+          ? customers[0]
+          : null);
+      if (!read)
+        throw new Error(
+          "사진에서 해당 고객을 찾지 못했습니다. 원본을 확인해 주세요.",
+        );
+      const filled = fillMissingFormFields(c, read);
+      const gained = [
+        "prod",
+        "weight",
+        "elevatorKnown",
+        "requestReason",
+        "requestDetails",
+        "fromAddr",
+        "toAddr",
+        "orderNo",
+        "siteNo",
+      ].filter((k) => !c[k] && filled[k]);
       setDay((d) => ({
         ...d,
         list: d.list.map((x) =>
@@ -1010,11 +1056,11 @@ export default function App() {
       }));
       flash(
         gained.length
-          ? "출고표에서 " + gained.length + "개 정보를 다시 읽었어요."
-          : "출고표를 다시 읽었지만 빈 정보를 찾지 못했어요. 사진을 확인해 주세요.",
+          ? "의뢰서에서 " + gained.length + "개 정보를 다시 읽었어요."
+          : "의뢰서를 다시 읽었지만 빈 정보를 찾지 못했어요. 사진을 확인해 주세요.",
       );
     } catch (error) {
-      flash(error.message || "출고표를 다시 읽지 못했어요.");
+      flash(error.message || "의뢰서를 다시 읽지 못했어요.");
     } finally {
       setRereadId(null);
     }
@@ -1136,7 +1182,7 @@ export default function App() {
                   aria-selected={addMode === "document"}
                   onClick={() => setAddMode("document")}
                 >
-                  출고의뢰서 사진
+                  의뢰서 사진
                 </button>
                 <button
                   type="button"
@@ -1150,10 +1196,7 @@ export default function App() {
               {addMode === "document" && (
                 <div className="panel">
                   <h2>의뢰서와 고객 목록 사진 넣기</h2>
-                  <p className="hint">
-                    {day.date} 방문 고객의 출고·반품의뢰서와 고객명·전화번호 엑셀 사진을 넣어주세요. 엑셀은 이름에 맞는 010 번호를 연결하는 데만 사용합니다.
-                  </p>
-                  <p className="hint">사진 속 고객 이름·전화번호·주소가 Google Gemini로 전송됩니다. 추출 결과를 확인한 뒤 저장하세요.</p>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -1211,7 +1254,9 @@ export default function App() {
                 <div className="panel review-panel">
                   <div className="review">
                     <div className="review-heading">
-                      <h3>추출 결과 확인 · {day.date} 방문 고객 {pending.length}건</h3>
+                      <h3>
+                        추출 결과 확인 · {day.date} 방문 고객 {pending.length}건
+                      </h3>
                       <p className="hint">
                         원본 사진과 비교해 잘못 읽힌 내용을 고쳐주세요.
                       </p>
@@ -1231,10 +1276,11 @@ export default function App() {
                         <summary className="review-summary">
                           <span className="review-number">{i + 1}</span>
                           <span className="review-summary-text">
-                            <strong>{c.name || "고객명 확인 필요"}</strong>
-                            <small>
-                              {c.addr || "주소 확인 필요"}
-                            </small>
+                            <strong>
+                              {documentTypeLabel(c.documentType)} ·{" "}
+                              {c.name || "고객명 확인 필요"}
+                            </strong>
+                            <small>{c.addr || "주소 확인 필요"}</small>
                           </span>
                         </summary>
                         <div className="review-fields">
@@ -1250,27 +1296,72 @@ export default function App() {
                               </button>
                             </>
                           )}
-                          {[
-                            ["installDate", "시공일"],
-                            ["name", "고객명"],
-                            ["addr", "고객 주소"],
-                            ["safePhone", "연락처 1"],
-                            ["phone2", "연락처 2"],
-                          ].map(([k, l]) => (
-                            <Field
-                              key={k}
-                              label={l}
-                              value={c[k]}
-                              onChange={(v) =>
+                          <label className="field">
+                            <span>문서 종류</span>
+                            <select
+                              value={c.documentType || "dispatch"}
+                              onChange={(e) =>
                                 setPending((p) =>
                                   p.map((x, j) =>
-                                    j === i ? { ...x, [k]: v } : x,
+                                    j === i
+                                      ? {
+                                          ...x,
+                                          documentType: e.target.value,
+                                          addr:
+                                            e.target.value === "move_install"
+                                              ? x.toAddr || x.addr
+                                              : e.target.value ===
+                                                  "move_dismantle"
+                                                ? x.fromAddr || x.addr
+                                                : x.addr,
+                                        }
+                                      : x,
                                   ),
                                 )
                               }
-                            />
-                          ))}
-                          <p className="hint">엑셀 고객 번호: {previewExcelPhone(c.name) || "일치하는 번호 없음"}</p>
+                            >
+                              {Object.entries(DOCUMENT_TYPES).map(
+                                ([value, label]) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </label>
+                          {documentReviewFields(c.documentType).map(
+                            ([k, l]) => (
+                              <Field
+                                key={k}
+                                label={l}
+                                value={c[k]}
+                                onChange={(v) =>
+                                  setPending((p) =>
+                                    p.map((x, j) =>
+                                      j === i
+                                        ? {
+                                            ...x,
+                                            [k]: v,
+                                            ...((k === "toAddr" &&
+                                              x.documentType ===
+                                                "move_install") ||
+                                            (k === "fromAddr" &&
+                                              x.documentType ===
+                                                "move_dismantle")
+                                              ? { addr: v }
+                                              : {}),
+                                          }
+                                        : x,
+                                    ),
+                                  )
+                                }
+                              />
+                            ),
+                          )}
+                          <p className="hint">
+                            엑셀 고객 번호:{" "}
+                            {previewExcelPhone(c.name) || "일치하는 번호 없음"}
+                          </p>
                           <label className="field">
                             <span>고객지정시간</span>
                             <select
@@ -1290,129 +1381,142 @@ export default function App() {
                               <option value="pm">오후</option>
                             </select>
                           </label>
-                          <label className="field">
-                            <span>엘리베이터 여부</span>
-                            <select
-                              value={
-                                c.elevatorKnown
-                                  ? c.noelev
-                                    ? "no"
-                                    : "yes"
-                                  : "unknown"
-                              }
-                              onChange={(e) =>
-                                setPending((p) =>
-                                  p.map((x, j) =>
-                                    j === i
-                                      ? {
-                                          ...x,
-                                          elevatorKnown:
-                                            e.target.value !== "unknown",
-                                          noelev: e.target.value === "no",
-                                        }
-                                      : x,
-                                  ),
-                                )
-                              }
-                            >
-                              <option value="unknown">확인 필요</option>
-                              <option value="yes">있음</option>
-                              <option value="no">없음</option>
-                            </select>
-                          </label>
-                          <label className="field">
-                            <span>사다리차 필요여부</span>
-                            <select
-                              value={
-                                c.ladderKnown
-                                  ? c.ladderNeeded
-                                    ? "yes"
-                                    : "no"
-                                  : "unknown"
-                              }
-                              onChange={(e) =>
-                                setPending((p) =>
-                                  p.map((x, j) =>
-                                    j === i
-                                      ? {
-                                          ...x,
-                                          ladderKnown:
-                                            e.target.value !== "unknown",
-                                          ladderNeeded:
-                                            e.target.value === "yes",
-                                        }
-                                      : x,
-                                  ),
-                                )
-                              }
-                            >
-                              <option value="unknown">확인 필요</option>
-                              <option value="yes">필요</option>
-                              <option value="no">불필요</option>
-                            </select>
-                          </label>
-                          <table className="review-product-table">
-                            <thead>
-                              <tr>
-                                <th>제품명</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {(c.productRows?.length
-                                ? c.productRows
-                                : [c.prod || ""]
-                              ).map((product, rowIndex) => (
-                                <tr key={rowIndex}>
-                                  <td>
-                                    <input
-                                      aria-label={`제품명 ${rowIndex + 1}`}
-                                      value={product}
-                                      onChange={(e) =>
-                                        setPending((p) =>
-                                          p.map((x, j) => {
-                                            if (j !== i) return x;
-                                            const productRows = x.productRows
-                                              ?.length
-                                              ? [...x.productRows]
-                                              : [x.prod || ""];
-                                            productRows[rowIndex] =
-                                              e.target.value;
-                                            return {
+                          {(!c.documentType ||
+                            c.documentType === "dispatch") && (
+                            <>
+                              <label className="field">
+                                <span>엘리베이터 여부</span>
+                                <select
+                                  value={
+                                    c.elevatorKnown
+                                      ? c.noelev
+                                        ? "no"
+                                        : "yes"
+                                      : "unknown"
+                                  }
+                                  onChange={(e) =>
+                                    setPending((p) =>
+                                      p.map((x, j) =>
+                                        j === i
+                                          ? {
                                               ...x,
-                                              productRows,
-                                              prod: productRows[0],
-                                            };
-                                          }),
-                                        )
-                                      }
-                                    />
-                                  </td>
+                                              elevatorKnown:
+                                                e.target.value !== "unknown",
+                                              noelev: e.target.value === "no",
+                                            }
+                                          : x,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  <option value="unknown">확인 필요</option>
+                                  <option value="yes">있음</option>
+                                  <option value="no">없음</option>
+                                </select>
+                              </label>
+                              <label className="field">
+                                <span>사다리차 필요여부</span>
+                                <select
+                                  value={
+                                    c.ladderKnown
+                                      ? c.ladderNeeded
+                                        ? "yes"
+                                        : "no"
+                                      : "unknown"
+                                  }
+                                  onChange={(e) =>
+                                    setPending((p) =>
+                                      p.map((x, j) =>
+                                        j === i
+                                          ? {
+                                              ...x,
+                                              ladderKnown:
+                                                e.target.value !== "unknown",
+                                              ladderNeeded:
+                                                e.target.value === "yes",
+                                            }
+                                          : x,
+                                      ),
+                                    )
+                                  }
+                                >
+                                  <option value="unknown">확인 필요</option>
+                                  <option value="yes">필요</option>
+                                  <option value="no">불필요</option>
+                                </select>
+                              </label>
+                            </>
+                          )}
+                          {showsProductTable(c.documentType) && (
+                            <table className="review-product-table">
+                              <thead>
+                                <tr>
+                                  <th>제품명</th>
                                 </tr>
-                              ))}
-                            </tbody>
-                            <tfoot>
-                              <tr>
-                                <th>
-                                  <label>
-                                    오더별 수량 합계 · 총 무게 (kg)
-                                    <input
-                                      inputMode="decimal"
-                                      value={c.weight || ""}
-                                      onChange={(e) =>
-                                        setPending((p) =>
-                                          p.map((x, j) =>
-                                            j === i
-                                              ? { ...x, weight: e.target.value }
-                                              : x,
-                                          ),
-                                        )
-                                      }
-                                    />
-                                  </label>
-                                </th>
-                              </tr>
-                            </tfoot>
-                          </table>
+                              </thead>
+                              <tbody>
+                                {(c.productRows?.length
+                                  ? c.productRows
+                                  : [c.prod || ""]
+                                ).map((product, rowIndex) => (
+                                  <tr key={rowIndex}>
+                                    <td>
+                                      <input
+                                        aria-label={`제품명 ${rowIndex + 1}`}
+                                        value={product}
+                                        onChange={(e) =>
+                                          setPending((p) =>
+                                            p.map((x, j) => {
+                                              if (j !== i) return x;
+                                              const productRows = x.productRows
+                                                ?.length
+                                                ? [...x.productRows]
+                                                : [x.prod || ""];
+                                              productRows[rowIndex] =
+                                                e.target.value;
+                                              return {
+                                                ...x,
+                                                productRows,
+                                                prod: productRows[0],
+                                              };
+                                            }),
+                                          )
+                                        }
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              {(!c.documentType ||
+                                c.documentType === "dispatch") && (
+                                <tfoot>
+                                  <tr>
+                                    <th>
+                                      <label>
+                                        오더별 수량 합계 · 총 무게 (kg)
+                                        <input
+                                          inputMode="decimal"
+                                          value={c.weight || ""}
+                                          onChange={(e) =>
+                                            setPending((p) =>
+                                              p.map((x, j) =>
+                                                j === i
+                                                  ? {
+                                                      ...x,
+                                                      weight: e.target.value,
+                                                    }
+                                                  : x,
+                                              ),
+                                            )
+                                          }
+                                        />
+                                      </label>
+                                    </th>
+                                  </tr>
+                                </tfoot>
+                              )}
+                            </table>
+                          )}
                           <button
                             onClick={() =>
                               setPending((p) => p.filter((_, j) => j !== i))
@@ -1434,10 +1538,10 @@ export default function App() {
               )}
               {addMode === "document" && (
                 <ConfirmedDocuments
-                  imports={
-                    (day.imports || day.list.filter((customer) => customer.source === "form"))
-                      .filter((customer) => customer.source === "form")
-                  }
+                  imports={(
+                    day.imports ||
+                    day.list.filter((customer) => customer.source === "form")
+                  ).filter((customer) => customer.source === "form")}
                   onOpen={openDocument}
                 />
               )}
@@ -1483,43 +1587,99 @@ export default function App() {
                         ))}
                       </div>
                     </div>
-                    <div className="field">
-                      <span>해당되는 것 누르기</span>
-                      <div className="chips">
-                        {[
-                          ["noelev", "엘리베이터 없음"],
-                          ["bs", "기존 소파 수거"],
-                          ["single", "단품 (암체어 등)"],
-                          ["call", "전날 전화 요청"],
-                        ].map(([k, l]) => (
-                          <label className="chip" key={k}>
-                            <input
-                              type="checkbox"
-                              checked={!!draft[k]}
-                              onChange={(e) => change(k, e.target.checked)}
-                            />
-                            {l}
-                          </label>
-                        ))}
+                    {(!draft.documentType ||
+                      draft.documentType === "dispatch") && (
+                      <div className="field">
+                        <span>해당되는 것 누르기</span>
+                        <div className="chips">
+                          {[
+                            ["noelev", "엘리베이터 없음"],
+                            ["bs", "기존 소파 수거"],
+                            ["single", "단품 (암체어 등)"],
+                            ["call", "전날 전화 요청"],
+                          ].map(([k, l]) => (
+                            <label className="chip" key={k}>
+                              <input
+                                type="checkbox"
+                                checked={!!draft[k]}
+                                onChange={(e) => change(k, e.target.checked)}
+                              />
+                              {l}
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                     <details>
-                      <summary>더 적을 것 (제품, 특이사항, 2차 번호)</summary>
+                      <summary>
+                        {draft.documentType && draft.documentType !== "dispatch"
+                          ? "문서별 요청 내용과 특이사항"
+                          : "더 적을 것 (제품, 특이사항, 2차 번호)"}
+                      </summary>
                       <div className="form-fields">
+                        {editing && draft.documentType && (
+                          <>
+                            <label className="field">
+                              <span>문서 종류</span>
+                              <select
+                                value={draft.documentType}
+                                onChange={(e) =>
+                                  change("documentType", e.target.value)
+                                }
+                              >
+                                {Object.entries(DOCUMENT_TYPES).map(
+                                  ([value, label]) => (
+                                    <option key={value} value={value}>
+                                      {label}
+                                    </option>
+                                  ),
+                                )}
+                              </select>
+                            </label>
+                            {documentReviewFields(draft.documentType)
+                              .filter(([key]) =>
+                                [
+                                  "fromAddr",
+                                  "toAddr",
+                                  "requestReason",
+                                  "requestDetails",
+                                  "orderNo",
+                                  "siteNo",
+                                ].includes(key),
+                              )
+                              .map(([key, label]) => (
+                                <Field
+                                  key={key}
+                                  label={label}
+                                  value={draft[key]}
+                                  onChange={(value) => change(key, value)}
+                                />
+                              ))}
+                          </>
+                        )}
                         {[
                           ["prod", "제품"],
                           ["weight", "총 무게 (kg)"],
                           ["safePhone", "안심번호 (0508)"],
                           ["phone2", "2차 연락처"],
                           ["elevSize", "엘리베이터 인승"],
-                        ].map(([k, l]) => (
-                          <Field
-                            key={k}
-                            label={l}
-                            value={draft[k]}
-                            onChange={(v) => change(k, v)}
-                          />
-                        ))}
+                        ]
+                          .filter(
+                            ([key]) =>
+                              !draft.documentType ||
+                              draft.documentType === "dispatch" ||
+                              ["safePhone", "phone2"].includes(key) ||
+                              (draft.documentType === "return" &&
+                                key === "prod"),
+                          )
+                          .map(([k, l]) => (
+                            <Field
+                              key={k}
+                              label={l}
+                              value={draft[k]}
+                              onChange={(v) => change(k, v)}
+                            />
+                          ))}
                         <label className="field">
                           <span>특이사항</span>
                           <textarea
@@ -1720,10 +1880,10 @@ export default function App() {
                               type="button"
                               className="customer-name"
                               onClick={() => openDocument(c)}
-                              aria-label={c.name + " 출고표 보기"}
+                              aria-label={c.name + " 의뢰서 보기"}
                             >
                               {c.name}
-                              <small>출고표</small>
+                              <small>의뢰서</small>
                             </button>
                             {c.done && c.doneAt ? " · 완료 " + c.doneAt : ""}
                           </strong>

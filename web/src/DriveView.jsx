@@ -1,6 +1,7 @@
 import React from "react";
 import { digits, fmt, normalizePhone, shortArea } from "./logic.js";
 import { legInfo, fmtDuration } from "./tmapRoute.js";
+import {documentTypeLabel, documentSpecificFields} from './documentTypes.js';
 
 const tmap = (address) =>
   "tmap://search?name=" + encodeURIComponent(address || "");
@@ -28,7 +29,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate }) {
       </header>
       {!day.list.length ? (
         <div className="drive-empty">
-          <h2>출고표를 먼저 넣어 주세요</h2>
+          <h2>의뢰서를 먼저 넣어 주세요</h2>
           <button className="primary big" onClick={onBack}>
             코스 짜기로 가기
           </button>
@@ -79,11 +80,12 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate }) {
           </div>
           <div className="drive-main">
             <span className="drive-eyebrow">
-              {index + 1}번째 배송 ·{" "}
+              {index + 1}번째 방문 · {documentTypeLabel(current.documentType)} ·{" "}
               {current.arrivedAt ? "도착 기록 " + current.arrivedAt : "이동 중"}
             </span>
             <h1>{current.name || "고객"}</h1>
             <p className="drive-address">{current.addr}</p>
+            {documentSpecificFields(current).map(([label, value]) => <p className="drive-memo" key={label}>{label}: {value}</p>)}
             <div className="drive-eta">
               <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
               <strong>{current.arrivedAt || fmt(row.start)}</strong>
@@ -138,7 +140,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate }) {
                   onUpdate(current.id, { done: true, doneAt: nowTime() })
                 }
               >
-                {next ? "다음 집 출발" : "배송 마치기"}
+                {next ? "다음 집 출발" : "작업 마치기"}
               </button>
             )}
             {next && (

@@ -40,6 +40,15 @@ test('같은 이름의 의뢰서나 서로 다른 엑셀 번호가 중복되면 
   assert.equal(conflictingPhones.unmatched.length,2);
 });
 
+test('같은 고객과 주소라도 다른 종류의 작업은 별도 방문 건으로 남긴다',()=>{
+  const day=emptyDay('2026-11-17');
+  const {day:result}=applyPhotoImports(day,[
+    baseCustomer({source:'form',documentType:'dispatch',name:'홍길동',addr:'서울 강남구 1'}),
+    baseCustomer({source:'form',documentType:'return',name:'홍길동',addr:'서울 강남구 1'}),
+  ]);
+  assert.deepEqual(result.list.map(item=>item.documentType),['dispatch','return']);
+});
+
 test('저장된 배송이 없으면 내일을 초기 배송 날짜로 선택한다',()=>{
   const {d}=restoreDay(null);
   assert.equal(d.date,shiftDate(today(),1));
@@ -91,7 +100,7 @@ test('출고표를 다시 읽으면 빈 정보만 채우고 직접 수정한 값
   const {fillMissingFormFields,stopFacts}=await import('./logic.js');
   const read={prod:'보네르 3000',weight:'90.2',elevatorKnown:true,noelev:false};
   const filled=fillMissingFormFields({prod:'',weight:'',noelev:false,elevatorKnown:false},read);
-  assert.deepEqual(stopFacts(filled).slice(0,3),[['제품','보네르 3000'],['엘리베이터','있음'],['무게','90.2kg']]);
+  assert.deepEqual(stopFacts(filled).filter(([label])=>['제품','엘리베이터','무게'].includes(label)),[['제품','보네르 3000'],['엘리베이터','있음'],['무게','90.2kg']]);
   const manual=fillMissingFormFields({prod:'직접 적은 제품',weight:'75',noelev:true,elevatorKnown:true},read);
   assert.equal(manual.prod,'직접 적은 제품');
   assert.equal(manual.weight,'75');
