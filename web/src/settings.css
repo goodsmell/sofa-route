@@ -11,6 +11,3 @@ nav.tabs .in[role=tablist]{grid-template-columns:repeat(4,minmax(0,1fr))}
 .settings-edit input{width:100%;min-width:0;min-height:49px;padding:9px 11px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;font-size:17px}
 .settings-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .settings-actions a{margin-left:auto;font-size:15px;font-weight:600}
-/* 출발과 귀가 접기 */
-#trip-settings>summary::after{content:"";width:18px;height:18px;flex:none;background:var(--muted);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center/contain no-repeat;transition:transform .2s}
-#trip-settings[open]>summary::after{content:"";transform:rotate(180deg)}
