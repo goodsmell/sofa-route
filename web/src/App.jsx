@@ -497,6 +497,13 @@ export default function App() {
       ]),
     });
   // 처음 추천을 만들 때 세 코스의 도로 구간 시간도 함께 계산한다.
+  // 의뢰서 확정 뒤 추천 선택 화면이 열리면, 그때의 최신 코스로 추천을 한 번 만든다.
+  const [autoPlan, setAutoPlan] = useState(null);
+  useEffect(() => {
+    if (!autoPlan || aiBusy || tab !== "order") return;
+    setAutoPlan(null);
+    if (autoPlan === day.date) makePlans(day);
+  }, [autoPlan, tab, day, aiBusy]);
   async function makePlans(baseDay = day, quiet = false) {
     const rest = baseDay.list.filter((c) => !c.done);
     if (rest.length < 2) {
@@ -1130,6 +1137,8 @@ export default function App() {
     );
     setViewStage(null);
     if (next.list.length) switchTab("order");
+    // 추천 선택 화면으로 넘어가면 바로 추천 코스를 만든다(아래 effect).
+    if (next.list.filter((c) => !c.done).length >= 2) setAutoPlan(next.date);
     flash(
       `의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결`,
     );
@@ -1440,12 +1449,7 @@ export default function App() {
               tab === "add" || tab === "order" ? "workflow-header" : ""
             }
           >
-            {tab === "add" ? (
-              <>
-                <span className="header-eyebrow">소파 배송 동선표</span>
-                <h1>코스 짜기</h1>
-              </>
-            ) : tab === "order" ? (
+            {tab === "add" || tab === "order" ? (
               <>
                 {datePicker("header-eyebrow")}
                 <h1>코스 짜기</h1>
