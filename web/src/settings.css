@@ -100,3 +100,7 @@ body:has(.recommendation-view){padding-bottom:calc(72px + env(safe-area-inset-bo
 .recommendation-view .recommendation-stats,.recommendation-view .recommendation-path{padding-left:30px}
 .recommendation-view .recommendation-late{justify-self:end;width:max-content}
 .recommendation-view .recommendation-card-heading>span:nth-child(2){display:flex;flex-direction:column;min-width:0}
+/* "시간 지연 N곳"은 한 글씨 크기로 */
+.recommendation-view .recommendation-late,.recommendation-view .recommendation-ontime{font-size:15px;font-weight:600;white-space:nowrap}
+.recommendation-view .recommendation-ontime{justify-content:flex-end;color:var(--muted);font-weight:500}
+.recommendation-view .recommendation-ontime{display:flex;padding:4px 6px;margin:-4px -6px}

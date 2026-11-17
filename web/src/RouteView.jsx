@@ -834,10 +834,10 @@ export default function RouteView(props) {
                             setLateView({ title, calc: optionCalc });
                           }}
                         >
-                          <strong>{late}곳</strong><small>시간 지연 ›</small>
+                          시간 지연 {late}곳 ›
                         </span>
                       ) : (
-                        <span><strong>0곳</strong><small>시간 지연</small></span>
+                        <span className="recommendation-ontime">시간 지연 0곳</span>
                       )}
                     </span>
                     <span className="recommendation-path">{recommendationPath(optionDay)}</span>
