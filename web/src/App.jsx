@@ -22,6 +22,7 @@ import { imageCanvas } from "./ocr.js";
 import { saveDocument, loadDocument, deleteDocuments } from "./imageStore.js";
 import DocumentViewer from "./DocumentViewer.jsx";
 import AiSetup from "./AiSetup.jsx";
+import KeyGate from "./KeyGate.jsx";
 import RouteMap from "./RouteMap.jsx";
 import { planWithGemini } from "./routeAI.js";
 import { analyzePhoto } from "./photoAI.js";
@@ -732,6 +733,23 @@ export default function App() {
     else localStorage.removeItem(AI_KEY);
     setAiKey(key);
     setAiSetup(false);
+  }
+  const [tmapKeySet, setTmapKeySet] = useState(
+    () => !!localStorage.getItem(TMAP_KEY),
+  );
+  function submitGate({ gemini, tmap: tmapKey, remember }) {
+    if (gemini) {
+      sessionStorage.setItem(AI_KEY, gemini);
+      if (remember) localStorage.setItem(AI_KEY, gemini);
+      else localStorage.removeItem(AI_KEY);
+      setAiKey(gemini);
+    }
+    if (tmapKey) {
+      localStorage.setItem(TMAP_KEY, tmapKey);
+      setTmapKeySet(true);
+      // 지도 SDK는 앱키로 처음 한 번만 불러오므로 새로 고침해서 적용한다.
+      window.location.reload();
+    }
   }
   function forgetAI() {
     sessionStorage.removeItem(AI_KEY);
@@ -1985,6 +2003,11 @@ export default function App() {
           ))}
         </div>
       </nav>
+      <KeyGate
+        needGemini={!aiKey}
+        needTmap={!tmapKeySet}
+        onSubmit={submitGate}
+      />
       <AiSetup
         open={aiSetup}
         mode={aiSetupMode}

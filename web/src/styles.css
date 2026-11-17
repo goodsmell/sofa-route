@@ -718,3 +718,4 @@ nav.tabs button svg{width:21px;height:21px}
   .recommendation-radio{width:23px;height:23px}
   .recommendation-continue{min-height:56px;font-size:16px}
 }
+.key-gate{z-index:200}
