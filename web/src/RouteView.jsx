@@ -754,7 +754,13 @@ export default function RouteView(props) {
                   aria-pressed={checked}
                   disabled={!available}
                   className={"recommendation-card" + (checked ? " selected" : "")}
-                  onClick={() => setMode(kind)}
+                  // 카드만 바꾸고 화면은 그대로 둔다(위로 튀지 않게).
+                  onClick={() => {
+                    setModeState(kind);
+                    try {
+                      sessionStorage.setItem("sofa-route-mode", kind);
+                    } catch {}
+                  }}
                 >
                   <span className="recommendation-card-heading">
                     <span><strong>{title}</strong><small>{available ? (recommendation.by === "area" ? "지역 기준 대략 순서" : subtitle) : "다시 만들기를 눌러 주세요"}</small></span>

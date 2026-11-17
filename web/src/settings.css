@@ -36,3 +36,31 @@ details.closing>summary::after{transform:none}
 .product-row input{flex:1}
 .product-remove{flex:none;min-height:40px;padding:0 12px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--bad);font-size:14px;font-weight:600}
 .product-add{width:100%;min-height:40px;border:1px dashed var(--rule);border-radius:6px;background:transparent;color:var(--accent);font-size:14px;font-weight:700}
+/* 추천 선택 화면: 휴대폰 한 화면에 스크롤 없이 들어가도록 촘촘하게 */
+.recommendation-view .recommendation-heading{margin:0 0 10px}
+.recommendation-view .recommendation-heading h2{font-size:19px;margin:0 0 2px}
+.recommendation-view .recommendation-heading p{font-size:13px}
+.recommendation-view .recommendation-remake{min-height:32px;font-size:14px}
+.recommendation-view .recommendation-cards{gap:8px}
+.recommendation-view .recommendation-card,.recommendation-view .recommendation-card.selected{min-height:0;padding:11px 14px;gap:6px;border-radius:10px}
+.recommendation-view .recommendation-card{border-width:2px}
+.recommendation-view .recommendation-card.selected{border-width:2px;border-color:var(--accent)}
+.recommendation-view .recommendation-card-heading strong{font-size:17px}
+.recommendation-view .recommendation-card-heading small{font-size:12px;margin-top:0}
+.recommendation-view .recommendation-radio{width:20px;height:20px;border-width:2px}
+.recommendation-view .recommendation-stats strong{font-size:18px}
+.recommendation-view .recommendation-stats small{font-size:12px;margin-top:2px}
+.recommendation-view .recommendation-path{font-size:12px;line-height:1.3}
+.recommendation-view .recommendation-continue{min-height:50px;margin-top:12px;font-size:16px}
+.recommendation-view .recommendation-help{margin-top:8px;font-size:13px;line-height:1.4}
+/* 추천 선택 화면은 머리글·단계 표시 여백도 줄인다 */
+#root>.wrap:has(.recommendation-view)>header{padding-top:12px}
+#root>.wrap:has(.recommendation-view) .flow-steps{margin:14px 0 12px}
+/* 고르지 않은 카드는 설명 줄을 숨겨 높이를 줄인다 */
+.recommendation-view .recommendation-card:not(.selected) .recommendation-card-heading small{display:none}
+.recommendation-view .recommendation-stats strong{font-size:17px}
+.recommendation-view .recommendation-card,.recommendation-view .recommendation-card.selected{padding:9px 13px;gap:5px}
+.recommendation-view .recommendation-cards{gap:6px}
+.recommendation-view .recommendation-path{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.recommendation-view .recommendation-continue{min-height:46px;margin-top:10px}
+body:has(.recommendation-view){padding-bottom:calc(72px + env(safe-area-inset-bottom,0px))}
