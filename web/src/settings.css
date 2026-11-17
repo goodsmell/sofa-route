@@ -11,3 +11,4 @@ nav.tabs .in[role=tablist]{grid-template-columns:repeat(4,minmax(0,1fr))}
 .settings-edit input{width:100%;min-width:0;min-height:49px;padding:9px 11px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;font-size:17px}
 .settings-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .settings-actions a{margin-left:auto;font-size:15px;font-weight:600}
+.settings-mock{margin-top:14px}

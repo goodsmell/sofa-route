@@ -34,6 +34,7 @@ import KeyGate from "./KeyGate.jsx";
 import RouteMap from "./RouteMap.jsx";
 import { planWithGemini } from "./routeAI.js";
 import { analyzePhoto } from "./photoAI.js";
+import { mockImports, isMock } from "./mockData.js";
 import {
   DOCUMENT_TYPES,
   documentTypeLabel,
@@ -956,6 +957,44 @@ export default function App() {
     flash(
       `의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결`,
     );
+  }
+  // 설정의 테스트 데이터: 가짜 고객을 추출 결과 확인 목록에 넣거나 한 번에 지운다.
+  const mockCount =
+    Object.values(imports).reduce(
+      (n, s) => n + s.pending.filter(isMock).length,
+      0,
+    ) +
+    Object.values({ ...history, [day.date]: day }).reduce(
+      (n, d) => n + (d.list || []).filter(isMock).length,
+      0,
+    );
+  function addMock() {
+    const mock = mockImports(day.date);
+    updateSession(day.date, (s) => ({
+      ...s,
+      pending: [...s.pending.filter((c) => !isMock(c)), ...mock.pending],
+      phoneCandidates: [
+        ...s.phoneCandidates.filter((c) => !isMock(c)),
+        ...mock.phoneCandidates,
+      ],
+    }));
+    setAddMode("document");
+    switchTab("add");
+    flash("테스트 고객 " + mock.pending.length + "명을 넣었어요.");
+  }
+  function clearMock() {
+    for (const date of Object.keys(importsRef.current))
+      updateSession(date, (s) => ({
+        ...s,
+        pending: s.pending.filter((c) => !isMock(c)),
+        phoneCandidates: s.phoneCandidates.filter((c) => !isMock(c)),
+      }));
+    const strip = (d) => ({ ...d, list: (d.list || []).filter((c) => !isMock(c)) });
+    setHistory((h) =>
+      Object.fromEntries(Object.entries(h).map(([k, d]) => [k, strip(d)])),
+    );
+    setDay((d) => strip(d));
+    flash("테스트 고객을 모두 지웠어요.");
   }
   // 고른 사진은 먼저 기기에 저장해 대기열에 올리고, 대기열을 차례로 분석한다.
   // 앱을 나갔다 와도 대기열이 남아 있어서 다시 열면 이어서 읽는다.
@@ -1881,6 +1920,10 @@ export default function App() {
           <Settings
             keys={{ gemini: aiKey, tmap: tmapKey }}
             onSaveKey={saveKey}
+            date={day.date}
+            mockCount={mockCount}
+            onAddMock={addMock}
+            onClearMock={clearMock}
           />
         )}
         {tab === "calendar" && (

@@ -81,7 +81,7 @@ function KeyRow({ field, current, onSave }) {
   );
 }
 
-export default function Settings({ keys, onSaveKey }) {
+export default function Settings({ keys, onSaveKey, date, mockCount, onAddMock, onClearMock }) {
   return (
     <section className="view">
       <div className="panel">
@@ -95,6 +95,23 @@ export default function Settings({ keys, onSaveKey }) {
             onSave={(key) => onSaveKey(field.name, key)}
           />
         ))}
+      </div>
+      <div className="panel">
+        <h2>테스트 데이터</h2>
+        <p className="hint">
+          사진 없이 흐름을 시험해 볼 수 있게 가짜 고객 7명과 고객 번호 4건을{" "}
+          {date} 추출 결과 확인 목록에 넣어요. 이름이 모두 "테스트"로 시작해요.
+        </p>
+        <div className="settings-actions settings-mock">
+          <button type="button" className="btn" onClick={onAddMock}>
+            테스트 고객 넣기
+          </button>
+          {mockCount > 0 && (
+            <button type="button" className="btn danger" onClick={onClearMock}>
+              테스트 고객 {mockCount}건 지우기
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );
