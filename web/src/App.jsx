@@ -143,29 +143,6 @@ const Field = ({ label, value, onChange, type = "text", placeholder = "" }) => (
   </label>
 );
 
-function DocumentPreview({ imageId }) {
-  const [url, setUrl] = useState("");
-  useEffect(() => {
-    if (!imageId) return;
-    let active = true;
-    let objectUrl = "";
-    loadDocument(imageId)
-      .then((record) => {
-        if (!active || !record?.image) return;
-        objectUrl = URL.createObjectURL(record.image);
-        setUrl(objectUrl);
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [imageId]);
-  return url ? (
-    <img className="review-preview" src={url} alt="선택한 의뢰서 원본" />
-  ) : null;
-}
-
 // 의뢰서 종류를 이름 옆에 색 뱃지로 보여 준다.
 const DocBadge = ({ type }) => (
   <span className={"doc-badge doc-" + (type || "dispatch")}>
@@ -1450,15 +1427,12 @@ export default function App() {
                         <div className="review-fields">
                           <p className="review-source">{c.file || "사진"}</p>
                           {c.imageId && (
-                            <>
-                              <DocumentPreview imageId={c.imageId} />
-                              <button
-                                type="button"
-                                onClick={() => openDocument(c)}
-                              >
-                                원본 사진 크게 보기
-                              </button>
-                            </>
+                            <button
+                              type="button"
+                              onClick={() => openDocument(c)}
+                            >
+                              원본 사진 보기
+                            </button>
                           )}
                           <label className="field">
                             <span>문서 종류</span>
