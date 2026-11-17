@@ -1704,7 +1704,7 @@ export default function App() {
                       className="primary big"
                       onClick={() => commit(pending)}
                     >
-                      방문 고객 {pending.length}건 저장 · 엑셀 번호 연결
+                      코스 짜기
                     </button>
                   </div>
                 </div>
