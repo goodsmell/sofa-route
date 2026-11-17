@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   fmt,
   normalizePhone,
@@ -10,20 +10,12 @@ import {
   toMin,
   compute,
   precallList,
-  shiftDate,
 } from "./logic.js";
 import { legInfo, fmtDuration, routeTotals } from "./tmapRoute.js";
 import { isFixed, planDay } from "./plan.js";
 import {documentTypeLabel, needsDocumentReread} from './documentTypes.js';
 
 const tmap = (s) => "tmap://search?name=" + encodeURIComponent(s);
-const DAY = "일월화수목금토";
-const iso = (d) =>
-  d.getFullYear() +
-  "-" +
-  String(d.getMonth() + 1).padStart(2, "0") +
-  "-" +
-  String(d.getDate()).padStart(2, "0");
 
 const PhoneIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -58,126 +50,6 @@ const NaviIcon = () => (
     <circle cx="12" cy="10" r="2.3" fill="currentColor" />
   </svg>
 );
-
-function WeekStrip({ day, history, onOpenDay }) {
-  const weekMonday = (date) => {
-    const d = new Date(date + "T00:00:00");
-    return shiftDate(date, -((d.getDay() + 6) % 7));
-  };
-  const around = (date) => {
-    const monday = weekMonday(date);
-    return { start: shiftDate(monday, -28), end: shiftDate(monday, 34) };
-  };
-  const [range, setRange] = useState(() => around(day.date));
-  const [visibleMonth, setVisibleMonth] = useState(() => day.date.slice(0, 7));
-  const strip = useRef(null);
-  const previousDate = useRef(null);
-  const focusSelected = useRef(true);
-  const prependedWidth = useRef(null);
-  const extending = useRef(false);
-  const syncVisibleMonth = (node) => {
-    const center = node.scrollLeft + node.clientWidth / 2;
-    const visible = Array.from(node.children).find(
-      (item) => item.offsetLeft + item.offsetWidth > center,
-    );
-    if (visible?.dataset.date)
-      setVisibleMonth(visible.dataset.date.slice(0, 7));
-  };
-  if (previousDate.current !== day.date) {
-    previousDate.current = day.date;
-    focusSelected.current = true;
-  }
-  useEffect(() => {
-    if (day.date < range.start || day.date > range.end)
-      setRange(around(day.date));
-  }, [day.date, range.start, range.end]);
-  useLayoutEffect(() => {
-    const node = strip.current;
-    if (!node) return;
-    if (prependedWidth.current !== null) {
-      node.scrollLeft += node.scrollWidth - prependedWidth.current;
-      prependedWidth.current = null;
-    }
-    if (focusSelected.current) {
-      const monday = node.querySelector(
-        `[data-date="${weekMonday(day.date)}"]`,
-      );
-      if (monday) {
-        node.scrollLeft = monday.offsetLeft;
-        focusSelected.current = false;
-      }
-    }
-    syncVisibleMonth(node);
-    extending.current = false;
-  }, [day.date, range.start, range.end]);
-  const dates = [];
-  for (let date = range.start; date <= range.end; date = shiftDate(date, 1))
-    dates.push(date);
-  const todayIso = iso(new Date());
-  return (
-    <div className="week-wrap">
-      <div className="week-month">
-        <strong>{visibleMonth.replace("-", "년 ")}월</strong>
-        <span>좌우로 밀어 날짜 보기</span>
-      </div>
-      <div
-        className="week"
-        ref={strip}
-        role="list"
-        aria-label="날짜별 배송. 좌우로 스크롤해 다른 날짜를 볼 수 있습니다"
-        onScroll={(e) => {
-          const node = e.currentTarget;
-          syncVisibleMonth(node);
-          if (extending.current) return;
-          if (node.scrollLeft < node.clientWidth) {
-            extending.current = true;
-            prependedWidth.current = node.scrollWidth;
-            setRange((current) => ({
-              ...current,
-              start: shiftDate(current.start, -28),
-            }));
-          } else if (
-            node.scrollWidth - node.scrollLeft - node.clientWidth <
-            node.clientWidth
-          ) {
-            extending.current = true;
-            setRange((current) => ({
-              ...current,
-              end: shiftDate(current.end, 28),
-            }));
-          }
-        }}
-      >
-        {dates.map((date) => {
-          const d = new Date(date + "T00:00:00"),
-            record = date === day.date ? day : history[date],
-            count = record?.list?.length || 0;
-          return (
-            <button
-              key={date}
-              data-date={date}
-              role="listitem"
-              type="button"
-              className={
-                "week-day" +
-                (date === day.date ? " on" : "") +
-                (date === todayIso ? " today" : "")
-              }
-              aria-current={date === day.date ? "date" : undefined}
-              onClick={() => onOpenDay(date)}
-            >
-              <span>
-                {d.getDate() === 1 ? `${d.getMonth() + 1}월` : DAY[d.getDay()]}
-              </span>
-              <strong>{d.getDate()}</strong>
-              <small>{count ? count + "곳" : "-"}</small>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
 function Leg({ day, i, busy }) {
   const info = legInfo(day, i);
@@ -916,7 +788,6 @@ export default function RouteView(props) {
   return (
     <section className="view">
       <div className="wrap">
-        <WeekStrip day={day} history={history} onOpenDay={actions.openDay} />
         {day.list.length === 0 ? (
           <div className="empty">
             <p>이 날짜에는 배송이 없어요.</p>

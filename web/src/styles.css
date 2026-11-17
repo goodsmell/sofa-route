@@ -252,18 +252,6 @@ body{font-size:18px}
 #root>.wrap>header h1{margin:0;font-size:28px;line-height:1.25;letter-spacing:-.01em}
 #root>.wrap>header .lead{font-size:16px;margin-top:2px}
 
-.week-wrap{display:flex;flex-direction:column}
-.week-month{display:flex;align-items:baseline;justify-content:space-between;gap:12px;padding:0 2px 5px}
-.week-month strong{font-size:17px;font-variant-numeric:tabular-nums}
-.week-month span{color:var(--muted);font-size:13px}
-.week{position:relative;display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;padding:4px 0 12px;scrollbar-width:thin}
-.week-day{flex:0 0 calc((100% - 36px)/7);min-width:0;scroll-snap-align:start;min-height:72px;padding:6px 0;border:1px solid var(--rule);border-radius:12px;background:var(--paper);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-weight:500;color:var(--ink)}
-.week-day span{font-size:13px;color:var(--muted)}
-.week-day strong{font-size:20px;line-height:1.2}
-.week-day small{font-size:12px;color:var(--muted)}
-.week-day.today span{color:var(--accent);font-weight:700}
-.week-day.on{background:var(--ink);border-color:var(--ink);color:var(--paper)}
-.week-day.on span,.week-day.on small{color:var(--paper);opacity:.85}
 
 .overview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:14px 0;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
 .overview span{display:block;font-size:14px;color:var(--muted)}
@@ -470,7 +458,6 @@ nav.tabs button{font-size:12px}
 .header-date-picker>span{flex:none;color:var(--accent);font-size:14px;font-weight:700}
 .header-date-picker input[type=date]{position:absolute;inset:0;width:100%;height:100%;min-height:0;padding:0;opacity:0;cursor:pointer}
 .header-date-picker:focus-within{outline:3px solid var(--accent);outline-offset:4px;border-radius:3px}
-.week{touch-action:pan-x pan-y;overscroll-behavior-x:contain}
 
 /* 지도 탭 */
 .map-full{position:fixed;z-index:10;inset:0 0 calc(68px + env(safe-area-inset-bottom,0px));overflow:hidden;background:#e9eeea;color:#23282b}
@@ -574,12 +561,6 @@ input[type=text],input[type=tel],input[type=time],input[type=date],input[type=nu
 .flow-step.complete .flow-marker{font-size:17px}
 .flow-label{font-size:13px;font-weight:700}
 
-.week-month strong{font-size:15px}
-.week{padding:3px 0 9px}
-.week-day{min-height:59px;border-radius:10px;padding:4px 0}
-.week-day span{font-size:12px}
-.week-day strong{font-size:16px}
-.week-day small{font-size:11px}
 .modes{margin-top:11px;border-radius:11px}
 .modes button{min-height:48px;border-radius:8px;font-size:14px}
 .modes button small{font-size:11px}
