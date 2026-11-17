@@ -285,6 +285,7 @@ export default function App() {
     [pending, setPending] = useState([]),
     [phoneCandidates, setPhoneCandidates] = useState([]),
     [status, setStatus] = useState(""),
+    [failedFiles, setFailedFiles] = useState([]),
     [busy, setBusy] = useState(false),
     [rereadId, setRereadId] = useState(null),
     [toast, setToast] = useState(""),
@@ -939,10 +940,12 @@ export default function App() {
       return;
     }
     setBusy(true);
+    setFailedFiles([]);
     setStatus("AI 사진 분석 준비 중…");
     try {
       const results = [];
       const failures = [];
+      const failed = [];
       let imageSaveFailed = false;
       for (let i = 0; i < files.length; i++) {
         setStatus("사진 " + (i + 1) + "/" + files.length + " 읽는 중…");
@@ -969,8 +972,10 @@ export default function App() {
           results.push(...customers);
         } catch (error) {
           failures.push(`${files[i].name}: ${error.message || error}`);
+          failed.push(files[i]);
         }
       }
+      setFailedFiles(failed);
       const forms = results.filter((customer) => customer.source === "form");
       const contacts = results.filter((customer) => customer.source === "list");
       setPending((current) => [...current, ...forms]);
@@ -990,9 +995,9 @@ export default function App() {
       }
       setStatus(
         forms.length || contacts.length
-          ? `${files.length - failures.length}장 AI 분석 · ${day.date} 의뢰서 고객 ${forms.length}건${contacts.length ? ` · 엑셀 번호 ${contacts.length}건은 이름 매칭에만 사용` : ""}${imageSaveFailed ? " 원본 사진 저장에 실패했어요." : ""}${failures.length ? ` 실패: ${failures.join(" / ")}` : ""}`
+          ? `${files.length - failures.length}장 AI 분석 · ${day.date} 의뢰서 고객 ${forms.length}건${contacts.length ? ` · 엑셀 번호 ${contacts.length}건은 이름 매칭에만 사용` : ""}${imageSaveFailed ? " 원본 사진 저장에 실패했어요." : ""}${failures.length ? `\n\n${failures.length}장 실패:\n${failures.join("\n")}` : ""}`
           : failures.length
-            ? `사진 분석 실패: ${failures.join(" / ")}`
+            ? `${failures.length}장 실패:\n${failures.join("\n")}`
             : "고객 정보를 찾지 못했어요. 더 선명한 사진을 넣거나 직접 입력해 주세요.",
       );
     } catch (e) {
@@ -1220,6 +1225,15 @@ export default function App() {
                     <p className="import-status" role="status">
                       {status}
                     </p>
+                  )}
+                  {failedFiles.length > 0 && !busy && (
+                    <button
+                      type="button"
+                      className="btn"
+                      onClick={() => importImages(failedFiles)}
+                    >
+                      실패한 사진 {failedFiles.length}장 다시 시도
+                    </button>
                   )}
                 </div>
               )}
