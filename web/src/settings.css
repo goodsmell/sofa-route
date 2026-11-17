@@ -75,3 +75,23 @@ body:has(.recommendation-view){padding-bottom:calc(72px + env(safe-area-inset-bo
 .recommendation-view .recommendation-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
 .recommendation-view .recommendation-stats>span:nth-child(1){justify-content:flex-start}
 .recommendation-view .recommendation-stats>span:nth-child(2){justify-content:flex-end}
+/* 추천 카드의 시간 지연 → 늦는 고객 목록 */
+.recommendation-view .recommendation-late{display:flex;align-items:baseline;justify-content:flex-end;gap:4px;margin:-4px -6px;padding:4px 6px;border-radius:6px;color:var(--bad);cursor:pointer}
+.recommendation-view .recommendation-late small{color:var(--bad);font-weight:600}
+.recommendation-view .recommendation-late:focus-visible{outline:2px solid var(--accent)}
+.late-overlay{position:fixed;inset:0;z-index:40;background:rgba(20,26,28,.4);display:flex;align-items:flex-end;justify-content:center;animation:late-fade .2s ease}
+.late-sheet{width:100%;max-width:620px;max-height:80dvh;overflow:auto;background:var(--paper);border-radius:16px 16px 0 0;padding:18px 18px calc(18px + env(safe-area-inset-bottom,0px));animation:late-up .26s cubic-bezier(.2,.8,.2,1)}
+.late-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.late-head h3{margin:0;font-size:18px}
+.late-head p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.late-head button{flex:none;min-height:36px;padding:0 12px;border:1px solid var(--rule);border-radius:8px;background:var(--paper);font-weight:600}
+.late-list{list-style:none;margin:0;padding:0}
+.late-list li{display:flex;gap:10px;padding:12px 0;border-top:1px solid var(--rule)}
+.late-order{flex:none;width:26px;height:26px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-size:13px;font-weight:700}
+.late-list strong{display:block;font-size:16px}
+.late-list small{display:block;color:var(--muted);font-size:13px}
+.late-list p{margin:4px 0 0;font-size:14px}
+.late-list em{font-style:normal;color:var(--bad);font-weight:700}
+@keyframes late-fade{from{opacity:0}}
+@keyframes late-up{from{transform:translateY(40px);opacity:.4}}
+@media (prefers-reduced-motion:reduce){.late-overlay,.late-sheet{animation:none}}

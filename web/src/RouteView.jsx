@@ -51,6 +51,52 @@ const NaviIcon = () => (
   </svg>
 );
 
+// 추천 코스에서 약속 시간을 넘기는 고객 목록 (아래에서 올라오는 창)
+function LateSheet({ title, calc, onClose }) {
+  const rows = calc.rows
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => row.flags.some(([level]) => level === "bad"));
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return (
+    <div
+      className="late-overlay"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <section className="late-sheet" role="dialog" aria-modal="true" aria-label={title + " 시간 지연 고객"}>
+        <div className="late-head">
+          <div>
+            <h3>시간 지연 {rows.length}곳</h3>
+            <p>{title} 코스로 가면 약속 시간을 넘겨요.</p>
+          </div>
+          <button type="button" onClick={onClose}>닫기</button>
+        </div>
+        <ol className="late-list">
+          {rows.map(({ row, index }) => {
+            const over = row.start - row.sl.e;
+            return (
+              <li key={row.c.id}>
+                <span className="late-order">{index + 1}</span>
+                <div>
+                  <strong>{row.c.name || "고객"}</strong>
+                  <small>{shortArea(row.c.addr)}</small>
+                  <p>
+                    {row.sl.label} 약속 ~{fmt(row.sl.e)} · 예상 도착 {fmt(row.start)}
+                    <em> · {fmtDuration(over)} 늦음</em>
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    </div>
+  );
+}
+
 function Leg({ day, i, busy }) {
   const info = legInfo(day, i);
   if (info.state === "tmap")
@@ -688,6 +734,8 @@ function recommendationPath(day) {
 export default function RouteView(props) {
   const { day, history, calc, calls, legBusy, aiBusy, tmapReady, actions, stage } =
     props;
+  // 추천 카드의 "시간 지연"을 눌렀을 때 보여 줄 늦는 고객 목록
+  const [lateView, setLateView] = useState(null);
   const [selectedMode, setModeState] = useState(() => {
     try {
       return sessionStorage.getItem("sofa-route-mode") || "customer";
@@ -725,15 +773,13 @@ export default function RouteView(props) {
   const done = day.list.filter((c) => c.done).length;
   if (stage === 2 && day.list.length > 0 && day.plans?.customer) {
     const selectedPlan = day.plans[mode] ? mode : "customer";
-    const selectedDay = planDay(day, day.plans[selectedPlan]);
-    const selectedCalc = compute(selectedDay);
     return (
       <section className="view recommendation-view">
         <div className="wrap">
           <div className="recommendation-heading">
             <div>
               <h2>추천 코스</h2>
-              <p>배송지 {day.list.length}곳 · 출발 {day.depart} · 귀가 {fmt(selectedCalc.home)} 예상</p>
+              <p>배송지 {day.list.length}곳</p>
             </div>
             <button type="button" className="recommendation-remake" disabled={aiBusy} onClick={actions.makePlans}>
               {aiBusy ? "만드는 중…" : "다시 만들기"}
@@ -769,7 +815,29 @@ export default function RouteView(props) {
                   {available && <>
                     <span className="recommendation-stats">
                       <span><strong>{fmt(optionCalc.home)}</strong><small>귀가 예상</small></span>
-                      <span><strong>{late}곳</strong><small>시간 지연</small></span>
+                      {late > 0 ? (
+                        // 카드 선택과 따로, 누르면 늦는 고객 목록을 연다.
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          className="recommendation-late"
+                          aria-label={`${title} 시간 지연 ${late}곳 고객 보기`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setLateView({ title, calc: optionCalc });
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setLateView({ title, calc: optionCalc });
+                          }}
+                        >
+                          <strong>{late}곳</strong><small>시간 지연 ›</small>
+                        </span>
+                      ) : (
+                        <span><strong>0곳</strong><small>시간 지연</small></span>
+                      )}
                     </span>
                     <span className="recommendation-path">{recommendationPath(optionDay)}</span>
                   </>}
@@ -777,6 +845,7 @@ export default function RouteView(props) {
               );
             })}
           </div>
+          {lateView && <LateSheet {...lateView} onClose={() => setLateView(null)} />}
           <button type="button" className="btn primary recommendation-continue" onClick={() => {
             actions.usePlan(selectedPlan);
             setMode("fixed");
