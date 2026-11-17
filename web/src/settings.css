@@ -71,3 +71,7 @@ body:has(.recommendation-view){padding-bottom:calc(72px + env(safe-area-inset-bo
 .recommendation-view .recommendation-stats small{margin-top:0}
 .recommendation-view .recommendation-card,.recommendation-view .recommendation-card.selected{padding:8px 12px;gap:4px}
 .recommendation-view .recommendation-cards{gap:5px}
+/* 배송지 수는 모든 카드가 같아서 빼고, 귀가 예상(왼쪽)·시간 지연(오른쪽) 두 칸만 둔다 */
+.recommendation-view .recommendation-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+.recommendation-view .recommendation-stats>span:nth-child(1){justify-content:flex-start}
+.recommendation-view .recommendation-stats>span:nth-child(2){justify-content:flex-end}
