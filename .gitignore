@@ -2,3 +2,6 @@ node_modules/
 dist/
 .DS_Store
 *.traineddata
+
+# 고객 정보가 담긴 배송 코스 내보내기 파일
+*배송코스*.txt
