@@ -413,13 +413,13 @@ body.dragging-route .grip{cursor:grabbing}
 .header-date-picker.header-date-secondary{position:absolute;right:0;top:34px;color:var(--accent)}
 .header-date-picker.header-date-secondary>span{font-size:13px}
 .flow-steps{position:relative;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));margin:60px 0 26px;padding:0;isolation:isolate}
-.flow-steps::before,.flow-steps::after{content:"";position:absolute;z-index:-1;top:19px;left:20px;right:calc(25% - 20px);height:3px;background:var(--rule)}
+.flow-steps::before,.flow-steps::after{content:"";position:absolute;z-index:-1;top:19px;left:12.5%;right:12.5%;height:3px;background:var(--rule)}
 .flow-steps::after{right:auto;width:0;background:var(--accent)}
 .flow-steps[data-stage="2"]::after{width:25%}
 .flow-steps[data-stage="3"]::after{width:50%}
 .flow-steps[data-stage="4"]::after{width:75%}
-.flow-step{position:relative;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
-.flow-step{border:0;border-radius:0;background:transparent;padding:0;text-align:left;cursor:pointer}
+.flow-step{position:relative;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.flow-step{border:0;border-radius:0;background:transparent;padding:0;text-align:center;cursor:pointer}
 .flow-step:disabled{cursor:default;opacity:1}
 .flow-step:not(:disabled):focus-visible{outline:2px solid var(--accent);outline-offset:4px}
 .flow-marker{width:42px;height:42px;display:flex;align-items:center;justify-content:center;background:#edf1f2;color:#8b969b;font-size:23px;font-weight:400;line-height:1}
@@ -572,7 +572,7 @@ input[type=text],input[type=tel],input[type=time],input[type=date],input[type=nu
 .header-eyebrow,.header-date-picker.header-eyebrow>span{font-size:14px}
 .header-date-picker.header-date-secondary{top:20px}
 .flow-steps{margin:24px 0 18px}
-.flow-steps::before,.flow-steps::after{top:14px;left:15px;right:calc(25% - 15px);height:2px}
+.flow-steps::before,.flow-steps::after{top:14px;height:2px}
 .flow-marker{width:30px;height:30px;font-size:15px}
 .flow-step.complete .flow-marker{font-size:17px}
 .flow-label{font-size:13px;font-weight:700}
