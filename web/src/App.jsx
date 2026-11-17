@@ -20,6 +20,14 @@ import {
 } from "./logic.js";
 import { imageCanvas } from "./ocr.js";
 import { saveDocument, loadDocument, deleteDocuments } from "./imageStore.js";
+import {
+  loadImports,
+  saveImports,
+  sessionOf,
+  updateSession as updateImportSession,
+  nextQueued,
+  queuedCount,
+} from "./importQueue.js";
 import DocumentViewer from "./DocumentViewer.jsx";
 import Settings from "./Settings.jsx";
 import KeyGate from "./KeyGate.jsx";
@@ -282,10 +290,7 @@ export default function App() {
   const [draft, setDraft] = useState(blank),
     [editing, setEditing] = useState(null),
     [addMode, setAddMode] = useState("document"),
-    [pending, setPending] = useState([]),
-    [phoneCandidates, setPhoneCandidates] = useState([]),
     [status, setStatus] = useState(""),
-    [failedFiles, setFailedFiles] = useState([]),
     [busy, setBusy] = useState(false),
     [rereadId, setRereadId] = useState(null),
     [toast, setToast] = useState(""),
@@ -303,6 +308,27 @@ export default function App() {
   const [aiBusy, setAiBusy] = useState(false),
     [legBusy, setLegBusy] = useState(false);
   const dayRef = useRef(day);
+  // 사진 분석 진행 상황(대기·실패 사진, 확인 목록)은 날짜별로 기기에 저장한다.
+  const [imports, setImports] = useState(loadImports),
+    importsRef = useRef(imports),
+    queueRunning = useRef(false);
+  function updateSession(date, fn) {
+    const next = updateImportSession(importsRef.current, date, fn);
+    importsRef.current = next;
+    setImports(next);
+    if (!saveImports(next))
+      setStorageError("사진 분석 진행 상황을 이 기기에 저장하지 못했습니다.");
+  }
+  const session = sessionOf(imports, day.date),
+    pending = session.pending,
+    phoneCandidates = session.phoneCandidates;
+  const sessionSetter = (field) => (value) =>
+    updateSession(day.date, (s) => ({
+      ...s,
+      [field]: typeof value === "function" ? value(s[field]) : value,
+    }));
+  const setPending = sessionSetter("pending"),
+    setPhoneCandidates = sessionSetter("phoneCandidates");
   const timer = useRef(null),
     calc = useMemo(() => compute(day), [day]),
     calls = useMemo(() => precallList(calc.rows), [calc]);
@@ -762,8 +788,6 @@ export default function App() {
     );
     setSelected(date);
     setMonth(date.slice(0, 7));
-    setPending([]);
-    setPhoneCandidates([]);
     setEditing(null);
     setDraft(blank());
     setViewStage(null);
@@ -933,83 +957,119 @@ export default function App() {
       `의뢰서 ${imported.formsAdded}건 저장 · 고객 번호 ${imported.matched}건 연결`,
     );
   }
+  // 고른 사진은 먼저 기기에 저장해 대기열에 올리고, 대기열을 차례로 분석한다.
+  // 앱을 나갔다 와도 대기열이 남아 있어서 다시 열면 이어서 읽는다.
   async function importImages(files) {
     if (!files.length) return;
     if (!aiKey) {
       setStatus("AI 사진 분석을 사용하려면 설정에서 Gemini API 키를 연결해 주세요.");
       return;
     }
+    const date = day.date,
+      queued = [];
+    for (const file of files) {
+      try {
+        queued.push({ imageId: await saveDocument(file), name: file.name });
+      } catch {
+        setStatus("사진을 이 기기에 저장하지 못했어요. Chrome에서 다시 열어 주세요.");
+        return;
+      }
+    }
+    updateSession(date, (s) => ({ ...s, queue: [...s.queue, ...queued] }));
+    runQueue();
+  }
+  function retryFailed() {
+    updateSession(day.date, (s) => ({
+      ...s,
+      queue: [...s.queue, ...s.failed.map(({ imageId, name }) => ({ imageId, name }))],
+      failed: [],
+    }));
+    runQueue();
+  }
+  async function runQueue() {
+    if (queueRunning.current || !aiKey || !nextQueued(importsRef.current)) return;
+    queueRunning.current = true;
     setBusy(true);
-    setFailedFiles([]);
-    setStatus("AI 사진 분석 준비 중…");
+    const done = { photos: 0, forms: 0, contacts: 0, failed: 0 };
+    let paused = false;
     try {
-      const results = [];
-      const failures = [];
-      const failed = [];
-      let imageSaveFailed = false;
-      for (let i = 0; i < files.length; i++) {
-        setStatus("사진 " + (i + 1) + "/" + files.length + " 읽는 중…");
+      for (let next; (next = nextQueued(importsRef.current)); ) {
+        const { date, item } = next;
+        setStatus("사진 읽는 중… 남은 사진 " + queuedCount(importsRef.current) + "장");
+        let customers;
         try {
-          const canvas = await imageCanvas(files[i]);
-          const customers = await analyzePhoto(
-            files[i],
-            canvas,
-            aiKey,
-            fetch,
-            day.date,
-          );
-          const forms = customers.filter((c) => c.source === "form");
-          if (forms.length) {
-            try {
-              const imageId = await saveDocument(files[i]);
-              forms.forEach((c) => {
-                c.imageId = imageId;
-              });
-            } catch {
-              imageSaveFailed = true;
-            }
-          }
-          results.push(...customers);
+          const record = await loadDocument(item.imageId);
+          if (!record?.image) throw new Error("저장된 사진이 없습니다. 다시 넣어 주세요.");
+          const canvas = await imageCanvas(record.image);
+          customers = await analyzePhoto({ name: item.name }, canvas, aiKey, fetch, date);
         } catch (error) {
-          failures.push(`${files[i].name}: ${error.message || error}`);
-          failed.push(files[i]);
+          const message = error.message || String(error);
+          // 앱을 나가서 연결이 끊긴 것이면 실패로 치지 않고 대기열에 둔 채 멈춘다.
+          if (document.hidden && /연결하지 못|시간이 초과/.test(message)) {
+            paused = true;
+            break;
+          }
+          done.failed++;
+          updateSession(date, (s) => ({
+            ...s,
+            queue: s.queue.filter((x) => x.imageId !== item.imageId),
+            failed: [...s.failed, { ...item, error: message }],
+          }));
+          continue;
         }
+        const forms = customers
+          .filter((c) => c.source === "form")
+          .map((c) => ({ ...c, imageId: item.imageId }));
+        const contacts = customers.filter((c) => c.source === "list");
+        if (!forms.length) deleteDocuments([item.imageId]).catch(() => {});
+        done.photos++;
+        done.forms += forms.length;
+        done.contacts += contacts.length;
+        const current = sessionOf(importsRef.current, date);
+        let candidates = [...current.phoneCandidates, ...contacts];
+        // 확인할 의뢰서가 없을 때 들어온 고객 번호 표는 이미 확정한 고객에게 바로 연결한다.
+        if (contacts.length && !forms.length && !current.pending.length && date === dayRef.current.date) {
+          const imported = applyPhotoImports(dayRef.current, candidates);
+          dayRef.current = imported.day;
+          setDay(imported.day);
+          candidates = imported.unmatched;
+          if (imported.matched)
+            flash(`고객 번호 ${imported.matched}건을 의뢰서 고객에게 연결했어요.`);
+        }
+        updateSession(date, (s) => ({
+          ...s,
+          queue: s.queue.filter((x) => x.imageId !== item.imageId),
+          pending: [...s.pending, ...forms],
+          phoneCandidates: candidates,
+        }));
       }
-      setFailedFiles(failed);
-      const forms = results.filter((customer) => customer.source === "form");
-      const contacts = results.filter((customer) => customer.source === "list");
-      setPending((current) => [...current, ...forms]);
-      if (contacts.length && !forms.length && !pending.length) {
-        const imported = applyPhotoImports(day, [
-          ...phoneCandidates,
-          ...contacts,
-        ]);
-        setDay(imported.day);
-        setPhoneCandidates((current) => [...current, ...imported.unmatched]);
-        if (imported.matched)
-          flash(
-            `고객 번호 ${imported.matched}건을 의뢰서 고객에게 연결했어요.`,
-          );
-      } else if (contacts.length) {
-        setPhoneCandidates((current) => [...current, ...contacts]);
-      }
-      setStatus(
-        forms.length || contacts.length
-          ? `${files.length - failures.length}장 AI 분석 · ${day.date} 의뢰서 고객 ${forms.length}건${contacts.length ? ` · 엑셀 번호 ${contacts.length}건은 이름 매칭에만 사용` : ""}${imageSaveFailed ? " 원본 사진 저장에 실패했어요." : ""}${failures.length ? `\n\n${failures.length}장 실패:\n${failures.join("\n")}` : ""}`
-          : failures.length
-            ? `${failures.length}장 실패:\n${failures.join("\n")}`
-            : "고객 정보를 찾지 못했어요. 더 선명한 사진을 넣거나 직접 입력해 주세요.",
-      );
-    } catch (e) {
-      setStatus(
-        "읽기 실패: " +
-          (e.message || e) +
-          " Gemini 키와 인터넷 연결을 확인해 주세요.",
-      );
     } finally {
+      queueRunning.current = false;
       setBusy(false);
     }
+    setStatus(
+      paused
+        ? "앱으로 돌아오면 남은 사진을 이어서 읽어요."
+        : done.forms || done.contacts
+          ? `${done.photos}장 AI 분석 · 의뢰서 고객 ${done.forms}건${done.contacts ? ` · 고객 번호 ${done.contacts}건은 이름 매칭에만 사용` : ""}`
+          : done.failed
+            ? ""
+            : "고객 정보를 찾지 못했어요. 더 선명한 사진을 넣거나 직접 입력해 주세요.",
+    );
   }
+  // 앱을 다시 열거나 다른 앱에서 돌아오면 남은 사진을 이어서 읽는다.
+  useEffect(() => {
+    runQueue();
+    const resume = () => {
+      if (!document.hidden) runQueue();
+    };
+    document.addEventListener("visibilitychange", resume);
+    window.addEventListener("online", resume);
+    return () => {
+      document.removeEventListener("visibilitychange", resume);
+      window.removeEventListener("online", resume);
+    };
+  }, [aiKey]);
   async function rereadDocument(c) {
     if (!c.imageId || rereadId) return;
     if (!aiKey) {
@@ -1226,13 +1286,15 @@ export default function App() {
                       {status}
                     </p>
                   )}
-                  {failedFiles.length > 0 && !busy && (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => importImages(failedFiles)}
-                    >
-                      실패한 사진 {failedFiles.length}장 다시 시도
+                  {session.failed.length > 0 && (
+                    <p className="import-status" role="status">
+                      {session.failed.length}장 실패:
+                      {session.failed.map((f) => "\n" + f.name + ": " + f.error)}
+                    </p>
+                  )}
+                  {session.failed.length > 0 && !busy && (
+                    <button type="button" className="btn" onClick={retryFailed}>
+                      실패한 사진 {session.failed.length}장 다시 시도
                     </button>
                   )}
                 </div>
