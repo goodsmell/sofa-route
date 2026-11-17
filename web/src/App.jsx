@@ -327,6 +327,17 @@ export default function App() {
       openReviewChoice === undefined ? pending[0]?.id : openReviewChoice;
   const setPending = sessionSetter("pending"),
     setPhoneCandidates = sessionSetter("phoneCandidates");
+  // 추출 결과 확인에서 i번째 고객의 제품 행을 고친다. 첫 제품은 prod에도 둔다.
+  const editProducts = (i, fn) =>
+    setPending((p) =>
+      p.map((x, j) => {
+        if (j !== i) return x;
+        const productRows = fn(
+          x.productRows?.length ? [...x.productRows] : [x.prod || ""],
+        );
+        return { ...x, productRows, prod: productRows[0] || "" };
+      }),
+    );
   const timer = useRef(null),
     calc = useMemo(() => compute(day), [day]),
     calls = useMemo(() => precallList(calc.rows), [calc]);
@@ -1597,34 +1608,57 @@ export default function App() {
                                 {(c.productRows?.length
                                   ? c.productRows
                                   : [c.prod || ""]
-                                ).map((product, rowIndex) => (
+                                ).map((product, rowIndex, rows) => (
                                   <tr key={rowIndex}>
                                     <td>
-                                      <input
-                                        aria-label={`제품명 ${rowIndex + 1}`}
-                                        value={product}
-                                        onChange={(e) =>
-                                          setPending((p) =>
-                                            p.map((x, j) => {
-                                              if (j !== i) return x;
-                                              const productRows = x.productRows
-                                                ?.length
-                                                ? [...x.productRows]
-                                                : [x.prod || ""];
+                                      <div className="product-row">
+                                        <input
+                                          aria-label={`제품명 ${rowIndex + 1}`}
+                                          value={product}
+                                          onChange={(e) =>
+                                            editProducts(i, (productRows) => {
                                               productRows[rowIndex] =
                                                 e.target.value;
-                                              return {
-                                                ...x,
-                                                productRows,
-                                                prod: productRows[0],
-                                              };
-                                            }),
-                                          )
-                                        }
-                                      />
+                                              return productRows;
+                                            })
+                                          }
+                                        />
+                                        {rows.length > 1 && (
+                                          <button
+                                            type="button"
+                                            className="product-remove"
+                                            aria-label={`제품 ${rowIndex + 1} 삭제`}
+                                            onClick={() =>
+                                              editProducts(i, (productRows) =>
+                                                productRows.filter(
+                                                  (_, k) => k !== rowIndex,
+                                                ),
+                                              )
+                                            }
+                                          >
+                                            삭제
+                                          </button>
+                                        )}
+                                      </div>
                                     </td>
                                   </tr>
                                 ))}
+                                <tr>
+                                  <td>
+                                    <button
+                                      type="button"
+                                      className="product-add"
+                                      onClick={() =>
+                                        editProducts(i, (productRows) => [
+                                          ...productRows,
+                                          "",
+                                        ])
+                                      }
+                                    >
+                                      + 제품 추가
+                                    </button>
+                                  </td>
+                                </tr>
                               </tbody>
                               {(!c.documentType ||
                                 c.documentType === "dispatch") && (

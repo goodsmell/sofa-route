@@ -29,3 +29,10 @@ details.closing>summary::after{transform:none}
 #trip-settings>summary{min-height:44px}
 #trip-settings[open]{padding-bottom:16px}
 #trip-settings:not([open]){gap:0}
+/* 추출 결과 확인: 제품 표 행 추가·삭제와 입력칸 모양 */
+.review-product-table input{min-height:40px;padding:7px 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;font-size:15px}
+.review-product-table input:focus{outline:2px solid var(--accent);outline-offset:0}
+.product-row{display:flex;align-items:center;gap:6px}
+.product-row input{flex:1}
+.product-remove{flex:none;min-height:40px;padding:0 12px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--bad);font-size:14px;font-weight:600}
+.product-add{width:100%;min-height:40px;border:1px dashed var(--rule);border-radius:6px;background:transparent;color:var(--accent);font-size:14px;font-weight:700}
