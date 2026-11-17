@@ -942,6 +942,163 @@ export default function App() {
     );
     return phones.size === 1 ? [...phones][0] : "";
   }
+  // 추출 결과 확인에서 i번째 고객의 값을 바꾼다.
+  const patchPending = (i, patch) =>
+    setPending((p) =>
+      p.map((x, j) =>
+        j === i
+          ? { ...x, ...(typeof patch === "function" ? patch(x) : patch) }
+          : x,
+      ),
+    );
+  // 추출 결과 확인의 입력칸 하나. 순서는 documentReviewFields(코스 복사 순서)를 따른다.
+  function reviewField(c, i, k, label) {
+    const select = (value, onChange, options) => (
+      <label className="field" key={k}>
+        <span>{label}</span>
+        <select value={value} onChange={(e) => onChange(e.target.value)}>
+          {options.map(([v, t]) => (
+            <option key={v} value={v}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </label>
+    );
+    const triple = (known, yes) => (known ? (yes ? "yes" : "no") : "unknown");
+    switch (k) {
+      case "slot":
+        return select(c.slot, (v) => patchPending(i, { slot: v }), [
+          ["any", "지정불가"],
+          ["am", "오전"],
+          ["pm", "오후"],
+        ]);
+      case "phone":
+        return (
+          <Field
+            key={k}
+            label={label}
+            type="tel"
+            placeholder="010-0000-0000"
+            value={reviewPhone(c)}
+            onChange={(v) => patchPending(i, { phone: v, phoneTouched: true })}
+          />
+        );
+      case "elevator":
+        return select(
+          triple(c.elevatorKnown, !c.noelev),
+          (v) =>
+            patchPending(i, { elevatorKnown: v !== "unknown", noelev: v === "no" }),
+          [
+            ["unknown", "확인 필요"],
+            ["yes", "있음"],
+            ["no", "없음"],
+          ],
+        );
+      case "ladder":
+        return select(
+          triple(c.ladderKnown, c.ladderNeeded),
+          (v) =>
+            patchPending(i, { ladderKnown: v !== "unknown", ladderNeeded: v === "yes" }),
+          [
+            ["unknown", "확인 필요"],
+            ["yes", "필요"],
+            ["no", "불필요"],
+          ],
+        );
+      case "bs":
+        return select(c.bs ? "yes" : "no", (v) => patchPending(i, { bs: v === "yes" }), [
+          ["no", "없음"],
+          ["yes", "있음"],
+        ]);
+      case "memo":
+        return (
+          <label className="field" key={k}>
+            <span>{label}</span>
+            <textarea
+              value={c.memo || ""}
+              onChange={(e) => patchPending(i, { memo: e.target.value })}
+            />
+          </label>
+        );
+      case "products": {
+        const rows = c.productRows?.length ? c.productRows : [c.prod || ""];
+        return (
+          <table className="review-product-table" key={k}>
+            <thead>
+              <tr>
+                <th>{label}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((product, rowIndex) => (
+                <tr key={rowIndex}>
+                  <td>
+                    <div className="product-row">
+                      <input
+                        aria-label={`제품명 ${rowIndex + 1}`}
+                        value={product}
+                        onChange={(e) =>
+                          editProducts(i, (list) => {
+                            list[rowIndex] = e.target.value;
+                            return list;
+                          })
+                        }
+                      />
+                      {rows.length > 1 && (
+                        <button
+                          type="button"
+                          className="product-remove"
+                          aria-label={`제품 ${rowIndex + 1} 삭제`}
+                          onClick={() =>
+                            editProducts(i, (list) =>
+                              list.filter((_, n) => n !== rowIndex),
+                            )
+                          }
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              <tr>
+                <td>
+                  <button
+                    type="button"
+                    className="product-add"
+                    onClick={() => editProducts(i, (list) => [...list, ""])}
+                  >
+                    + 제품 추가
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        );
+      }
+      default:
+        return (
+          <Field
+            key={k}
+            label={label}
+            type={k === "installDate" ? "date" : "text"}
+            value={c[k]}
+            onChange={(v) =>
+              patchPending(i, (x) => ({
+                [k]: v,
+                // 이동 의뢰서는 방문지(addr)를 설치·해체 주소에 맞춘다.
+                ...((k === "toAddr" && x.documentType === "move_install") ||
+                (k === "fromAddr" && x.documentType === "move_dismantle")
+                  ? { addr: v }
+                  : {}),
+              }))
+            }
+          />
+        );
+    }
+  }
   // 추출 결과 확인의 고객 번호: 직접 고친 값이 있으면 그것, 없으면 고객 번호 표에서 이름이 맞는 번호
   const reviewPhone = (c) =>
     c.phoneTouched ? c.phone : c.phone || previewExcelPhone(c.name);
@@ -1488,227 +1645,7 @@ export default function App() {
                             </select>
                           </label>
                           {documentReviewFields(c.documentType).map(
-                            ([k, l]) => (
-                              <Field
-                                key={k}
-                                label={l}
-                                type={k === "installDate" ? "date" : "text"}
-                                value={c[k]}
-                                onChange={(v) =>
-                                  setPending((p) =>
-                                    p.map((x, j) =>
-                                      j === i
-                                        ? {
-                                            ...x,
-                                            [k]: v,
-                                            ...((k === "toAddr" &&
-                                              x.documentType ===
-                                                "move_install") ||
-                                            (k === "fromAddr" &&
-                                              x.documentType ===
-                                                "move_dismantle")
-                                              ? { addr: v }
-                                              : {}),
-                                          }
-                                        : x,
-                                    ),
-                                  )
-                                }
-                              />
-                            ),
-                          )}
-                          <Field
-                            label="고객 번호"
-                            type="tel"
-                            placeholder="010-0000-0000"
-                            value={reviewPhone(c)}
-                            onChange={(v) =>
-                              setPending((p) =>
-                                p.map((x, j) =>
-                                  j === i
-                                    ? { ...x, phone: v, phoneTouched: true }
-                                    : x,
-                                ),
-                              )
-                            }
-                          />
-                          <label className="field">
-                            <span>고객지정시간</span>
-                            <select
-                              value={c.slot}
-                              onChange={(e) =>
-                                setPending((p) =>
-                                  p.map((x, j) =>
-                                    j === i
-                                      ? { ...x, slot: e.target.value }
-                                      : x,
-                                  ),
-                                )
-                              }
-                            >
-                              <option value="any">지정불가</option>
-                              <option value="am">오전</option>
-                              <option value="pm">오후</option>
-                            </select>
-                          </label>
-                          {(!c.documentType ||
-                            c.documentType === "dispatch") && (
-                            <>
-                              <label className="field">
-                                <span>엘리베이터 여부</span>
-                                <select
-                                  value={
-                                    c.elevatorKnown
-                                      ? c.noelev
-                                        ? "no"
-                                        : "yes"
-                                      : "unknown"
-                                  }
-                                  onChange={(e) =>
-                                    setPending((p) =>
-                                      p.map((x, j) =>
-                                        j === i
-                                          ? {
-                                              ...x,
-                                              elevatorKnown:
-                                                e.target.value !== "unknown",
-                                              noelev: e.target.value === "no",
-                                            }
-                                          : x,
-                                      ),
-                                    )
-                                  }
-                                >
-                                  <option value="unknown">확인 필요</option>
-                                  <option value="yes">있음</option>
-                                  <option value="no">없음</option>
-                                </select>
-                              </label>
-                              <label className="field">
-                                <span>사다리차 필요여부</span>
-                                <select
-                                  value={
-                                    c.ladderKnown
-                                      ? c.ladderNeeded
-                                        ? "yes"
-                                        : "no"
-                                      : "unknown"
-                                  }
-                                  onChange={(e) =>
-                                    setPending((p) =>
-                                      p.map((x, j) =>
-                                        j === i
-                                          ? {
-                                              ...x,
-                                              ladderKnown:
-                                                e.target.value !== "unknown",
-                                              ladderNeeded:
-                                                e.target.value === "yes",
-                                            }
-                                          : x,
-                                      ),
-                                    )
-                                  }
-                                >
-                                  <option value="unknown">확인 필요</option>
-                                  <option value="yes">필요</option>
-                                  <option value="no">불필요</option>
-                                </select>
-                              </label>
-                            </>
-                          )}
-                          {showsProductTable(c.documentType) && (
-                            <table className="review-product-table">
-                              <thead>
-                                <tr>
-                                  <th>제품명</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {(c.productRows?.length
-                                  ? c.productRows
-                                  : [c.prod || ""]
-                                ).map((product, rowIndex, rows) => (
-                                  <tr key={rowIndex}>
-                                    <td>
-                                      <div className="product-row">
-                                        <input
-                                          aria-label={`제품명 ${rowIndex + 1}`}
-                                          value={product}
-                                          onChange={(e) =>
-                                            editProducts(i, (productRows) => {
-                                              productRows[rowIndex] =
-                                                e.target.value;
-                                              return productRows;
-                                            })
-                                          }
-                                        />
-                                        {rows.length > 1 && (
-                                          <button
-                                            type="button"
-                                            className="product-remove"
-                                            aria-label={`제품 ${rowIndex + 1} 삭제`}
-                                            onClick={() =>
-                                              editProducts(i, (productRows) =>
-                                                productRows.filter(
-                                                  (_, k) => k !== rowIndex,
-                                                ),
-                                              )
-                                            }
-                                          >
-                                            삭제
-                                          </button>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
-                                <tr>
-                                  <td>
-                                    <button
-                                      type="button"
-                                      className="product-add"
-                                      onClick={() =>
-                                        editProducts(i, (productRows) => [
-                                          ...productRows,
-                                          "",
-                                        ])
-                                      }
-                                    >
-                                      + 제품 추가
-                                    </button>
-                                  </td>
-                                </tr>
-                              </tbody>
-                              {(!c.documentType ||
-                                c.documentType === "dispatch") && (
-                                <tfoot>
-                                  <tr>
-                                    <th>
-                                      <label>
-                                        오더별 수량 합계 · 총 무게 (kg)
-                                        <input
-                                          inputMode="decimal"
-                                          value={c.weight || ""}
-                                          onChange={(e) =>
-                                            setPending((p) =>
-                                              p.map((x, j) =>
-                                                j === i
-                                                  ? {
-                                                      ...x,
-                                                      weight: e.target.value,
-                                                    }
-                                                  : x,
-                                              ),
-                                            )
-                                          }
-                                        />
-                                      </label>
-                                    </th>
-                                  </tr>
-                                </tfoot>
-                              )}
-                            </table>
+                            ([k, l]) => reviewField(c, i, k, l),
                           )}
                           <button
                             onClick={() =>
@@ -1724,7 +1661,7 @@ export default function App() {
                       className="primary big"
                       onClick={() => commit(pending)}
                     >
-                      코스 짜기
+                      코스 추천 받기
                     </button>
                   </div>
                 </div>
