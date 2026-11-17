@@ -1405,7 +1405,16 @@ export default function App() {
       list.splice(to, 0, c);
       return { ...d, list };
     });
+    setMoveTick((n) => n + 1);
   }
+  // 순서를 옮기면 잠깐(1.2초) 기다렸다가 T맵 이동 시간을 새 순서로 다시 받는다.
+  // 연달아 여러 번 옮기면 마지막에 한 번만 계산한다.
+  const [moveTick, setMoveTick] = useState(0);
+  useEffect(() => {
+    if (!moveTick || !localStorage.getItem(TMAP_KEY)) return;
+    const id = setTimeout(() => fetchLegs(dayRef.current, true), 1200);
+    return () => clearTimeout(id);
+  }, [moveTick]);
   const chosen = selected === day.date ? day : history[selected],
     pastDates = Object.keys({ ...history, [day.date]: day }).filter(
       (date) =>
