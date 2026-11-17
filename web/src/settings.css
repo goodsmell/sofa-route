@@ -19,3 +19,6 @@ nav.tabs .in[role=tablist]{grid-template-columns:repeat(4,minmax(0,1fr))}
 .doc-incident{--c:var(--bad)}
 .doc-measurement{--c:var(--ok)}
 .doc-move_install,.doc-move_dismantle{--c:#9a7fd1}
+/* 접기 화살표: 닫히는 애니메이션이 시작될 때 바로 아래로 돌린다 */
+details.closing>summary::after{transform:none}
+.review-summary{scroll-margin-top:12px}

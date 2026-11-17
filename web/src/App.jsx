@@ -29,6 +29,7 @@ import {
   queuedCount,
 } from "./importQueue.js";
 import DocumentViewer from "./DocumentViewer.jsx";
+import AnimatedDetails from "./AnimatedDetails.jsx";
 import Settings from "./Settings.jsx";
 import KeyGate from "./KeyGate.jsx";
 import RouteMap from "./RouteMap.jsx";
@@ -173,6 +174,8 @@ const DocBadge = ({ type }) => (
 );
 
 function ConfirmedDocuments({ imports, onOpen }) {
+  // 한 번에 한 의뢰서만 펼친다.
+  const [openId, setOpenId] = useState(null);
   if (!imports.length) return null;
   return (
     <div className="panel review-panel">
@@ -183,7 +186,12 @@ function ConfirmedDocuments({ imports, onOpen }) {
         </p>
       </div>
       {imports.map((c, i) => (
-        <details className="review-item" key={c.id || i}>
+        <AnimatedDetails
+          className="review-item"
+          key={c.id || i}
+          open={c.id === openId}
+          onToggle={() => setOpenId((id) => (id === c.id ? null : c.id))}
+        >
           <summary className="review-summary">
             <span className="review-number">{i + 1}</span>
             <span className="review-summary-text">
@@ -244,7 +252,7 @@ function ConfirmedDocuments({ imports, onOpen }) {
               </table>
             )}
           </div>
-        </details>
+        </AnimatedDetails>
       ))}
     </div>
   );
@@ -336,6 +344,10 @@ export default function App() {
       ...s,
       [field]: typeof value === "function" ? value(s[field]) : value,
     }));
+  // 추출 결과 확인 목록은 한 번에 한 고객만 펼친다. 처음엔 첫 고객이 열려 있다.
+  const [openReviewChoice, setOpenReviewId] = useState(undefined),
+    openReviewId =
+      openReviewChoice === undefined ? pending[0]?.id : openReviewChoice;
   const setPending = sessionSetter("pending"),
     setPhoneCandidates = sessionSetter("phoneCandidates");
   const timer = useRef(null),
@@ -1388,7 +1400,7 @@ export default function App() {
                       </p>
                     </div>
                     {pending.map((c, i) => (
-                      <details
+                      <AnimatedDetails
                         className={
                           "review-item" +
                           (!c.name.trim() ||
@@ -1397,7 +1409,10 @@ export default function App() {
                             : "")
                         }
                         key={c.id || i}
-                        open={i === 0 ? true : undefined}
+                        open={c.id === openReviewId}
+                        onToggle={() =>
+                          setOpenReviewId(openReviewId === c.id ? null : c.id)
+                        }
                       >
                         <summary className="review-summary">
                           <span className="review-number">{i + 1}</span>
@@ -1651,7 +1666,7 @@ export default function App() {
                             이 항목 빼기
                           </button>
                         </div>
-                      </details>
+                      </AnimatedDetails>
                     ))}
                     <button
                       className="primary big"
