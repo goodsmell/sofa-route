@@ -104,3 +104,6 @@ body:has(.recommendation-view){padding-bottom:calc(72px + env(safe-area-inset-bo
 .recommendation-view .recommendation-late,.recommendation-view .recommendation-ontime{font-size:15px;font-weight:600;white-space:nowrap}
 .recommendation-view .recommendation-ontime{justify-content:flex-end;color:var(--muted);font-weight:500}
 .recommendation-view .recommendation-ontime{display:flex;padding:4px 6px;margin:-4px -6px}
+/* 코스 카드: 고객 이름 옆 문서 종류 뱃지 */
+.stop-text:has(.doc-badge){flex-direction:row;align-items:center;flex-wrap:wrap;gap:4px 8px}
+.stop-text .doc-badge{font-size:12px;color:var(--c);overflow-wrap:normal;word-break:keep-all}

@@ -131,7 +131,6 @@ function StopCard({
   const phone = c.phone || c.safePhone;
   const late = row.flags.some(([k]) => k === "bad");
   const badges = [
-    c.documentType ? documentTypeLabel(c.documentType) : null,
     c.promiseTime
       ? c.promiseTime + " 확정"
       : c.slot === "am"
@@ -164,6 +163,12 @@ function StopCard({
           <span className="stop-no">{index + 1}</span>
           <span className="stop-text">
             <strong>{c.name || "이름 확인"}</strong>
+            {/* 문서 종류는 이름 옆 색 뱃지로 (의뢰서 목록과 같은 모양) */}
+            {c.documentType && (
+              <span className={"doc-badge doc-" + c.documentType}>
+                {documentTypeLabel(c.documentType)}
+              </span>
+            )}
           </span>
         </button>
         {callMode && phone && !c.done && (
