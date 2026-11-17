@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   fmt,
   normalizePhone,
@@ -571,9 +571,70 @@ function Timeline({
     setDragState(dragRef.current);
   };
   const pointer = useRef(null);
-  const targetAt = (x, y) => {
-    const el = document.elementFromPoint(x, y)?.closest("[data-idx]");
-    return el ? +el.dataset.idx : null;
+  const listRef = useRef(null);
+  const flip = useRef(null); // 놓기 직전 카드 위치(id → top). 새 순서로 그린 뒤 그 자리에서 미끄러지게 한다.
+  const stopsEl = () => [...(listRef.current?.querySelectorAll("li[data-idx]") || [])];
+  const legEl = (i) => listRef.current?.querySelector(`li[data-leg="${i}"]`);
+  const reduceMotion = () =>
+    typeof matchMedia === "function" &&
+    matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // 끄는 카드는 손가락을 따라가고, 사이에 있는 카드는 비켜 준다(transform만 바꿔서 부드럽게).
+  const paint = (d) => {
+    const pitchDown = d.from + 1 < d.tops.length ? d.tops[d.from + 1] - d.tops[d.from] : 0;
+    const pitchUp = d.from > 0 ? d.tops[d.from] - d.tops[d.from - 1] : 0;
+    stopsEl().forEach((li) => {
+      const k = +li.dataset.idx,
+        leg = legEl(k);
+      if (k === d.from) {
+        li.style.transform = `translateY(${d.dy}px) scale(1.02)`;
+        li.classList.add("lifted");
+        if (leg) leg.style.opacity = "0.25";
+        return;
+      }
+      const shift =
+        d.from < d.to && k > d.from && k <= d.to
+          ? -pitchDown
+          : d.to < d.from && k >= d.to && k < d.from
+            ? pitchUp
+            : 0;
+      li.style.transform = shift ? `translateY(${shift}px)` : "";
+      if (leg) leg.style.transform = shift ? `translateY(${shift}px)` : "";
+    });
+  };
+  const clearPaint = () => {
+    stopsEl().forEach((li) => {
+      li.style.transform = "";
+      li.classList.remove("lifted");
+      const leg = legEl(+li.dataset.idx);
+      if (leg) {
+        leg.style.transform = "";
+        leg.style.opacity = "";
+      }
+    });
+  };
+  // 손가락 위치로 끄는 카드의 이동량과 놓일 자리를 정한다(원래 카드 위치 기준이라 비켜 준 카드에 흔들리지 않는다).
+  const follow = () => {
+    const d = dragRef.current,
+      p = pointer.current;
+    if (!d || !p) return;
+    const dy = p.y + window.scrollY - d.startY;
+    const center = d.tops[d.from] + d.heights[d.from] / 2 + dy;
+    let to = d.from,
+      best = Infinity;
+    d.tops.forEach((top, k) => {
+      const gap = Math.abs(top + d.heights[k] / 2 - center);
+      if (gap < best) {
+        best = gap;
+        to = k;
+      }
+    });
+    const next = { ...d, dy, to };
+    dragRef.current = next;
+    paint(next);
+    if (to !== d.to) {
+      setDragState(next);
+      navigator.vibrate?.(8);
+    }
   };
   useEffect(() => {
     if (!drag) return;
@@ -584,8 +645,7 @@ function Timeline({
         if (p.y < 110) window.scrollBy(0, -Math.ceil((110 - p.y) / 6));
         else if (p.y > window.innerHeight - 150)
           window.scrollBy(0, Math.ceil((p.y - window.innerHeight + 150) / 6));
-        const to = targetAt(p.x, p.y);
-        if (to != null) setDrag((d) => (d && d.to !== to ? { ...d, to } : d));
+        follow();
       }
       frame = requestAnimationFrame(tick);
     };
@@ -596,35 +656,72 @@ function Timeline({
       document.body.classList.remove("dragging-route");
     };
   }, [!!drag]);
+  // 순서가 바뀐 뒤: 놓기 직전 위치에서 새 위치로 미끄러지게 한다.
+  useLayoutEffect(() => {
+    const before = flip.current;
+    flip.current = null;
+    if (!before || reduceMotion()) return;
+    stopsEl().forEach((li) => {
+      const old = before[li.dataset.id];
+      if (old == null) return;
+      const delta = old - li.getBoundingClientRect().top;
+      if (Math.abs(delta) < 1) return;
+      li.animate(
+        [{ transform: `translateY(${delta}px)` }, { transform: "translateY(0)" }],
+        { duration: 260, easing: "cubic-bezier(.2,.8,.2,1)" },
+      );
+    });
+    listRef.current
+      ?.querySelectorAll("li[data-leg]")
+      .forEach((leg) =>
+        leg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 260, easing: "ease-out" }),
+      );
+  }, [calc.rows.map((row) => row.c.id).join()]);
+  const finish = (commit) => {
+    const d = dragRef.current;
+    pointer.current = null;
+    if (commit && d && d.to !== d.from) {
+      flip.current = Object.fromEntries(
+        stopsEl().map((li) => [li.dataset.id, li.getBoundingClientRect().top]),
+      );
+      clearPaint();
+      setDrag(null);
+      actions.move(d.from, d.to);
+      return;
+    }
+    // 제자리에 놓거나 취소하면 원래 자리로 부드럽게 돌아간다.
+    stopsEl().forEach((li) => {
+      if (li.style.transform && !reduceMotion())
+        li.animate(
+          [{ transform: li.style.transform }, { transform: "none" }],
+          { duration: 200, easing: "ease-out" },
+        );
+    });
+    clearPaint();
+    setDrag(null);
+  };
   const grip = (i) => ({
     onPointerDown: (e) => {
       e.preventDefault();
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {}
+      const items = stopsEl();
+      const tops = items.map((li) => li.getBoundingClientRect().top + window.scrollY);
+      const heights = items.map((li) => li.getBoundingClientRect().height);
       pointer.current = { x: e.clientX, y: e.clientY };
-      setDrag({ from: i, to: i });
+      const d = { from: i, to: i, dy: 0, startY: e.clientY + window.scrollY, tops, heights };
+      setDrag(d);
+      paint(d);
+      navigator.vibrate?.(10);
     },
     onPointerMove: (e) => {
-      const d = dragRef.current;
-      if (!d) return;
+      if (!dragRef.current) return;
       pointer.current = { x: e.clientX, y: e.clientY };
-      const to = targetAt(e.clientX, e.clientY);
-      if (to != null && to !== d.to) setDrag({ ...d, to });
+      follow();
     },
-    onPointerUp: (e) => {
-      const d = dragRef.current;
-      if (d) {
-        const to = targetAt(e.clientX, e.clientY) ?? d.to;
-        if (to !== d.from) actions.move(d.from, to);
-      }
-      setDrag(null);
-      pointer.current = null;
-    },
-    onPointerCancel: () => {
-      setDrag(null);
-      pointer.current = null;
-    },
+    onPointerUp: () => finish(true),
+    onPointerCancel: () => finish(false),
     onKeyDown: (e) => {
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         e.preventDefault();
@@ -641,7 +738,7 @@ function Timeline({
           자리로
         </p>
       )}
-      <ol className="timeline">
+      <ol className="timeline" ref={listRef}>
         <li className="tl-end">
           <time>{day.depart}</time>
           <div>
@@ -651,10 +748,10 @@ function Timeline({
         </li>
         {calc.rows.map((row, i) => (
           <React.Fragment key={row.c.id}>
-            <li className="tl-leg">
+            <li className="tl-leg" data-leg={i}>
               <Leg day={day} i={i} busy={legBusy} />
             </li>
-            <li className="tl-stop" data-idx={i}>
+            <li className="tl-stop" data-idx={i} data-id={row.c.id}>
               <time
                 className={
                   row.flags.some(([k]) => k === "bad") && !row.c.done
@@ -677,8 +774,8 @@ function Timeline({
                 }
                 actions={actions}
                 grip={grip(i)}
-                dragging={drag?.from === i}
-                target={drag && drag.to === i && drag.from !== i}
+                dragging={false}
+                target={false}
                 callMode={callMode}
                 deliveryMode={deliveryMode}
               />
@@ -697,17 +794,6 @@ function Timeline({
         </li>
       </ol>
     </>
-  );
-}
-
-function TotalsNote({ day, calc }) {
-  if (!legsReadyOf(day)) return null;
-  const totals = routeTotals(day);
-  return (
-    <p className="note center">
-      총 {totals.km}km · 운전 {fmtDuration(totals.min)} · 출발부터 귀가까지{" "}
-      {fmtDuration(calc.home - toMin(day.depart))}
-    </p>
   );
 }
 
@@ -1068,7 +1154,6 @@ export default function RouteView(props) {
                     코스 복사
                   </button>
                 </div>
-                <TotalsNote day={viewDay} calc={viewCalc} />
               </>
             )}
           </>

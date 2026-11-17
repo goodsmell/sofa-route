@@ -119,3 +119,7 @@ body:has(.recommendation-view){padding-bottom:calc(72px + env(safe-area-inset-bo
 /* 카드 뱃지 줄: 통화 체크와 같은 높이로 글자를 가운데에 */
 .badges{align-items:center}
 .badges .badge{display:inline-flex;align-items:center;min-height:32px;padding:0 10px}
+/* 순서 옮기기: 끄는 동안 비켜 주는 카드는 부드럽게, 끄는 카드는 손가락을 바로 따라간다 */
+body.dragging-route .timeline>li{transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .2s}
+body.dragging-route .timeline>li.lifted{transition:none;position:relative;z-index:5}
+.timeline>li.lifted .stop{box-shadow:0 12px 28px rgba(20,26,28,.18);border-color:var(--accent)}
