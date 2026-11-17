@@ -1224,8 +1224,16 @@ export default function App() {
                 </div>
               )}
               {addMode === "document" && (
-                <div className="panel trip-fields" id="trip-settings">
-                  <h2>출발과 귀가</h2>
+                <details className="panel trip-fields" id="trip-settings">
+                  <summary>
+                    <span>
+                      출발과 귀가
+                      <small className="trip-summary">
+                        {day.depart} {day.start || "출발지 미입력"} →{" "}
+                        {day.end || "귀가지 미입력"}
+                      </small>
+                    </span>
+                  </summary>
                   <Field
                     label="출발 장소"
                     value={day.start}
@@ -1242,7 +1250,7 @@ export default function App() {
                     value={day.end}
                     onChange={(v) => setDay((d) => ({ ...d, end: v }))}
                   />
-                </div>
+                </details>
               )}
               {addMode === "document" && pending.length > 0 && (
                 <div className="panel review-panel">
