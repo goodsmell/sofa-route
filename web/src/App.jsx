@@ -9,6 +9,7 @@ import {
   baseCustomer,
   normalizePhone,
   compute,
+  toMin,
   precallList,
   recommendOrder,
   applyPhotoImports,
@@ -87,6 +88,11 @@ const labelDate = (s) => {
 };
 const tmap = (s) => "tmap://search?name=" + encodeURIComponent(s);
 const blank = () => baseCustomer();
+// 구간마다 실제 출발 예정 시각(분): 0번은 출발 시각, 그다음은 앞 집 작업이 끝나는 시각
+const legSchedule = (d) => {
+  const { rows } = compute(d);
+  return [toMin(d.depart), ...rows.map((row) => row.end)];
+};
 const AI_KEY = "sofa-route-gemini-key-v1",
   TMAP_KEY = "sofa-route-tmap-key-v1",
   TRUCK_KEY = "sofa-route-truck-v1";
@@ -617,7 +623,10 @@ export default function App() {
         setLegBusy(true);
         try {
           const result = await calculateRecommendedLegs(next, (ordered) =>
-            fetchTmapRoute(ordered, key, profile, fetch, { useCache: false }),
+            fetchTmapRoute(ordered, key, profile, fetch, {
+              useCache: false,
+              schedule: legSchedule,
+            }),
           );
           Object.assign(plans, result.plans);
           located = result.located;
@@ -678,6 +687,7 @@ export default function App() {
     try {
       const route = await fetchTmapRoute(ordered, key, profile, fetch, {
         useCache: false,
+        schedule: legSchedule,
       });
       if (!route.legs)
         throw new Error(
@@ -742,6 +752,7 @@ export default function App() {
     try {
       const route = await fetchTmapRoute(baseDay, key, profile, fetch, {
         useCache: false,
+        schedule: legSchedule,
       });
       if (!route.legs)
         throw new Error(

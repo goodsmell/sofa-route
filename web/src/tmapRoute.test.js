@@ -148,3 +148,20 @@ test('구가 새로 생긴 시는 T맵이 알려 준 구를 주소에 넣어 다
   assert.equal(withDistrict('경기도 안산시 고잔로 54',data),'');
   assert.equal(withDistrict('경기도 화성시 동탄대로 446',{coordinateInfo:{coordinate:[{gu_gun:'화성시'}]}}),'');
 });
+
+test('구간마다 실제 출발 예정 시각으로 T맵에 다시 묻고, 실패한 구간은 첫 결과를 둔다',async()=>{
+  const {timedLegs}=await import('./tmapRoute.js');
+  const day={date:'2026-11-18',depart:'06:40',start:'출발',end:'귀가',list:[{id:'a'},{id:'b'}]};
+  const points=[{lat:37,lng:127,index:-1},{lat:37.1,lng:127.1,index:0},{lat:37.2,lng:127.2,index:1},{lat:37.3,lng:127.3,index:2}];
+  const first=[{km:10,min:20},{km:12,min:25},{km:14,min:30}];
+  const sent=[];
+  const fetcher=async(url,options)=>{
+    const body=JSON.parse(options.body); sent.push(body.startTime);
+    if(body.startTime.endsWith('2350')) return {ok:false,status:400,json:async()=>({})};
+    return {ok:true,status:200,json:async()=>({properties:{totalTime:'3600',totalDistance:'20000'}})};
+  };
+  // 0번 06:40, 1번 09:30, 2번(귀가) 23:50 출발 예정
+  const legs=await timedLegs(day,points,first,{},'k',fetcher,()=>[400,570,1430]);
+  assert.deepEqual(sent.sort(),['202611180640','202611180930','202611182350']);
+  assert.deepEqual(legs,[{km:20,min:60},{km:20,min:60},{km:14,min:30}]);
+});

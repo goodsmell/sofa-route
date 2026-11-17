@@ -272,7 +272,9 @@ export async function resolvePoints(day, key, fetcher = fetch) {
 
 const legKey = (day, points, profile) => JSON.stringify([day.date, day.depart, validTruck(profile) ? [profile.height, profile.width, profile.length, profile.weight, profile.totalWeight] : 0, points.map(p => [p.lat.toFixed(5), p.lng.toFixed(5)])]);
 
-export async function fetchTmapRoute(day, key, profile, fetcher = fetch, {useCache = true} = {}) {
+// schedule(day)를 주면, 첫 계산 뒤 구간마다 실제 출발 예정 시각(앞 집 작업이 끝나는 시각)으로 T맵에 다시 물어
+// 그 시간대 교통을 반영한다. schedule은 구간 i(0=출발→1번, n=마지막→귀가)의 출발 시각(분)을 돌려준다.
+export async function fetchTmapRoute(day, key, profile, fetcher = fetch, {useCache = true, schedule = null} = {}) {
   if (!day.list.length) throw new Error('배송지가 없습니다.');
   if (day.list.length > 30) throw new Error('경로는 배송지 30곳까지 받을 수 있어요.');
   const found = await resolvePoints(day, key, fetcher);
@@ -282,7 +284,9 @@ export async function fetchTmapRoute(day, key, profile, fetcher = fetch, {useCac
   const cacheKey = legKey(day, points, profile);
   const cache = useCache && typeof localStorage !== 'undefined' ? storage.get(LEG_CACHE) : {};
   if (useCache && cache[cacheKey]) {
-    return {points, lines: [], legs: spreadLegs(cache[cacheKey], order, day.list.length), missing: found.missing, located, truck: validTruck(profile), cached: true};
+    let legs = spreadLegs(cache[cacheKey], order, day.list.length);
+    if (schedule) legs = await timedLegs(day, points, legs, profile, key, fetcher, schedule);
+    return {points, lines: [], legs, missing: found.missing, located, truck: validTruck(profile), cached: true};
   }
   const response = await request(`${API}/routes/routeSequential30?version=1`, {
     method: 'POST', headers: {appKey: key, Accept: 'application/json', 'Content-Type': 'application/json'},
@@ -294,7 +298,42 @@ export async function fetchTmapRoute(day, key, profile, fetcher = fetch, {useCac
   if (!lines.length) throw new Error('T맵이 도로 경로를 돌려주지 않았어요.');
   const subLegs = routeLegs(data, points);
   if (subLegs && typeof localStorage !== 'undefined') {const all = storage.get(LEG_CACHE); all[cacheKey] = subLegs; storage.set(LEG_CACHE, all, 60)}
-  return {points, lines, legs: subLegs ? spreadLegs(subLegs, order, day.list.length) : null, missing: found.missing, located, truck: validTruck(profile)};
+  let legs = subLegs ? spreadLegs(subLegs, order, day.list.length) : null;
+  if (legs && schedule) legs = await timedLegs(day, points, legs, profile, key, fetcher, schedule);
+  return {points, lines, legs, missing: found.missing, located, truck: validTruck(profile)};
+}
+
+// 하루 시작(0시)에서 min분 뒤의 날짜·시각 ("2026-11-18", "14:05"). 자정을 넘기면 다음 날이 된다.
+function clockAt(date, min) {
+  const d = new Date(date + 'T00:00:00');
+  d.setMinutes(Math.round(min));
+  const pad = n => String(n).padStart(2, '0');
+  return {date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`, depart: `${pad(d.getHours())}:${pad(d.getMinutes())}`};
+}
+
+// 구간 하나(from→to)를 주어진 출발 시각으로 T맵에 묻는다. T맵은 경유지가 1개 이상 필요해서 도착 지점을 경유지로도 넣는다.
+async function segmentLeg(day, from, to, atMin, profile, key, fetcher) {
+  const response = await request(`${API}/routes/routeSequential30?version=1`, {
+    method: 'POST', headers: {appKey: key, Accept: 'application/json', 'Content-Type': 'application/json'},
+    body: JSON.stringify(routeBody({...day, ...clockAt(day.date, atMin)}, [from, to, to], profile)),
+  }, fetcher);
+  if (!response.ok) return null;
+  const total = (await response.json().catch(() => null))?.properties;
+  const time = +total?.totalTime, distance = +total?.totalDistance;
+  return time > 0 ? toLeg(distance || 0, time) : null;
+}
+
+// 첫 계산 결과로 하루 일정을 짜 보고, 구간마다 그 출발 시각의 교통으로 다시 계산한다. 실패한 구간은 첫 결과를 그대로 둔다.
+export async function timedLegs(day, points, legs, profile, key, fetcher, schedule) {
+  const departures = schedule(applyLegs(day, legs));
+  const out = [...legs], jobs = [];
+  for (let j = 0; j < points.length - 1; j++) {
+    const from = points[j], to = points[j + 1], leg = to.index;
+    if (to.index !== from.index + 1 || !Number.isFinite(departures?.[leg])) continue;
+    jobs.push(() => segmentLeg(day, from, to, departures[leg], profile, key, fetcher).then(r => {if (r) out[leg] = r}, () => {}));
+  }
+  for (let i = 0; i < jobs.length; i += 3) await Promise.all(jobs.slice(i, i + 3).map(job => job()));
+  return out;
 }
 
 // 구간 결과를 고객별 이동 시간에 저장한다. travelFrom은 그때의 바로 앞 장소라서 순서가 바뀌면 다시 받아야 함을 알 수 있다.
