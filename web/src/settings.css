@@ -24,3 +24,8 @@ details.closing>summary::after{transform:none}
 .review-summary{scroll-margin-top:12px}
 /* 추출 결과 확인: 큰 제목 아래 작은 날짜·건수 */
 .review-count{margin:0 0 6px;font-size:14px;font-weight:600;color:var(--muted)}
+/* 출발과 귀가: 접혀 있을 때 위아래 여백 줄이기 */
+#trip-settings{padding:6px 0}
+#trip-settings>summary{min-height:44px}
+#trip-settings[open]{padding-bottom:16px}
+#trip-settings:not([open]){gap:0}
