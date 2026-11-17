@@ -5,6 +5,24 @@ import React, { useLayoutEffect, useRef } from "react";
 const DURATION = 260,
   EASING = "cubic-bezier(.2,.8,.2,1)";
 
+// 연 칸의 제목이 화면 맨 위(조금 띄워서)에 오도록 펼쳐지는 동안 함께 부드럽게 스크롤한다.
+// 위쪽에서 동시에 접히는 칸이 있으면 그만큼 줄어든 최종 위치를 미리 계산한다.
+const TOP_GAP = 12;
+// 화면에 그리기 전(접히는 칸이 아직 원래 높이일 때) 바로 재야 정확하다.
+function scrollToSummary(el, summary, reduce) {
+  let shrinkAbove = 0;
+  for (const other of el.parentElement?.children || [])
+    if (
+      other !== el &&
+      other.closingDelta &&
+      other.compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING
+    )
+      shrinkAbove += other.closingDelta;
+  const top =
+    window.scrollY + summary.getBoundingClientRect().top - shrinkAbove - TOP_GAP;
+  window.scrollTo({ top: Math.max(0, top), behavior: reduce ? "auto" : "smooth" });
+}
+
 export default function AnimatedDetails({ open, onToggle, className, children }) {
   const ref = useRef(null),
     anim = useRef(null),
@@ -27,6 +45,8 @@ export default function AnimatedDetails({ open, onToggle, className, children })
     const from = el.offsetHeight;
     el.open = open;
     const to = el.offsetHeight;
+    el.closingDelta = open ? 0 : from - to;
+    if (open && summary) scrollToSummary(el, summary, reduce);
     if (reduce || from === to) {
       anim.current = null;
       return;
@@ -45,10 +65,8 @@ export default function AnimatedDetails({ open, onToggle, className, children })
       anim.current = null;
       el.style.overflow = "";
       el.classList.remove("closing");
+      el.closingDelta = 0;
       if (!open) el.open = false;
-      // 위쪽 칸이 접히면서 연 칸의 제목이 화면 위로 밀려났으면 보이게 끌어온다.
-      if (open && summary && summary.getBoundingClientRect().top < 0)
-        summary.scrollIntoView({ behavior: "smooth", block: "start" });
     };
     a.oncancel = () => {
       el.style.overflow = "";
