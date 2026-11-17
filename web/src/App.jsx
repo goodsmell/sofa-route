@@ -35,7 +35,7 @@ import KeyGate from "./KeyGate.jsx";
 import RouteMap from "./RouteMap.jsx";
 import { planWithGemini } from "./routeAI.js";
 import { analyzePhoto } from "./photoAI.js";
-import { mockImports, isMock } from "./mockData.js";
+import { mockImports, isMock, mockDocumentImage } from "./mockData.js";
 import {
   DOCUMENT_TYPES,
   documentTypeLabel,
@@ -993,9 +993,23 @@ export default function App() {
         ),
       0,
     );
-  function addMock() {
-    const mock = mockImports(day.date);
-    updateSession(day.date, (s) => ({
+  async function addMock() {
+    const date = day.date,
+      mock = mockImports(date);
+    // 고객마다 가짜 의뢰서 사진을 만들어 실제 의뢰서처럼 기기에 저장해 둔다.
+    for (const c of mock.pending) {
+      try {
+        const blob = await mockDocumentImage(c, documentTypeLabel(c.documentType));
+        const file = new File([blob], c.name.replace(/\s/g, "_") + "_의뢰서.jpg", {
+          type: "image/jpeg",
+        });
+        c.imageId = await saveDocument(file);
+        c.file = file.name;
+      } catch {
+        // 사진을 못 만들어도 고객은 넣는다.
+      }
+    }
+    updateSession(date, (s) => ({
       ...s,
       pending: [...s.pending.filter((c) => !isMock(c)), ...mock.pending],
       phoneCandidates: [
@@ -1008,6 +1022,14 @@ export default function App() {
     flash("테스트 고객 " + mock.pending.length + "명을 넣었어요.");
   }
   function clearMock() {
+    const records = { ...history, [day.date]: day },
+      imageIds = [
+        ...Object.values(importsRef.current).flatMap((s) => s.pending),
+        ...Object.values(records).flatMap((d) => [...(d.list || []), ...(d.imports || [])]),
+      ]
+        .filter((c) => isMock(c) && c.imageId)
+        .map((c) => c.imageId);
+    deleteDocuments(imageIds).catch(() => {});
     for (const date of Object.keys(importsRef.current))
       updateSession(date, (s) => ({
         ...s,

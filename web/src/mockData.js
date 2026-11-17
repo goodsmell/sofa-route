@@ -115,3 +115,85 @@ export function mockImports(date) {
     ),
   };
 }
+
+// 테스트 고객의 가짜 의뢰서 사진. 실제 의뢰서처럼 표에 고객 정보를 적은 그림(JPEG)을 만든다.
+const yesNo = (known, yes, a, b) => (known ? (yes ? a : b) : "");
+function documentRows(c) {
+  const t = c.documentType;
+  const rows = [
+    [t === "return" ? "배송요청일" : t === "dispatch" ? "시공일" : "요청일", c.installDate],
+    ["고객명", c.name],
+    [t === "return" ? "배송지주소" : t?.startsWith("move") ? "설치주소" : "고객 주소", c.addr],
+    ["해체/철거주소", c.fromAddr],
+    ["안심번호", c.safePhone.replace(/^(\d{4})(\d{4})(\d{4})$/, "$1-$2-$3")],
+    ["연락처 2", c.phone2.replace(/^(\d{3})(\d{4})(\d{4})$/, "$1-$2-$3")],
+    ["주문번호", c.orderNo],
+    ["현장번호", c.siteNo],
+    ["제품", (c.productRows.length ? c.productRows : [c.prod]).filter(Boolean).join(" / ")],
+    ["엘리베이터", c.noelev ? "없음" : c.elevSize ? "있음 · " + c.elevSize : yesNo(c.elevatorKnown, true, "있음", "")],
+    ["총 무게", c.weight ? c.weight + " kg" : ""],
+    ["사다리차", yesNo(c.ladderKnown, c.ladderNeeded, "필요", "불필요")],
+    ["기존 소파 수거", t === "dispatch" ? (c.bs ? "있음" : "없음") : ""],
+    [t === "return" ? "반품사유" : "요청사유", c.requestReason],
+    ["요청사항", c.requestDetails],
+    ["특이사항", c.memo],
+  ];
+  return rows.filter(([, v]) => v);
+}
+
+function wrap(ctx, text, width) {
+  const lines = [];
+  let line = "";
+  for (const ch of String(text)) {
+    if (ctx.measureText(line + ch).width > width && line) {
+      lines.push(line);
+      line = ch;
+    } else line += ch;
+  }
+  return [...lines, line];
+}
+
+export function mockDocumentImage(c, title) {
+  const W = 900, H = 1270, pad = 60, labelW = 190;
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d");
+  const font = (size, weight = 400) =>
+    (ctx.font = `${weight} ${size}px "Apple SD Gothic Neo","Malgun Gothic",sans-serif`);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = "#111";
+  font(22, 800);
+  ctx.fillText("SOFA", pad, pad + 10);
+  font(36, 800);
+  ctx.textAlign = "center";
+  ctx.fillText(title, W / 2, pad + 70);
+  ctx.textAlign = "left";
+  font(18);
+  ctx.fillStyle = "#c0392b";
+  ctx.fillText("테스트용 가짜 의뢰서", W - pad - 170, pad + 10);
+  ctx.strokeStyle = "#333";
+  ctx.lineWidth = 2;
+  let y = pad + 110;
+  font(22);
+  for (const [label, value] of documentRows(c)) {
+    const lines = wrap(ctx, value, W - pad * 2 - labelW - 30);
+    const h = Math.max(56, lines.length * 32 + 24);
+    ctx.fillStyle = "#eef1f2";
+    ctx.fillRect(pad, y, labelW, h);
+    ctx.strokeRect(pad, y, W - pad * 2, h);
+    ctx.beginPath();
+    ctx.moveTo(pad + labelW, y);
+    ctx.lineTo(pad + labelW, y + h);
+    ctx.stroke();
+    ctx.fillStyle = "#333";
+    font(20, 700);
+    ctx.fillText(label, pad + 14, y + 35);
+    ctx.fillStyle = "#111";
+    font(22);
+    lines.forEach((l, i) => ctx.fillText(l, pad + labelW + 16, y + 36 + i * 32));
+    y += h;
+  }
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+}
