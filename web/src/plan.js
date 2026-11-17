@@ -151,18 +151,54 @@ export function customerOrder(day, stops, start, end, pos) {
   return best;
 }
 
+// 출퇴근 시간대(07~09시, 17~19시). 이때 운전하면 막힌다고 보고 손해로 친다.
+const RUSH = [
+  [420, 540],
+  [1020, 1140],
+];
+const rushOverlap = (from, to) =>
+  RUSH.reduce((sum, [s, e]) => sum + Math.max(0, Math.min(to, e) - Math.max(from, s)), 0);
+
+// 대략 시간으로 하루를 돌려 보고, 방문 시간 전에 도착해 기다린 시간(분)과 출퇴근 시간대에 운전한 시간(분)을 센다.
+// 예: 06:40 출발해 35분 거리 집에 가면 09:00까지 1시간 45분을 기다린다. 그 시간에 먼 집부터 가는 편이 낫다.
+export function idleAndRush(day, stops, start, end, pos) {
+  let t = toMin(day.depart),
+    here = start,
+    wait = 0,
+    rush = 0;
+  for (const c of stops) {
+    const p = pos[c.id];
+    const move = p ? driveMin(here, p) : 30;
+    rush += rushOverlap(t, t + move);
+    const reach = t + move,
+      begin = Math.max(reach, visitWindow(c).s);
+    wait += begin - reach;
+    t = begin + serviceMin(c, move);
+    if (p) here = p;
+  }
+  rush += rushOverlap(t, t + driveMin(here, end));
+  return { wait, rush };
+}
+
 // 시간 약속 위반은 크게 피하면서 운전 거리에도 비중을 두는 절충안.
+// 첫 집 앞에서 하염없이 기다리는 시간과 출퇴근길 운전도 손해로 쳐서, 그 시간에 먼 곳부터 가도록 한다.
 export function balancedOrder(day, stops, start, end, pos) {
   let best = driverOrder(stops, start, end, pos);
-  const score = (order) =>
-    customerScore(day, order, start, end, pos) +
-    pathKm(
-      start,
-      order.filter((c) => pos[c.id]),
-      end,
-      pos,
-    ) *
-      2;
+  const score = (order) => {
+    const { wait, rush } = idleAndRush(day, order, start, end, pos);
+    return (
+      customerScore(day, order, start, end, pos) +
+      pathKm(
+        start,
+        order.filter((c) => pos[c.id]),
+        end,
+        pos,
+      ) *
+        2 +
+      wait +
+      rush * 0.7
+    );
+  };
   let bestScore = score(best);
   for (let pass = 0; pass < 20; pass++) {
     let changed = false;

@@ -107,3 +107,16 @@ test('같은 추천 순서는 한 번만 계산하고 실패한 코스도 다시
   assert.equal(result.plans.balanced.timeError, '경로 실패');
   assert.equal(result.errors.length, 1);
 });
+
+test('균형 추천은 9시 전에 가까운 집 앞에서 기다리기보다 먼 집부터 간다',async()=>{
+  const {balancedOrder,idleAndRush}=await import('./plan.js');
+  // 출발·귀가는 안산 근처. near는 20분 거리, far는 1시간 20분 거리(직선 약 60km)
+  const s={lat:37.30,lng:126.80};
+  const p={near:{lat:37.40,lng:126.85},far:{lat:37.30,lng:127.48}};
+  const stop=(id)=>({id,name:id,addr:'경기',slot:'any',done:false});
+  const day={date:'2026-11-18',depart:'06:40',list:[stop('near'),stop('far')]};
+  const nearFirst=idleAndRush(day,[stop('near'),stop('far')],s,s,p);
+  const farFirst=idleAndRush(day,[stop('far'),stop('near')],s,s,p);
+  assert.ok(farFirst.wait<nearFirst.wait);
+  assert.deepEqual(balancedOrder(day,[stop('near'),stop('far')],s,s,p).map(c=>c.id),['far','near']);
+});
