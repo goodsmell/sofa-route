@@ -140,9 +140,20 @@ async function lookup(candidate, key, fetcher) {
   const response = await request(url, {headers: {appKey: key, Accept: 'application/json'}}, fetcher);
   if (!response.ok) return null;
   const data = await response.json().catch(() => null);
-  const point = candidate.kind === 'poi' ? exactPoi(data, candidate) : exactGeocode(data, candidate.q);
+  let point = candidate.kind === 'poi' ? exactPoi(data, candidate) : exactGeocode(data, candidate.q);
+  // 구가 새로 생긴 시(예: 2026년 화성시 동탄구)는 구 없이 쓴 주소에 좌표를 안 준다. T맵이 알려 준 구를 넣어 한 번 더 찾는다.
+  const district = !point && candidate.kind !== 'poi' && !candidate.retried && withDistrict(candidate.q, data);
+  if (district) point = await lookup({...candidate, q: district, retried: true}, key, fetcher);
   if (point && typeof localStorage !== 'undefined') {cache[id] = point; storage.set(GEO_CACHE, cache, 400)}
   return point;
+}
+
+// "경기도 화성시 동탄대로 446" + T맵 응답의 gu_gun "화성시 동탄구" → "경기도 화성시 동탄구 동탄대로 446"
+export function withDistrict(q, data) {
+  const guGun = String(data?.coordinateInfo?.coordinate?.[0]?.gu_gun || '').trim();
+  const [city, gu] = guGun.split(/\s+/);
+  if (!city || !gu || !/구$/.test(gu) || q.includes(gu) || !q.includes(city)) return '';
+  return q.replace(city, city + ' ' + gu);
 }
 
 // 후보를 차례로 찾아보고 처음 찾은 좌표를 쓴다.

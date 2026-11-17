@@ -139,3 +139,12 @@ test('T맵이 선을 도착 지점 뒤에 붙여 보내도 출발→1번 구간 
   const pts=[{lat:37,lng:127},{lat:37.2,lng:127.2},{lat:37.4,lng:127.4},{lat:37.6,lng:127.6}];
   assert.deepEqual(routeLegs(data,pts),[{km:24.5,min:35},{km:23,min:58},{km:24.1,min:30}]);
 });
+
+test('구가 새로 생긴 시는 T맵이 알려 준 구를 주소에 넣어 다시 찾는다',async()=>{
+  const {withDistrict}=await import('./tmapRoute.js');
+  const data={coordinateInfo:{coordinate:[{lat:'',lon:'',gu_gun:'화성시 동탄구'}]}};
+  assert.equal(withDistrict('경기도 화성시 동탄대로 446',data),'경기도 화성시 동탄구 동탄대로 446');
+  assert.equal(withDistrict('경기도 화성시 동탄구 동탄대로 446',data),'');
+  assert.equal(withDistrict('경기도 안산시 고잔로 54',data),'');
+  assert.equal(withDistrict('경기도 화성시 동탄대로 446',{coordinateInfo:{coordinate:[{gu_gun:'화성시'}]}}),'');
+});
