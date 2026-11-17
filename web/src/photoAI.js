@@ -2,7 +2,13 @@ import {baseCustomer, normalizePhone, normalizeOcrAddress} from './logic.js';
 import {DOCUMENT_TYPES} from './documentTypes.js';
 
 const MODEL='gemini-3.5-flash-lite';
-const ENDPOINT=`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+// 기본 모델이 붐벼서(503 등) 계속 거절하면 서버가 따로인 예비 모델로 한 번 더 보낸다.
+const FALLBACK_MODEL='gemini-3.5-flash';
+const endpoint=(model)=>`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+// 기본 모델: 바로 → 2초 → 5초 뒤 (3번), 예비 모델: 바로 → 3초 뒤 (2번)
+const PLAN=[[MODEL,[0,2000,5000]],[FALLBACK_MODEL,[0,3000]]];
+const BUSY=new Set([429,500,502,503,504]);
+const sleep=(ms)=>new Promise(resolve=>setTimeout(resolve,ms));
 const fields=['name','addr','phone','safePhone','phone2','installDate','slot','prod','weight','elevSize','memo','fromAddr','toAddr','requestReason','requestDetails','orderNo','siteNo'];
 const stringProperties=Object.fromEntries(fields.map(key=>[key,{type:'string'}]));
 const schema={
@@ -63,7 +69,7 @@ export function normalizePhotoResult(result,file,targetDate=''){
 
 function canvasData(canvas){return canvas.toDataURL('image/jpeg',.88).split(',')[1]}
 
-export async function analyzePhoto(file,canvas,key,fetcher=fetch,targetDate=''){
+export async function analyzePhoto(file,canvas,key,fetcher=fetch,targetDate='',wait=sleep){
   const prompt=[
     '이 사진은 소파 업무의 출고의뢰서, 반품의뢰서, 1회 사고조치 요청서, 실측 요청서, 이동(설치), 이동(해체), 또는 고객명·전화번호 엑셀 표 중 하나다.',
     '사진에 실제로 보이는 글자만 추출한다. 추측하거나 누락된 값을 만들어내지 않는다. 불명확한 값은 빈 문자열로 둔다.',
@@ -81,14 +87,24 @@ export async function analyzePhoto(file,canvas,key,fetcher=fetch,targetDate=''){
     '엘리베이터와 사다리차 여부가 보이지 않으면 Known은 false다. 반품사유/사고 요청사유는 requestReason, 조치·실측·이동 요청 내용은 requestDetails, 주문·요청번호는 orderNo, 현장번호는 siteNo, 그 외 특이사항은 memo에 적는다.',
     '오직 지정된 JSON 형식으로 답한다.',
   ].join('\n');
-  const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),60000);
-  let response;
-  try{
-    response=await fetcher(ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},signal:controller.signal,body:JSON.stringify({contents:[{role:'user',parts:[{text:prompt},{inlineData:{mimeType:'image/jpeg',data:canvasData(canvas)}}]}],generationConfig:{responseMimeType:'application/json',responseSchema:schema,temperature:0}})});
-  }catch(error){throw new Error(error.name==='AbortError'?'AI 사진 분석 시간이 초과됐습니다.':'AI 사진 분석에 연결하지 못했습니다.');}
-  finally{clearTimeout(timeout)}
-  const payload=await response.json().catch(()=>({}));
+  const body=JSON.stringify({contents:[{role:'user',parts:[{text:prompt},{inlineData:{mimeType:'image/jpeg',data:canvasData(canvas)}}]}],generationConfig:{responseMimeType:'application/json',responseSchema:schema,temperature:0}});
+  let response,payload;
+  plan: for(const [model,delays] of PLAN){
+    for(const delay of delays){
+      if(delay) await wait(delay);
+      const controller=new AbortController();
+      const timeout=setTimeout(()=>controller.abort(),60000);
+      try{
+        response=await fetcher(endpoint(model),{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},signal:controller.signal,body});
+      }catch(error){throw new Error(error.name==='AbortError'?'AI 사진 분석 시간이 초과됐습니다.':'AI 사진 분석에 연결하지 못했습니다.');}
+      finally{clearTimeout(timeout)}
+      payload=await response.json().catch(()=>({}));
+      if(response.ok) break plan;
+      if(!BUSY.has(response.status)) break plan;
+      // 한도 초과는 기다려도 안 풀리니 바로 예비 모델로 넘어간다.
+      if(payload.error?.status==='RESOURCE_EXHAUSTED') break;
+    }
+  }
   if(!response.ok){const code=payload.error?.status;throw new Error(code==='RESOURCE_EXHAUSTED'?'AI 사용 한도에 도달했습니다.':code==='API_KEY_INVALID'||response.status===403?'Gemini API 키를 확인해 주세요.':`AI 사진 분석에 실패했습니다 (${response.status}).`)}
   const content=payload.candidates?.[0]?.content?.parts?.map(part=>part.text||'').join('')||'';
   let parsed;

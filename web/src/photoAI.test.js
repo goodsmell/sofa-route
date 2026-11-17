@@ -63,3 +63,28 @@ test('사진 요청에는 이미지와 JSON 형식이 들어가고 결과를 검
   assert.equal(result[0].name,'최은지');
   assert.throws(()=>normalizePhotoResult({kind:'unknown',customers:[]},'x'),/형식/);
 });
+
+test('기본 모델이 503이면 기다렸다 다시 보내고, 계속 막히면 예비 모델로 넘긴다',async()=>{
+  const {analyzePhoto}=await import('./photoAI.js');
+  const calls=[],waits=[];
+  const ok={ok:true,status:200,json:async()=>({candidates:[{content:{parts:[{text:JSON.stringify({kind:'dispatch',customers:[{name:'최은지',addr:'경기 안산시'}]})}]}}]})};
+  const busy={ok:false,status:503,json:async()=>({error:{status:'UNAVAILABLE'}})};
+  const fetcher=async(url)=>{calls.push(url.match(/models\/([^:]+)/)[1]);return calls.length<=3?busy:ok};
+  const result=await analyzePhoto({name:'a.jpg'},{toDataURL:()=>'data:image/jpeg;base64,abc'},'k',fetcher,'',async(ms)=>{waits.push(ms)});
+  assert.deepEqual(calls,['gemini-3.5-flash-lite','gemini-3.5-flash-lite','gemini-3.5-flash-lite','gemini-3.5-flash']);
+  assert.deepEqual(waits,[2000,5000]);
+  assert.equal(result[0].name,'최은지');
+});
+
+test('두 모델 모두 막히면 실패를 알리고, 키 오류는 다시 보내지 않는다',async()=>{
+  const {analyzePhoto}=await import('./photoAI.js');
+  const img={toDataURL:()=>'data:image/jpeg;base64,abc'};
+  let n=0;
+  const busy=async()=>{n++;return {ok:false,status:503,json:async()=>({})}};
+  await assert.rejects(analyzePhoto({name:'a.jpg'},img,'k',busy,'',async()=>{}),/503/);
+  assert.equal(n,5);
+  n=0;
+  const bad=async()=>{n++;return {ok:false,status:400,json:async()=>({error:{status:'API_KEY_INVALID'}})}};
+  await assert.rejects(analyzePhoto({name:'a.jpg'},img,'k',bad,'',async()=>{}),/키를 확인/);
+  assert.equal(n,1);
+});
