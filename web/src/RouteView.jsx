@@ -876,38 +876,6 @@ export default function RouteView(props) {
           </div>
         ) : (
           <>
-            <div
-              className={"modes" + (canCall ? " with-calling" : "")}
-              role="tablist"
-              aria-label="코스 보기"
-            >
-              {[
-                ["customer", "고객 시간", "추천"],
-                ["driver", "빠른 이동", "추천"],
-                ["balanced", "균형 추천", "추천"],
-                ...(canCall
-                  ? [
-                      [
-                        "fixed",
-                        "코스 확정",
-                        fixedList.length + "/" + rest.length + " 확정",
-                      ],
-                    ]
-                  : []),
-              ].map(([k, label, sub]) => (
-                <button
-                  key={k}
-                  type="button"
-                  role="tab"
-                  aria-selected={mode === k}
-                  onClick={() => setMode(k)}
-                >
-                  {label}
-                  <small>{sub}</small>
-                </button>
-              ))}
-            </div>
-
             <div className="overview">
               <div>
                 <span>배송</span>
