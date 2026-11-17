@@ -718,4 +718,19 @@ nav.tabs button svg{width:21px;height:21px}
   .recommendation-radio{width:23px;height:23px}
   .recommendation-continue{min-height:56px;font-size:16px}
 }
-.key-gate{z-index:200}
+.key-gate{z-index:200;background:#0b1214b3;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.key-card{width:min(100%,380px);background:var(--paper);border-radius:20px;padding:28px 22px 22px;box-shadow:0 20px 50px #0004;text-align:center}
+.key-icon{width:52px;height:52px;margin:0 auto 14px;border-radius:16px;background:var(--soft);display:grid;place-items:center}
+.key-icon svg{width:26px;height:26px;fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.key-card h2{margin:0;font-size:22px;letter-spacing:-.02em}
+.key-sub{margin:6px 0 22px;color:var(--muted);font-size:14px}
+.key-card form{display:flex;flex-direction:column;gap:16px;text-align:left}
+.key-field{display:flex;flex-direction:column;gap:6px}
+.key-label{display:flex;justify-content:space-between;align-items:baseline}
+.key-label label{font-size:14px;font-weight:700}
+.key-label a{font-size:13px;font-weight:600;color:var(--accent);text-decoration:none}
+.key-field input{width:100%;min-height:50px;padding:0 14px;border:1px solid var(--rule);border-radius:12px;background:var(--soft);color:var(--ink);font:inherit;font-size:16px;transition:border-color .15s,background .15s}
+.key-field input::placeholder{color:var(--muted);opacity:.8}
+.key-field input:focus{outline:none;border-color:var(--accent);background:var(--paper)}
+.key-submit{margin-top:6px;min-height:52px;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);font:inherit;font-size:17px;font-weight:700;cursor:pointer}
+.key-submit:disabled{opacity:.35;cursor:default}
