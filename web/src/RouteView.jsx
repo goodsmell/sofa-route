@@ -809,8 +809,9 @@ export default function RouteView(props) {
                   }}
                 >
                   <span className="recommendation-card-heading">
-                    <span><strong>{title}</strong><small>{available ? (recommendation.by === "area" ? "지역 기준 대략 순서" : subtitle) : "다시 만들기를 눌러 주세요"}</small></span>
+                    {/* 선택 동그라미는 왼쪽에 두어 오른쪽의 "시간 지연"과 떨어뜨린다 */}
                     <span className="recommendation-radio" aria-hidden="true" />
+                    <span><strong>{title}</strong><small>{available ? (recommendation.by === "area" ? "지역 기준 대략 순서" : subtitle) : "다시 만들기를 눌러 주세요"}</small></span>
                   </span>
                   {available && <>
                     <span className="recommendation-stats">

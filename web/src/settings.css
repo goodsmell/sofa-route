@@ -95,3 +95,8 @@ body:has(.recommendation-view){padding-bottom:calc(72px + env(safe-area-inset-bo
 @keyframes late-fade{from{opacity:0}}
 @keyframes late-up{from{transform:translateY(40px);opacity:.4}}
 @media (prefers-reduced-motion:reduce){.late-overlay,.late-sheet{animation:none}}
+/* 선택 동그라미를 제목 왼쪽에 두고, 아래 줄은 제목과 같은 들여쓰기로 맞춘다 */
+.recommendation-view .recommendation-card-heading{justify-content:flex-start;gap:10px}
+.recommendation-view .recommendation-stats,.recommendation-view .recommendation-path{padding-left:30px}
+.recommendation-view .recommendation-late{justify-self:end;width:max-content}
+.recommendation-view .recommendation-card-heading>span:nth-child(2){display:flex;flex-direction:column;min-width:0}
