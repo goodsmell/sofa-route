@@ -1414,9 +1414,10 @@ export default function App() {
                 <div className="panel review-panel">
                   <div className="review">
                     <div className="review-heading">
-                      <h3>
-                        추출 결과 확인 · {day.date} 방문 고객 {pending.length}건
-                      </h3>
+                      <h3>추출 결과 확인</h3>
+                      <p className="review-count">
+                        {day.date} 방문 고객 {pending.length}건
+                      </p>
                       <p className="hint">
                         원본 사진과 비교해 잘못 읽힌 내용을 고쳐주세요.
                       </p>

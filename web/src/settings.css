@@ -22,3 +22,5 @@ nav.tabs .in[role=tablist]{grid-template-columns:repeat(4,minmax(0,1fr))}
 /* 접기 화살표: 닫히는 애니메이션이 시작될 때 바로 아래로 돌린다 */
 details.closing>summary::after{transform:none}
 .review-summary{scroll-margin-top:12px}
+/* 추출 결과 확인: 큰 제목 아래 작은 날짜·건수 */
+.review-count{margin:0 0 6px;font-size:14px;font-weight:600;color:var(--muted)}
