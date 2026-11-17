@@ -10,12 +10,9 @@
   --bad:#b53b35;
   --ok:#276c50;
   --font:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  /* 다크 모드 없이 항상 밝은 화면 (입력칸·달력 같은 기본 컨트롤도 밝게) */
+  color-scheme:light;
 }
-@media(prefers-color-scheme:dark){:root{
-  --paper:#171d1f;--ink:#edf1f1;--muted:#acb8ba;--rule:#354044;
-  --accent:#86c1d1;--accent-ink:#132125;--soft:#20292c;
-  --warn:#e0ad78;--bad:#ee9792;--ok:#84d2ae;color-scheme:dark;
-}}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{background:var(--paper)}
