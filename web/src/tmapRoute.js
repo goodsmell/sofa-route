@@ -1,7 +1,8 @@
 const API = 'https://apis.openapi.sk.com/tmap';
 export const GEO_VERSION = 2;
 const GEO_CACHE = 'sofa-route-geo-v2';
-const LEG_CACHE = 'sofa-route-legs-v2';
+// v3: 출발→1번 구간을 0km로 잘못 나누던 결과를 버린다
+const LEG_CACHE = 'sofa-route-legs-v3';
 
 export function mapAddress(value) {
   const raw = String(value || '').trim();
@@ -197,7 +198,12 @@ export function routeLegs(data, points) {
     let leg = -1;
     for (const f of features) {
       if (f?.geometry?.type === 'Point' && /^(S|B\d+)$/.test(f.properties?.pointType || '')) leg++;
-      else if (f?.geometry?.type === 'LineString' && leg >= 0 && leg < count) {sums[leg].distance += +f.properties?.distance || 0; sums[leg].time += +f.properties?.time || 0}
+      else if (f?.geometry?.type === 'LineString') {
+        // T맵은 선을 "도착 지점" 뒤에 두고 도착 지점 이름(B1…, E)을 붙인다. 이름이 있으면 그걸로 구간을 정한다.
+        const type = f.properties?.pointType || '', via = type.match(/^B(\d+)$/);
+        const target = via ? +via[1] - 1 : type === 'E' ? count - 1 : leg;
+        if (target >= 0 && target < count) {sums[target].distance += +f.properties?.distance || 0; sums[target].time += +f.properties?.time || 0}
+      }
     }
     // 선에 시간이 없으면 경유지 도착·출발 시각 차이로 채운다.
     sums.forEach((s, i) => {

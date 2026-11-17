@@ -129,3 +129,13 @@ test('T맵 서버가 잠시 실패하면 다시 시도하고, 사용량 초과�
   assert.equal(n,3);
   await assert.rejects(request('u',{},async()=>({ok:false,status:429}),[1,1]),/사용량/);
 });
+
+test('T맵이 선을 도착 지점 뒤에 붙여 보내도 출발→1번 구간 거리를 0으로 만들지 않는다',async()=>{
+  const {routeLegs}=await import('./tmapRoute.js');
+  const P=(type)=>({geometry:{type:'Point',coordinates:[127,37]},properties:{pointType:type}});
+  const L=(type,d,t)=>({geometry:{type:'LineString',coordinates:[[127,37],[127.1,37.1]]},properties:{pointType:type,distance:d,time:t}});
+  // 실제 routeSequential30 응답 순서: S, B1, (B1로 가는 선), B2, (B2로 가는 선), E, (E로 가는 선)
+  const data={features:[P('S'),P('B1'),L('B1',24451,2112),P('B2'),L('B2',23013,3486),P('E'),L('E',24145,1800)]};
+  const pts=[{lat:37,lng:127},{lat:37.2,lng:127.2},{lat:37.4,lng:127.4},{lat:37.6,lng:127.6}];
+  assert.deepEqual(routeLegs(data,pts),[{km:24.5,min:35},{km:23,min:58},{km:24.1,min:30}]);
+});
