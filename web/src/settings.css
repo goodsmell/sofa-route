@@ -12,3 +12,10 @@ nav.tabs .in[role=tablist]{grid-template-columns:repeat(4,minmax(0,1fr))}
 .settings-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .settings-actions a{margin-left:auto;font-size:15px;font-weight:600}
 .settings-mock{margin-top:14px}
+/* 의뢰서 종류 뱃지 (고객명 옆) */
+.review-title{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.doc-badge{--c:var(--accent);flex:none;display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:12px;font-weight:700;line-height:1;white-space:nowrap;color:var(--c);background:color-mix(in srgb,var(--c) 15%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.doc-return{--c:var(--warn)}
+.doc-incident{--c:var(--bad)}
+.doc-measurement{--c:var(--ok)}
+.doc-move_install,.doc-move_dismantle{--c:#9a7fd1}

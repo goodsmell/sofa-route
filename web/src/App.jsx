@@ -165,6 +165,13 @@ function DocumentPreview({ imageId }) {
   ) : null;
 }
 
+// 의뢰서 종류를 이름 옆에 색 뱃지로 보여 준다.
+const DocBadge = ({ type }) => (
+  <span className={"doc-badge doc-" + (type || "dispatch")}>
+    {documentTypeLabel(type)}
+  </span>
+);
+
 function ConfirmedDocuments({ imports, onOpen }) {
   if (!imports.length) return null;
   return (
@@ -180,9 +187,10 @@ function ConfirmedDocuments({ imports, onOpen }) {
           <summary className="review-summary">
             <span className="review-number">{i + 1}</span>
             <span className="review-summary-text">
-              <strong>
-                {documentTypeLabel(c.documentType)} · {c.name || "고객명 없음"}
-              </strong>
+              <span className="review-title">
+                <strong>{c.name || "고객명 없음"}</strong>
+                <DocBadge type={c.documentType} />
+              </span>
               <small>{c.addr || "주소 없음"}</small>
             </span>
           </summary>
@@ -965,7 +973,12 @@ export default function App() {
       0,
     ) +
     Object.values({ ...history, [day.date]: day }).reduce(
-      (n, d) => n + (d.list || []).filter(isMock).length,
+      (n, d) =>
+        n +
+        Math.max(
+          (d.list || []).filter(isMock).length,
+          (d.imports || []).filter(isMock).length,
+        ),
       0,
     );
   function addMock() {
@@ -989,7 +1002,11 @@ export default function App() {
         pending: s.pending.filter((c) => !isMock(c)),
         phoneCandidates: s.phoneCandidates.filter((c) => !isMock(c)),
       }));
-    const strip = (d) => ({ ...d, list: (d.list || []).filter((c) => !isMock(c)) });
+    const strip = (d) => ({
+      ...d,
+      list: (d.list || []).filter((c) => !isMock(c)),
+      ...(d.imports ? { imports: d.imports.filter((c) => !isMock(c)) } : {}),
+    });
     setHistory((h) =>
       Object.fromEntries(Object.entries(h).map(([k, d]) => [k, strip(d)])),
     );
@@ -1385,10 +1402,10 @@ export default function App() {
                         <summary className="review-summary">
                           <span className="review-number">{i + 1}</span>
                           <span className="review-summary-text">
-                            <strong>
-                              {documentTypeLabel(c.documentType)} ·{" "}
-                              {c.name || "고객명 확인 필요"}
-                            </strong>
+                            <span className="review-title">
+                              <strong>{c.name || "고객명 확인 필요"}</strong>
+                              <DocBadge type={c.documentType} />
+                            </span>
                             <small>{c.addr || "주소 확인 필요"}</small>
                           </span>
                         </summary>
