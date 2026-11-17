@@ -429,12 +429,8 @@ export function stopFacts(c) {
   if (c.memo) facts.push(["특이사항", c.memo]);
   return facts;
 }
-const legText = (day, i) => {
-  const leg = legInfo(day, i);
-  return leg.state === "tmap"
-    ? leg.km + "km · " + fmtDuration(leg.min)
-    : "확인 전 (T맵 이동시간 받기 필요)";
-};
+// 코스 복사 때 고객마다 넣는 항목 (주소·전화 다음 순서대로)
+const COPY_FIELDS = ["주문·요청번호", "제품", "엘리베이터", "무게", "사다리차", "기존 소파 수거", "특이사항"];
 export function courseText(day) {
   const { rows, home } = compute(day),
     calls = precallList(rows),
@@ -486,19 +482,14 @@ export function courseText(day) {
         r.sl.label +
         " · 예상 " +
         fmt(r.start),
-      "이동: " + legText(day, i),
-      "전화: " + (phones.join(" / ") || "확인 필요"),
       "주소: " + (c.addr || "확인 필요"),
-      ...stopFacts(c).map(([k, v]) => k + ": " + v),
+      "전화: " + (phones.join(" / ") || "확인 필요"),
+      ...stopFacts(c)
+        .filter(([k]) => COPY_FIELDS.includes(k))
+        .map(([k, v]) => k + ": " + v),
     );
-    if (c.callMemo) out.push("통화 메모: " + c.callMemo);
   });
-  out.push(
-    "",
-    line,
-    "이동: " + legText(day, rows.length),
-    "→ 귀가 " + fmt(home) + " " + day.end,
-  );
+  out.push("", line, "→ 귀가 " + fmt(home) + " " + day.end);
   return out.join("\n");
 }
 

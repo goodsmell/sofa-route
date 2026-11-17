@@ -153,13 +153,15 @@ test('코스 텍스트에 전화·주소·제품·엘리베이터·BS·특이사
   assert.match(text,/2번 주영걸: 전날 연락 요청/);
 });
 
-test('복사한 코스 텍스트에 구간 이동과 전체 시간이 들어간다',async()=>{
+test('복사한 코스 텍스트에 전체 시간은 들어가고 고객 칸에는 정해진 항목만 들어간다',async()=>{
   const {courseText,emptyDay}=await import('./logic.js');
-  const day={...emptyDay('2026-11-16'),endTravel:25,endTravelKm:21,endFrom:'a',endTravelVersion:2,list:[{id:'a',name:'가',addr:'경기 성남시',slot:'any',travel:72,travelKm:41.3,travelFrom:'start',travelVersion:2}]};
+  const day={...emptyDay('2026-11-16'),endTravel:25,endTravelKm:21,endFrom:'a',endTravelVersion:2,list:[{id:'a',name:'최유진',addr:'경기도 이천시 시청중앙로 24',phone:'01088472689',safePhone:'050827723446',slot:'pm',orderNo:'0312958041',prod:'MVME 테이즈 소파',elevSize:'11인승 이상',weight:149.9,ladderKnown:true,ladderNeeded:false,memo:'오후 1시 이후 설치 가능',callMemo:'통화함',installDate:'2026-11-16',travel:72,travelKm:41.3,travelFrom:'start',travelVersion:2}]};
   const text=courseText(day);
   assert.match(text,/총 이동 62\.3km · 1시간 37분 · 출발~귀가/);
-  assert.match(text,/1\. 가[^\n]*\n이동: 41\.3km · 1시간 12분\n/);
-  assert.match(text,/이동: 21km · 25분\n→ 귀가/);
+  const block=text.split('━━━━━━━━━━━━━━━━━━━━')[1].trim().split('\n');
+  assert.match(block[0],/^1\. 최유진 · .+ · 예상 \d\d:\d\d$/);
+  assert.deepEqual(block.slice(1).map(l=>l.split(':')[0]),['주소','전화','주문·요청번호','제품','엘리베이터','무게','사다리차','기존 소파 수거','특이사항']);
+  assert.doesNotMatch(text,/이동: 41|문서:|통화 메모/);
 });
 
 test('사진에서 충부대로로 읽힌 주소는 중부대로로 고치고 기존 시간을 폐기한다',async()=>{
@@ -176,7 +178,6 @@ test('T맵으로 받기 전에는 가짜 30분 대신 확인 전으로 적는다
   const {courseText,emptyDay}=await import('./logic.js');
   const text=courseText({...emptyDay('2026-11-16'),list:[{id:'a',name:'가',addr:'경기 성남시',slot:'any',travel:30}]});
   assert.doesNotMatch(text,/30분/);
-  assert.match(text,/이동: 확인 전/);
   assert.match(text,/총 이동 확인 전/);
 });
 
