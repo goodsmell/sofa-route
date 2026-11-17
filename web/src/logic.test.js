@@ -229,3 +229,11 @@ test('배송 중 실제 도착과 다음 집 출발 시각을 이후 예상 시�
   const departed={...base,list:[{...base.list[0],done:true,arrivedAt:'09:25',doneAt:'10:20'},base.list[1]]};
   assert.equal(compute(departed).rows[1].start,10*60+40);
 });
+
+test('확인 단계에서 직접 넣은 고객 번호는 확정 후에도 그대로 남는다',async()=>{
+  const {applyPhotoImports,emptyDay,baseCustomer}=await import('./logic.js');
+  const form=baseCustomer({source:'form',name:'가',addr:'경기 성남시',documentType:'dispatch',phone:'010-1111-2222'});
+  const {day}=applyPhotoImports(emptyDay('2026-11-18'),[form]);
+  assert.equal(day.list[0].phone,'010-1111-2222');
+  assert.equal(day.imports[0].phone,'010-1111-2222');
+});

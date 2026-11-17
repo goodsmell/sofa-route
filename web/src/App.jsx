@@ -942,7 +942,18 @@ export default function App() {
     );
     return phones.size === 1 ? [...phones][0] : "";
   }
+  // 추출 결과 확인의 고객 번호: 직접 고친 값이 있으면 그것, 없으면 고객 번호 표에서 이름이 맞는 번호
+  const reviewPhone = (c) =>
+    c.phoneTouched ? c.phone : c.phone || previewExcelPhone(c.name);
   function commit(items) {
+    const clean = (value) => String(value || "").replace(/\s/g, "");
+    // 화면에 보이던 고객 번호를 그대로 저장한다. 번호가 정해진 고객에게는 표의 번호를 다시 붙이지 않는다.
+    items = items.map(({ phoneTouched, ...c }) => ({
+      ...c,
+      phone: normalizePhone(reviewPhone({ ...c, phoneTouched })),
+    }));
+    const decided = new Set(items.filter((c) => c.phone).map((c) => clean(c.name)));
+    const contacts = phoneCandidates.filter((x) => !decided.has(clean(x.name)));
     const ready = items.filter((c) => c.name.trim() && c.addr.trim()),
       missing = items.filter((c) => !c.name.trim() || !c.addr.trim());
     if (missing.length) {
@@ -950,7 +961,7 @@ export default function App() {
       flash("고객명과 설치주소를 확인해 주세요.");
       return;
     }
-    const imported = applyPhotoImports(day, [...ready, ...phoneCandidates]);
+    const imported = applyPhotoImports(day, [...ready, ...contacts]);
     const next = recommendOrder(imported.day);
     setDay(next);
     setPending([]);
@@ -1506,10 +1517,21 @@ export default function App() {
                               />
                             ),
                           )}
-                          <p className="hint">
-                            엑셀 고객 번호:{" "}
-                            {previewExcelPhone(c.name) || "일치하는 번호 없음"}
-                          </p>
+                          <Field
+                            label="고객 번호"
+                            type="tel"
+                            placeholder="010-0000-0000"
+                            value={reviewPhone(c)}
+                            onChange={(v) =>
+                              setPending((p) =>
+                                p.map((x, j) =>
+                                  j === i
+                                    ? { ...x, phone: v, phoneTouched: true }
+                                    : x,
+                                ),
+                              )
+                            }
+                          />
                           <label className="field">
                             <span>고객지정시간</span>
                             <select
