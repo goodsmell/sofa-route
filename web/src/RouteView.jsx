@@ -772,7 +772,7 @@ export default function RouteView(props) {
                       <span><strong>{fmt(optionCalc.home)}</strong><small>귀가 예상</small></span>
                       <span><strong>{late}곳</strong><small>시간 지연</small></span>
                     </span>
-                    {checked && <span className="recommendation-path">{recommendationPath(optionDay)}</span>}
+                    <span className="recommendation-path">{recommendationPath(optionDay)}</span>
                   </>}
                 </button>
               );
