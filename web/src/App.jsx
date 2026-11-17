@@ -21,7 +21,7 @@ import {
 import { imageCanvas } from "./ocr.js";
 import { saveDocument, loadDocument, deleteDocuments } from "./imageStore.js";
 import DocumentViewer from "./DocumentViewer.jsx";
-import AiSetup from "./AiSetup.jsx";
+import Settings from "./Settings.jsx";
 import KeyGate from "./KeyGate.jsx";
 import RouteMap from "./RouteMap.jsx";
 import { planWithGemini } from "./routeAI.js";
@@ -107,6 +107,11 @@ const TabIcon = ({ name }) => (
       <>
         <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z" />
         <path d="M9 4v14M15 6v14" />
+      </>
+    ) : name === "settings" ? (
+      <>
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 2v3M12 19v3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1" />
       </>
     ) : (
       <>
@@ -267,7 +272,7 @@ export default function App() {
     const t = localStorage.getItem(TABKEY);
     if (t === "order" && ["ready", "driving"].includes(initial.current.d.phase))
       return "drive";
-    return ["add", "order", "drive", "map", "calendar"].includes(t)
+    return ["add", "order", "drive", "map", "calendar", "settings"].includes(t)
       ? t
       : initial.current.d.list.length
         ? "order"
@@ -279,7 +284,6 @@ export default function App() {
     [addMode, setAddMode] = useState("document"),
     [pending, setPending] = useState([]),
     [phoneCandidates, setPhoneCandidates] = useState([]),
-    [aiSetupMode, setAiSetupMode] = useState("route"),
     [status, setStatus] = useState(""),
     [busy, setBusy] = useState(false),
     [rereadId, setRereadId] = useState(null),
@@ -295,10 +299,7 @@ export default function App() {
   const [aiKey, setAiKey] = useState(
     () => sessionStorage.getItem(AI_KEY) || localStorage.getItem(AI_KEY) || "",
   );
-  const [aiSetup, setAiSetup] = useState(false),
-    [keyDraft, setKeyDraft] = useState(""),
-    [rememberKey, setRememberKey] = useState(false),
-    [aiBusy, setAiBusy] = useState(false),
+  const [aiBusy, setAiBusy] = useState(false),
     [legBusy, setLegBusy] = useState(false);
   const dayRef = useRef(day);
   const timer = useRef(null),
@@ -403,7 +404,7 @@ export default function App() {
   const update = (id, patch) => setDay((d) => invalidateAddress(d, id, patch));
   const switchTab = (t) => {
     setTab(t);
-    if (["map", "calendar"].includes(t)) setViewStage(null);
+    if (["map", "calendar", "settings"].includes(t)) setViewStage(null);
     window.scrollTo(0, 0);
   };
   const openDocument = (c) =>
@@ -725,38 +726,26 @@ export default function App() {
         (_, i) => legInfo(day, i).state,
       ).every((x) => x === "tmap"),
     tmapReady = !!localStorage.getItem(TMAP_KEY);
-  function connectAI() {
-    const key = keyDraft.trim();
-    if (!key) return;
-    sessionStorage.setItem(AI_KEY, key);
-    if (rememberKey) localStorage.setItem(AI_KEY, key);
-    else localStorage.removeItem(AI_KEY);
-    setAiKey(key);
-    setAiSetup(false);
-  }
-  const [tmapKeySet, setTmapKeySet] = useState(
-    () => !!localStorage.getItem(TMAP_KEY),
+  const [tmapKey, setTmapKey] = useState(
+    () => localStorage.getItem(TMAP_KEY) || "",
   );
-  function submitGate({ gemini, tmap: tmapKey, remember }) {
-    if (gemini) {
-      sessionStorage.setItem(AI_KEY, gemini);
-      if (remember) localStorage.setItem(AI_KEY, gemini);
-      else localStorage.removeItem(AI_KEY);
-      setAiKey(gemini);
+  function saveKey(name, key) {
+    if (name === "gemini") {
+      sessionStorage.setItem(AI_KEY, key);
+      localStorage.setItem(AI_KEY, key);
+      setAiKey(key);
+      flash("Gemini 키를 바꿨어요.");
     }
-    if (tmapKey) {
-      localStorage.setItem(TMAP_KEY, tmapKey);
-      setTmapKeySet(true);
+    if (name === "tmap") {
+      localStorage.setItem(TMAP_KEY, key);
+      setTmapKey(key);
       // 지도 SDK는 앱키로 처음 한 번만 불러오므로 새로 고침해서 적용한다.
       window.location.reload();
     }
   }
-  function forgetAI() {
-    sessionStorage.removeItem(AI_KEY);
-    localStorage.removeItem(AI_KEY);
-    setAiKey("");
-    setKeyDraft("");
-    flash("AI 키를 지웠어요.");
+  function submitGate({ gemini, tmap }) {
+    if (gemini) saveKey("gemini", gemini);
+    if (tmap) saveKey("tmap", tmap);
   }
   function openDay(date, nextTab = "order") {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
@@ -946,10 +935,7 @@ export default function App() {
   async function importImages(files) {
     if (!files.length) return;
     if (!aiKey) {
-      setStatus("AI 사진 분석을 사용하려면 Gemini API 키를 연결해 주세요.");
-      setAiSetupMode("photo");
-      setKeyDraft("");
-      setAiSetup(true);
+      setStatus("AI 사진 분석을 사용하려면 설정에서 Gemini API 키를 연결해 주세요.");
       return;
     }
     setBusy(true);
@@ -1022,10 +1008,7 @@ export default function App() {
   async function rereadDocument(c) {
     if (!c.imageId || rereadId) return;
     if (!aiKey) {
-      setAiSetupMode("photo");
-      setKeyDraft("");
-      setAiSetup(true);
-      flash("다시 읽으려면 Gemini 키를 연결해 주세요.");
+      flash("다시 읽으려면 설정에서 Gemini 키를 연결해 주세요.");
       return;
     }
     setRereadId(c.id);
@@ -1156,6 +1139,11 @@ export default function App() {
                 {datePicker("header-eyebrow")}
                 <h1>코스 짜기</h1>
               </>
+            ) : tab === "settings" ? (
+              <>
+                <span className="header-eyebrow">소파 배송 동선표</span>
+                <h1>설정</h1>
+              </>
             ) : (
               <>
                 {datePicker("header-eyebrow")}
@@ -1214,18 +1202,6 @@ export default function App() {
               {addMode === "document" && (
                 <div className="panel">
                   <h2>의뢰서와 고객 목록 사진 넣기</h2>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiSetupMode("photo");
-                      setKeyDraft(aiKey);
-                      setRememberKey(!!localStorage.getItem(AI_KEY));
-                      setAiSetup(true);
-                    }}
-                  >
-                    {aiKey ? "Gemini 키 변경" : "Gemini 키 연결"}
-                  </button>
                   <label className="upload-label">
                     {busy ? "읽는 중…" : "+ 사진 선택하기"}
                     <input
@@ -1793,13 +1769,7 @@ export default function App() {
               rereadDocument,
               rereadId,
               aiKey,
-              aiSettings: () => {
-                setAiSetupMode("route");
-                setKeyDraft(aiKey);
-                setRememberKey(!!localStorage.getItem(AI_KEY));
-                setAiSetup(true);
-              },
-              forgetAI,
+              aiSettings: () => switchTab("settings"),
               clearDay: () => deleteForDate(day.date),
             }}
           />
@@ -1829,6 +1799,12 @@ export default function App() {
                 list: markLocated(d.list, route),
               }))
             }
+          />
+        )}
+        {tab === "settings" && (
+          <Settings
+            keys={{ gemini: aiKey, tmap: tmapKey }}
+            onSaveKey={saveKey}
           />
         )}
         {tab === "calendar" && (
@@ -1986,6 +1962,7 @@ export default function App() {
             ["order", "코스 짜기"],
             ["map", "지도"],
             ["calendar", "기록"],
+            ["settings", "설정"],
           ].map(([k, l]) => (
             <button
               key={k}
@@ -2005,18 +1982,8 @@ export default function App() {
       </nav>
       <KeyGate
         needGemini={!aiKey}
-        needTmap={!tmapKeySet}
+        needTmap={!tmapKey}
         onSubmit={submitGate}
-      />
-      <AiSetup
-        open={aiSetup}
-        mode={aiSetupMode}
-        keyValue={keyDraft}
-        onKeyChange={setKeyDraft}
-        remember={rememberKey}
-        onRemember={setRememberKey}
-        onClose={() => setAiSetup(false)}
-        onStart={connectAI}
       />
       <DocumentViewer
         viewer={viewer}

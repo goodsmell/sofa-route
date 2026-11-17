@@ -1,0 +1,13 @@
+/* 하단 탭이 4개(코스 짜기·지도·기록·설정)가 되면서 칸 수를 맞춘다 */
+nav.tabs .in[role=tablist]{grid-template-columns:repeat(4,minmax(0,1fr))}
+.settings-row{display:flex;flex-direction:column;gap:12px;padding:16px 0;border-top:1px solid var(--rule)}
+.settings-row:first-of-type{margin-top:14px}
+.settings-row-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.settings-row-head strong{display:block;font-size:17px}
+.settings-use{display:block;color:var(--muted);font-size:14px;margin-top:2px}
+.settings-state{flex:none;font-size:14px;font-weight:600;color:var(--muted)}
+.settings-state.on{color:var(--ok)}
+.settings-edit{display:flex;flex-direction:column;gap:10px}
+.settings-edit input{width:100%;min-width:0;min-height:49px;padding:9px 11px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;font-size:17px}
+.settings-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.settings-actions a{margin-left:auto;font-size:15px;font-weight:600}

@@ -1154,13 +1154,8 @@ export default function RouteView(props) {
               T맵에서 확인하세요.
             </p>
             <button type="button" className="btn" onClick={actions.aiSettings}>
-              {actions.aiKey ? "자동 순서(AI) 키 변경" : "자동 순서(AI) 연결"}
+              키 설정 열기
             </button>
-            {actions.aiKey && (
-              <button type="button" className="btn" onClick={actions.forgetAI}>
-                자동 순서(AI) 키 지우기
-              </button>
-            )}
             {day.list.length > 0 && (
               <button
                 type="button"
