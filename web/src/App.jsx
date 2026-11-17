@@ -1472,6 +1472,7 @@ export default function App() {
                               <Field
                                 key={k}
                                 label={l}
+                                type={k === "installDate" ? "date" : "text"}
                                 value={c[k]}
                                 onChange={(v) =>
                                   setPending((p) =>
