@@ -206,11 +206,20 @@ function StopCard({
           {c.done && <span className="badge ok">완료 {c.doneAt}</span>}
           {late && !c.done && <span className="badge bad">약속 시간 넘김</span>}
           {reminder && !c.done && <span className="badge warn">먼저 전화</span>}
-          {callMode && !c.done && !c.callConfirmed && !isFixed(c) && (
-            <span className="badge dashed">통화 전</span>
-          )}
-          {callMode && c.callConfirmed && !c.promiseTime && (
-            <span className="badge ok">통화 완료</span>
+          {/* 통화 체크: 눌러서 통화 전 ↔ 통화 완료를 바꾼다 */}
+          {callMode && !c.done && !c.promiseTime && (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={!!c.callConfirmed}
+              className={"call-check" + (c.callConfirmed ? " on" : "")}
+              onClick={() =>
+                actions.update(c.id, { callConfirmed: !c.callConfirmed })
+              }
+            >
+              <span className="call-box" aria-hidden="true" />
+              {c.callConfirmed ? "통화 완료" : "통화 전"}
+            </button>
           )}
           {badges.map((b) => (
             <span
