@@ -1320,6 +1320,25 @@ export default function App() {
                   />
                 </label>
               </div>
+              <details className="panel trip-fields" id="trip-settings">
+                <summary>출발과 귀가</summary>
+                <Field
+                  label="출발 장소"
+                  value={day.start}
+                  onChange={(v) => setDay((d) => ({ ...d, start: v }))}
+                />
+                <Field
+                  label="출발 시간"
+                  type="time"
+                  value={day.depart}
+                  onChange={(v) => setDay((d) => ({ ...d, depart: v }))}
+                />
+                <Field
+                  label="귀가 장소"
+                  value={day.end}
+                  onChange={(v) => setDay((d) => ({ ...d, end: v }))}
+                />
+              </details>
               <div
                 className="add-mode-tabs"
                 role="tablist"
@@ -1376,27 +1395,6 @@ export default function App() {
                     </button>
                   )}
                 </div>
-              )}
-              {addMode === "document" && (
-                <details className="panel trip-fields" id="trip-settings">
-                  <summary>출발과 귀가</summary>
-                  <Field
-                    label="출발 장소"
-                    value={day.start}
-                    onChange={(v) => setDay((d) => ({ ...d, start: v }))}
-                  />
-                  <Field
-                    label="출발 시간"
-                    type="time"
-                    value={day.depart}
-                    onChange={(v) => setDay((d) => ({ ...d, depart: v }))}
-                  />
-                  <Field
-                    label="귀가 장소"
-                    value={day.end}
-                    onChange={(v) => setDay((d) => ({ ...d, end: v }))}
-                  />
-                </details>
               )}
               {addMode === "document" && pending.length > 0 && (
                 <div className="panel review-panel">
