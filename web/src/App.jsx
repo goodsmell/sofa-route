@@ -780,6 +780,19 @@ export default function App() {
         (_, i) => legInfo(day, i).state,
       ).every((x) => x === "tmap"),
     tmapReady = !!localStorage.getItem(TMAP_KEY);
+  // 코스 화면에서 이동 시간이 비면(순서를 옮겼거나 주소를 고쳤을 때) 잠깐 기다렸다가 T맵에 자동으로 다시 묻는다.
+  // 연달아 여러 번 바꾸면 마지막에 한 번만, 같은 코스는 한 번만 시도한다(실패해도 무한 반복하지 않게).
+  const autoLegSig = useRef(""),
+    daySig = routeSig(day);
+  useEffect(() => {
+    if (tab !== "order" || legsReady || legBusy || !tmapReady || !day.list.length) return;
+    if (autoLegSig.current === daySig) return;
+    const id = setTimeout(() => {
+      autoLegSig.current = daySig;
+      fetchLegs(dayRef.current, true);
+    }, 1200);
+    return () => clearTimeout(id);
+  }, [tab, legsReady, legBusy, tmapReady, daySig]);
   const [tmapKey, setTmapKey] = useState(
     () => localStorage.getItem(TMAP_KEY) || "",
   );
@@ -1405,16 +1418,7 @@ export default function App() {
       list.splice(to, 0, c);
       return { ...d, list };
     });
-    setMoveTick((n) => n + 1);
   }
-  // 순서를 옮기면 잠깐(1.2초) 기다렸다가 T맵 이동 시간을 새 순서로 다시 받는다.
-  // 연달아 여러 번 옮기면 마지막에 한 번만 계산한다.
-  const [moveTick, setMoveTick] = useState(0);
-  useEffect(() => {
-    if (!moveTick || !localStorage.getItem(TMAP_KEY)) return;
-    const id = setTimeout(() => fetchLegs(dayRef.current, true), 1200);
-    return () => clearTimeout(id);
-  }, [moveTick]);
   const chosen = selected === day.date ? day : history[selected],
     pastDates = Object.keys({ ...history, [day.date]: day }).filter(
       (date) =>

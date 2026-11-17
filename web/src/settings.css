@@ -123,3 +123,8 @@ body:has(.recommendation-view){padding-bottom:calc(72px + env(safe-area-inset-bo
 body.dragging-route .timeline>li{transition:transform .22s cubic-bezier(.2,.8,.2,1),opacity .2s}
 body.dragging-route .timeline>li.lifted{transition:none;position:relative;z-index:5}
 .timeline>li.lifted .stop{box-shadow:0 12px 28px rgba(20,26,28,.18);border-color:var(--accent)}
+.stop-delete{flex:none;width:40px;min-height:44px;padding:0;border:0;background:transparent;color:var(--muted);display:grid;place-items:center}
+.stop-delete svg{width:20px;height:20px}
+.stop-delete:hover{color:var(--bad)}
+.bottom-actions.single{grid-template-columns:1fr}
+.bottom-actions.single>*{width:100%}

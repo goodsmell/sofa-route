@@ -180,6 +180,15 @@ function StopCard({
             <PhoneIcon />
           </a>
         )}
+        {/* 이 고객만 삭제 (확인 창이 뜬다) */}
+        <button
+          type="button"
+          className="stop-delete"
+          aria-label={(c.name || "고객") + " 삭제"}
+          onClick={() => actions.remove(c.id)}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+        </button>
         {count > 1 && (
           <button
             type="button"
@@ -1094,24 +1103,6 @@ export default function RouteView(props) {
                     </button>
                   </p>
                 )}
-                <button
-                  type="button"
-                  className="btn calculate-btn"
-                  disabled={legBusy || !tmapReady}
-                  onClick={
-                    plan ? () => actions.fetchPlanLegs(mode) : actions.fetchLegs
-                  }
-                >
-                  {legBusy ? "시간 계산 중…" : "시간 계산하기"}
-                </button>
-                <p className="note">
-                  {!tmapReady
-                    ? "T맵 앱키를 연결하면 구간 시간을 계산할 수 있어요."
-                    : ready
-                      ? "현재 순서의 T맵 구간 시간이 반영됐어요."
-                      : "순서나 약속 시간을 고친 뒤 이 버튼을 누르면 T맵 구간 시간을 새로 받습니다."}
-                </p>
-
                 <Timeline
                   key={mode}
                   day={viewDay}
@@ -1125,25 +1116,7 @@ export default function RouteView(props) {
                   }
                 />
 
-                <div className="bottom-actions">
-                  {plan ? (
-                    <button
-                      type="button"
-                      className="btn"
-                      disabled={aiBusy}
-                      onClick={actions.makePlans}
-                    >
-                      {aiBusy ? "다시 만드는 중…" : "추천 다시 만들기"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => setMode("customer")}
-                    >
-                      추천 코스 보기
-                    </button>
-                  )}
+                <div className="bottom-actions single">
                   <button
                     type="button"
                     className="btn"
@@ -1159,27 +1132,6 @@ export default function RouteView(props) {
           </>
         )}
 
-        <details className="settings">
-          <summary>설정</summary>
-          <div className="sub-body">
-            <p className="note">
-              이동 시간은 T맵 화물차 경로 기준이에요. 실제 도로 사정은 운전 중
-              T맵에서 확인하세요.
-            </p>
-            <button type="button" className="btn" onClick={actions.aiSettings}>
-              키 설정 열기
-            </button>
-            {day.list.length > 0 && (
-              <button
-                type="button"
-                className="btn danger"
-                onClick={actions.clearDay}
-              >
-                이 날짜 고객 전체 삭제
-              </button>
-            )}
-          </div>
-        </details>
       </div>
     </section>
   );
