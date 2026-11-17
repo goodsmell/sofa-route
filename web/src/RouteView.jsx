@@ -199,7 +199,7 @@ function StopCard({
         onClick={onToggle}
         tabIndex={-1}
       >
-        {shortArea(c.addr) || "주소 확인 필요"}
+        {c.addr || "주소 확인 필요"}
       </button>
       {(badges.length > 0 || late || reminder || c.done || !isFixed(c)) && (
         <div className="badges">
