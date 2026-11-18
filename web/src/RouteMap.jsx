@@ -1,9 +1,10 @@
 import { askConfirm } from "./ConfirmDialog.jsx";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { fetchTmapRoute, validTruck, GEO_VERSION } from "./tmapRoute.js";
+import { fetchTmapRoute, validTruck, GEO_VERSION, tmapNaviUrl } from "./tmapRoute.js";
+import { documentTypeLabel, documentSpecificFields } from "./documentTypes.js";
 import { loadTmapSdk } from "./tmapSdk.js";
-import { compute, fmt, shortArea, digits, normalizePhone } from "./logic.js";
+import { compute, fmt, shortArea, digits, normalizePhone, customerPhone } from "./logic.js";
 
 const KEY = "sofa-route-tmap-key-v1";
 const PROFILE = "sofa-route-truck-v1";
@@ -15,7 +16,6 @@ const DEFAULT_PROFILE = {
   length: "",
 };
 const HOME = [37.32, 126.95]; // 좌표가 하나도 없을 때 보여 줄 곳
-const tmapNavi = (s) => "tmap://search?name=" + encodeURIComponent(s);
 
 const pin = (label, state) => `<div class="pin ${state}"><span>${String(label).replace(/[&<>"']/g, "")}</span></div>`;
 
@@ -217,10 +217,13 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
       });
       overlaysRef.current.push(marker);
       if (isStop) {
-        marker.addListener("click", () => {
+        // 휴대폰에서는 핀 터치가 click으로 오지 않을 때가 있어 touchend도 받는다.
+        const choose = () => {
           setSelected(p.index);
           setSheet("peek");
-        });
+        };
+        marker.addListener("click", choose);
+        marker.addListener("touchend", choose);
         markersRef.current[p.index] = marker;
       }
     }
@@ -305,7 +308,15 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
 
   const row = selected != null ? rows[selected] : null;
   const c = row?.c;
-  const phone = c && (c.phone || c.safePhone);
+  const phone = customerPhone(c);
+  const products = c ? (c.productRows?.length ? c.productRows : [c.prod]).filter(Boolean) : [];
+  const facts = c
+    ? [
+        products.length ? ["제품", products.join(" / ")] : null,
+        ...documentSpecificFields(c).filter(([label]) => label !== "주문·요청번호"),
+        c.memo ? ["특이사항", c.memo] : null,
+      ].filter(Boolean)
+    : [];
   const done = day.list.filter((x) => x.done).length;
 
   return (
@@ -431,7 +442,12 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
                     {selected + 1}
                   </span>
                   <div>
-                    <strong>{c.name || "고객"}</strong>
+                    <strong>
+                      {c.name || "고객"}
+                      <span className={"doc-badge doc-" + (c.documentType || "dispatch")}>
+                        {documentTypeLabel(c.documentType)}
+                      </span>
+                    </strong>
                     <span>{shortArea(c.addr)}</span>
                   </div>
                 </div>
@@ -451,6 +467,17 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
                   {ICONS.next}
                 </button>
               </div>
+              <p className="sheet-addr">{c.addr || "주소 없음"}</p>
+              {facts.length > 0 && (
+                <dl className="sheet-facts">
+                  {facts.map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
               {!located.has(selected) && (
                 <p className="note warn">
                   이 고객은 지도에 위치가 없어요. 오늘 코스 카드에서 "T맵 검색용
@@ -464,7 +491,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
                     {normalizePhone(phone)}
                   </a>
                 )}
-                <a className="btn primary" href={tmapNavi(c.addr)}>
+                <a className="btn primary" href={tmapNaviUrl(c)}>
                   {ICONS.navi}T맵 길안내
                 </a>
               </div>

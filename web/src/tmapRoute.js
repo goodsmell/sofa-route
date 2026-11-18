@@ -392,3 +392,22 @@ export async function geocodeDay(day, key, fetcher = fetch) {
   }
   return {start: found.start, end: found.end, pos, cache, missing: found.missing};
 }
+
+// T맵 길안내 링크. 좌표와 앱키가 있으면 공식 길안내 URL(goalx=경도, goaly=위도)로 바로 경로 안내를 열고,
+// 없으면 주소 검색으로 연다.
+export function tmapNaviUrl(stop) {
+  let key = "";
+  try {
+    key = localStorage.getItem("sofa-route-tmap-key-v1") || "";
+  } catch {}
+  if (!key || !Number.isFinite(stop?.lat) || !Number.isFinite(stop?.lng))
+    return "tmap://search?name=" + encodeURIComponent(stop?.addr || "");
+  const q = new URLSearchParams({
+    appKey: key,
+    goalname: stop.name || stop.addr || "목적지",
+    goalx: String(stop.lng),
+    goaly: String(stop.lat),
+    goaladdr: stop.addr || "",
+  });
+  return "https://apis.openapi.sk.com/tmap/app/routes?" + q.toString().replace(/\+/g, "%20");
+}
