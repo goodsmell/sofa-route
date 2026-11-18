@@ -104,15 +104,15 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
             <div className="drive-eta">
               <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
               <strong>{current.arrivedAt || fmt(row.start)}</strong>
-              <small>
-                {current.promiseTime
-                  ? current.promiseTime + " 고객 약속"
-                  : current.slot === "am"
-                    ? "오전 희망"
-                    : current.slot === "pm"
-                      ? "오후 희망"
-                      : "시간 지정 없음"}
-              </small>
+              {(current.promiseTime || current.slot === "am" || current.slot === "pm") && (
+                <small>
+                  {current.promiseTime
+                    ? current.promiseTime + " 고객 약속"
+                    : current.slot === "am"
+                      ? "오전 희망"
+                      : "오후 희망"}
+                </small>
+              )}
             </div>
             <div className="drive-info">
               <span>
@@ -121,7 +121,6 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
                   ? fmtDuration(leg.min)
                   : "예상 " + fmtDuration(leg?.min || 30)}
               </span>
-              <span>주소 {shortArea(current.addr)}</span>
             </div>
             {(current.memo || current.callMemo) && (
               <p className="drive-memo">
