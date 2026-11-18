@@ -22,7 +22,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
   const facts = current
     ? [
         products.length ? ["제품", products] : null,
-        ...documentSpecificFields(current).filter(([label]) => label !== "주문·요청번호"),
+        ...documentSpecificFields(current).filter(([label]) => label !== "현장번호"),
         current.memo ? ["특이사항", current.memo] : null,
         current.callMemo ? ["통화 메모", current.callMemo] : null,
       ].filter(Boolean)
