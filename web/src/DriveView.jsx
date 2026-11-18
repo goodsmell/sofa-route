@@ -37,7 +37,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
         <div className="drive-empty">
           <h2>확정한 코스로 출발할 준비가 됐나요?</h2>
           <button className="primary big" onClick={onStart}>
-            일 시작 · 지금 출발
+            출발 !!!
           </button>
           <button className="big" onClick={onBack}>
             코스 다시 확인
