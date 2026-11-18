@@ -114,10 +114,10 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
                       : "";
                 const move = current.arrivedAt
                   ? ""
-                  : "이동 " +
+                  : "예상 이동 시간 " +
                     (leg?.state === "tmap"
                       ? fmtDuration(leg.min)
-                      : "예상 " + fmtDuration(leg?.min || 30));
+                      : "약 " + fmtDuration(leg?.min || 30));
                 const text = [move, wish].filter(Boolean).join(" · ");
                 return text && <small>{text}</small>;
               })()}
