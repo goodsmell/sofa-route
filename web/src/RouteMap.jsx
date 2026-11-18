@@ -1,3 +1,4 @@
+import { askConfirm } from "./ConfirmDialog.jsx";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { fetchTmapRoute, validTruck, GEO_VERSION } from "./tmapRoute.js";
@@ -617,7 +618,8 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
                 <button
                   type="button"
                   className="btn danger"
-                  onClick={() => {
+                  onClick={async () => {
+                    if (!(await askConfirm("T맵 앱키를 지울까요?", { confirmLabel: "지우기", detail: "지우면 앱키를 다시 넣어야 경로와 이동 시간을 받을 수 있어요." }))) return;
                     localStorage.removeItem(KEY);
                     window.location.reload();
                   }}

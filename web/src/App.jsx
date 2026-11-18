@@ -32,6 +32,7 @@ import {
   queuedCount,
 } from "./importQueue.js";
 import DocumentViewer from "./DocumentViewer.jsx";
+import { ConfirmHost, askConfirm } from "./ConfirmDialog.jsx";
 import AnimatedDetails from "./AnimatedDetails.jsx";
 import Settings from "./Settings.jsx";
 import KeyGate from "./KeyGate.jsx";
@@ -842,11 +843,11 @@ export default function App() {
     );
     if (!targets.length) return;
     if (
-      !confirm(
+      !(await askConfirm(
         targets.length === 1
           ? `${labelDate(targets[0])} 배송 기록을 삭제할까요?`
           : `지난 배송 기록 ${targets.length}일을 모두 삭제할까요?`,
-      )
+      ))
     )
       return;
     const nextHistory = { ...records };
@@ -897,7 +898,7 @@ export default function App() {
     const message = customer
       ? `${labelDate(date)} ${customer.name || "이 고객"}의 기록을 삭제할까요?`
       : `${labelDate(date)} 고객 기록 전체를 삭제할까요?`;
-    if (!confirm(message)) return;
+    if (!(await askConfirm(message))) return;
     const updated = id
       ? deleteCustomer(record, id)
       : deleteDayCustomers(record);
@@ -1212,7 +1213,8 @@ export default function App() {
     switchTab("add");
     flash("테스트 고객 " + mock.pending.length + "명을 넣었어요.");
   }
-  function clearMock() {
+  async function clearMock() {
+    if (!(await askConfirm("테스트 고객을 모두 지울까요?"))) return;
     const records = { ...history, [day.date]: day },
       imageIds = [
         ...Object.values(importsRef.current).flatMap((s) => s.pending),
@@ -2031,16 +2033,28 @@ export default function App() {
                 </div>
               </div>
               <div className="panel">
-                <h2>{labelDate(selected)}</h2>
-                {chosen?.list?.length ? (
-                  <div className="calendar-detail">
-                    <p>
+                <h2 className="calendar-date">
+                  {labelDate(selected)}
+                  {chosen?.list?.length > 0 && (
+                    <small>
                       {chosen.list.length}곳 · 완료{" "}
                       {chosen.list.filter((c) => c.done).length}곳
-                    </p>
+                    </small>
+                  )}
+                </h2>
+                {chosen?.list?.length ? (
+                  <div className="calendar-detail">
                     <ol>
                       {chosen.list.map((c) => (
                         <li key={c.id} className="calendar-record">
+                          <button
+                            type="button"
+                            className="calendar-delete"
+                            aria-label={(c.name || "고객") + " 삭제"}
+                            onClick={() => deleteForDate(selected, c.id)}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                          </button>
                           <strong className="calendar-name">
                             <button
                               type="button"
@@ -2092,13 +2106,6 @@ export default function App() {
                           ) : (
                             <p className="calendar-no-phone">고객 번호 없음</p>
                           )}
-                          <button
-                            type="button"
-                            className="danger calendar-delete"
-                            onClick={() => deleteForDate(selected, c.id)}
-                          >
-                            이 고객 삭제
-                          </button>
                         </li>
                       ))}
                     </ol>
@@ -2177,6 +2184,7 @@ export default function App() {
           switchTab("add");
         }}
       />
+      <ConfirmHost />
       {toast && (
         <div className="toast" role="status">
           {toast}

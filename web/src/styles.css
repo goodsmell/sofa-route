@@ -162,7 +162,20 @@ body.dragging-route{user-select:none}
 .calendar-phone{color:var(--accent);font-weight:700;text-decoration:underline;text-underline-offset:3px}
 .calendar-no-phone{margin:3px 0;font-size:14px;color:var(--muted)}
 .calendar-done{margin:0 0 5px;font-size:14px;color:var(--muted)}
-.calendar-delete{min-height:38px;margin-top:6px;padding:3px 0;border:0;border-bottom:1px solid var(--rule);border-radius:0;background:none;font-size:13px}
+.calendar-record{position:relative}
+.calendar-record .calendar-name{padding-right:44px}
+.calendar-delete{position:absolute;top:2px;right:-6px;width:44px;height:44px;min-height:0;padding:0;border:0;border-radius:10px;background:none;color:var(--muted);display:grid;place-items:center}
+.calendar-delete svg{width:21px;height:21px}
+.calendar-delete:hover,.calendar-delete:focus-visible{color:var(--bad);background:var(--soft)}
+.calendar-date{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}
+.calendar-date small{font-size:14px;font-weight:500;color:var(--muted)}
+.confirm-overlay{position:fixed;inset:0;z-index:90;background:#0008;display:flex;align-items:center;justify-content:center;padding:16px}
+.confirm-dialog{width:min(100%,360px);padding:22px 20px 16px;border-radius:16px;background:var(--paper);box-shadow:0 18px 50px #0004}
+.confirm-dialog h2{margin:0 0 8px;font-size:19px;line-height:1.35;word-break:keep-all}
+.confirm-dialog p{margin:0 0 18px;font-size:15px;color:var(--muted);word-break:keep-all}
+.confirm-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.confirm-actions button{min-height:48px;border-radius:11px;font-weight:700}
+.confirm-danger{background:var(--bad);border-color:var(--bad);color:#fff}
 .calendar-record .info-line{align-items:center;margin:3px 0}
 nav.tabs{position:fixed;z-index:20;bottom:0;left:0;right:0;background:var(--paper);border-top:1px solid var(--rule);padding:0 max(8px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(8px,env(safe-area-inset-left,0px))}
 nav.tabs .in{max-width:620px;margin:0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
