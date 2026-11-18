@@ -19,6 +19,15 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
   const products = current
     ? (current.productRows?.length ? current.productRows : [current.prod]).filter(Boolean)
     : [];
+  // 제품·요청 내용·메모를 한 카드에 이름표와 값으로 모은다.
+  const facts = current
+    ? [
+        products.length ? ["제품", products] : null,
+        ...documentSpecificFields(current).filter(([label]) => label !== "주문·요청번호"),
+        current.memo ? ["특이사항", current.memo] : null,
+        current.callMemo ? ["통화 메모", current.callMemo] : null,
+      ].filter(Boolean)
+    : [];
   return (
     <section className="drive-view" aria-label="배송 운행 화면">
       {!day.list.length ? (
@@ -85,24 +94,29 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
                 </button>
               )}
             </p>
-            {products.length > 0 && (
-              <div className="drive-products">
-                <span>제품</span>
-                <ul>
-                  {products.map((product, i) => (
-                    <li key={i}>{product}</li>
+            <div className="drive-facts">
+              {facts.length > 0 && (
+                <dl>
+                  {facts.map(([label, value]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>
+                        {Array.isArray(value)
+                          ? value.map((v, i) => <span key={i}>{v}</span>)
+                          : value}
+                      </dd>
+                    </div>
                   ))}
-                </ul>
-              </div>
-            )}
-            {documentSpecificFields(current).filter(([label]) => label !== "주문·요청번호").map(([label, value]) => <p className="drive-memo" key={label}>{label}: {value}</p>)}
-            <button
-              type="button"
-              className="drive-doc"
-              onClick={() => onOpenDocument(current)}
-            >
-              의뢰서 다시 보기
-            </button>
+                </dl>
+              )}
+              <button
+                type="button"
+                className="drive-doc"
+                onClick={() => onOpenDocument(current)}
+              >
+                의뢰서 다시 보기 ›
+              </button>
+            </div>
             <div className="drive-eta">
               <div className="drive-eta-cols">
                 <div>
@@ -130,12 +144,6 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
                 </small>
               )}
             </div>
-            {(current.memo || current.callMemo) && (
-              <p className="drive-memo">
-                {current.memo}
-                {current.callMemo && " · 통화: " + current.callMemo}
-              </p>
-            )}
           </div>
           <div className="drive-actions">
             <div className="drive-links">

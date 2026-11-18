@@ -443,10 +443,14 @@ nav.tabs button{font-size:12px}
 .drive-info{display:flex;flex-wrap:wrap;gap:8px;font-size:16px;font-weight:700}
 .drive-info span{padding:6px 10px;border:1px solid var(--rule);border-radius:9px}
 .drive-memo{margin:14px 0 0;color:var(--warn);font-size:16px}
-.drive-products{display:flex;gap:10px;align-items:baseline;margin:14px 0 0;font-size:18px;font-weight:700}
-.drive-products span{flex:none;font-size:14px;font-weight:700;color:var(--muted)}
-.drive-products ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:2px;word-break:keep-all}
-.drive-doc{align-self:flex-start;margin-top:14px;min-height:44px;padding:8px 14px;border:1px solid var(--rule);border-radius:10px;background:var(--paper);color:var(--accent);font-weight:700}
+.drive-facts{margin-top:18px;border:1px solid var(--rule);border-radius:14px;background:var(--paper);overflow:hidden}
+.drive-facts dl{margin:0;padding:4px 16px}
+.drive-facts dl>div{display:grid;grid-template-columns:76px minmax(0,1fr);gap:12px;padding:11px 0;align-items:baseline}
+.drive-facts dl>div+div{border-top:1px solid var(--rule)}
+.drive-facts dt{font-size:14px;font-weight:700;color:var(--muted)}
+.drive-facts dd{margin:0;font-size:17px;font-weight:600;line-height:1.4;word-break:keep-all;display:flex;flex-direction:column;gap:2px}
+.drive-doc{display:block;width:100%;min-height:46px;padding:10px 16px;border:0;border-top:1px solid var(--rule);border-radius:0;background:var(--soft);color:var(--accent);font-weight:700;text-align:center}
+.drive-facts dl:empty+.drive-doc,.drive-facts>.drive-doc:only-child{border-top:0}
 .drive-actions{width:100%;max-width:620px;margin:0 auto}
 .drive-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:9px}
 .drive-links a:only-child{grid-column:1/-1}
@@ -626,7 +630,8 @@ nav.tabs button svg{width:21px;height:21px}
 .drive-eta strong{font-size:clamp(40px,11vw,58px)}
 .drive-eta-cols strong{font-size:clamp(28px,9vw,48px)}
 .drive-eta span,.drive-eta small,.drive-eyebrow,.drive-info,.drive-memo{font-size:14px}
-.drive-products{font-size:16px}
+.drive-facts dd{font-size:15px}
+.drive-facts dl>div{grid-template-columns:64px minmax(0,1fr);gap:10px}
 .drive-big{min-height:58px;font-size:18px}
 .drive-empty h2{font-size:25px}
 .drive-empty p{font-size:15px}
