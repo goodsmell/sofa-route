@@ -19,17 +19,6 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
     : [];
   return (
     <section className="drive-view" aria-label="배송 운행 화면">
-      <header className="drive-header">
-        <button type="button" onClick={onBack}>
-          ‹ 코스 보기
-        </button>
-        <div>
-          <strong>{day.date} 배송</strong>
-          <small>
-            {day.list.filter((s) => s.done).length}/{day.list.length}곳 완료
-          </small>
-        </div>
-      </header>
       {!day.list.length ? (
         <div className="drive-empty">
           <h2>의뢰서를 먼저 넣어 주세요</h2>
@@ -46,12 +35,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
         </div>
       ) : day.phase !== "driving" ? (
         <div className="drive-empty">
-          <span className="drive-eyebrow">다음 날 배송</span>
           <h2>확정한 코스로 출발할 준비가 됐나요?</h2>
-          <p>
-            출발을 누른 시각부터 예상 방문 시간이 계산됩니다. 고객과 아직 통화
-            중이라면 코스 화면에서 수정할 수 있어요.
-          </p>
           <button className="primary big" onClick={onStart}>
             일 시작 · 지금 출발
           </button>
