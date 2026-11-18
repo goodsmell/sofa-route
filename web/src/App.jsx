@@ -8,6 +8,8 @@ import {
   restoreDay,
   baseCustomer,
   normalizePhone,
+  customerPhone,
+  digits,
   compute,
   toMin,
   precallList,
@@ -2064,18 +2066,22 @@ export default function App() {
                               복사
                             </button>
                           </div>
-                          {(c.phone || c.safePhone) && (
+                          {customerPhone(c) ? (
                             <div className="info-line">
-                              <span>
-                                {normalizePhone(c.phone || c.safePhone)}
-                              </span>
+                              <a
+                                className="calendar-phone"
+                                href={"tel:" + digits(customerPhone(c))}
+                                aria-label={c.name + "에게 전화"}
+                              >
+                                {normalizePhone(customerPhone(c))}
+                              </a>
                               <button
                                 type="button"
                                 className="copy-action"
                                 aria-label={c.name + " 전화번호 복사"}
                                 onClick={() =>
                                   copyText(
-                                    normalizePhone(c.phone || c.safePhone),
+                                    normalizePhone(customerPhone(c)),
                                     "전화번호",
                                   )
                                 }
@@ -2083,6 +2089,8 @@ export default function App() {
                                 복사
                               </button>
                             </div>
+                          ) : (
+                            <p className="calendar-no-phone">고객 번호 없음</p>
                           )}
                           <button
                             type="button"

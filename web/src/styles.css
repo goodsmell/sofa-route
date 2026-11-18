@@ -159,6 +159,8 @@ body.dragging-route{user-select:none}
 .calendar-record{padding:9px 0;border-bottom:1px solid var(--rule)}
 .calendar-record strong{display:block;margin-bottom:5px}
 .calendar-record .calendar-name{display:flex;align-items:center;flex-wrap:wrap;gap:7px;margin-bottom:2px}
+.calendar-phone{color:var(--accent);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.calendar-no-phone{margin:3px 0;font-size:14px;color:var(--muted)}
 .calendar-done{margin:0 0 5px;font-size:14px;color:var(--muted)}
 .calendar-delete{min-height:38px;margin-top:6px;padding:3px 0;border:0;border-bottom:1px solid var(--rule);border-radius:0;background:none;font-size:13px}
 .calendar-record .info-line{align-items:center;margin:3px 0}

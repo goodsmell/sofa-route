@@ -1,5 +1,5 @@
 import React from "react";
-import { digits, fmt, normalizePhone, shortArea } from "./logic.js";
+import { customerPhone, digits, fmt, normalizePhone, shortArea } from "./logic.js";
 import { legInfo, fmtDuration } from "./tmapRoute.js";
 import {documentTypeLabel, documentSpecificFields} from './documentTypes.js';
 
@@ -31,8 +31,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
   const row = index >= 0 ? calc.rows[index] : null;
   const next = index >= 0 ? day.list[index + 1] : null;
   // 전화 버튼은 안심번호(0508)가 아니라 실제 고객 번호로만 건다.
-  const realPhone = (value) => value && !/^0508/.test(digits(value)) ? value : "";
-  const phone = current && (realPhone(current.phone) || realPhone(current.phone2));
+  const phone = customerPhone(current);
   const leg = index >= 0 ? legInfo(day, index) : null;
   const products = current
     ? (current.productRows?.length ? current.productRows : [current.prod]).filter(Boolean)

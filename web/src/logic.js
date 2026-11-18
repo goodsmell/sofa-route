@@ -505,3 +505,9 @@ export function shortArea(addr) {
   const parts = [/특별시|광역시/.test(city) ? "" : city, gu, dong].filter(Boolean);
   return parts.join(" ") || text.split(",")[0];
 }
+
+// 고객에게 직접 거는 번호. 안심번호(0508)는 빼고 고객 번호 → 연락처 2 순서로 고른다.
+export function customerPhone(c) {
+  const real = (v) => (v && !/^0508/.test(digits(v)) ? v : "");
+  return (c && (real(c.phone) || real(c.phone2))) || "";
+}
