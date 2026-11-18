@@ -7,13 +7,16 @@ const tmap = (address) =>
   "tmap://search?name=" + encodeURIComponent(address || "");
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 
-export default function DriveView({ day, calc, onStart, onBack, onUpdate }) {
+export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpenDocument }) {
   const index = day.list.findIndex((stop) => !stop.done);
   const current = index >= 0 ? day.list[index] : null;
   const row = index >= 0 ? calc.rows[index] : null;
   const next = index >= 0 ? day.list[index + 1] : null;
   const phone = current && (current.phone || current.safePhone);
   const leg = index >= 0 ? legInfo(day, index) : null;
+  const products = current
+    ? (current.productRows?.length ? current.productRows : [current.prod]).filter(Boolean)
+    : [];
   return (
     <section className="drive-view" aria-label="배송 운행 화면">
       <header className="drive-header">
@@ -85,7 +88,24 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate }) {
             </span>
             <h1>{current.name || "고객"}</h1>
             <p className="drive-address">{current.addr}</p>
-            {documentSpecificFields(current).map(([label, value]) => <p className="drive-memo" key={label}>{label}: {value}</p>)}
+            {products.length > 0 && (
+              <div className="drive-products">
+                <span>제품</span>
+                <ul>
+                  {products.map((product, i) => (
+                    <li key={i}>{product}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {documentSpecificFields(current).filter(([label]) => label !== "주문·요청번호").map(([label, value]) => <p className="drive-memo" key={label}>{label}: {value}</p>)}
+            <button
+              type="button"
+              className="drive-doc"
+              onClick={() => onOpenDocument(current)}
+            >
+              의뢰서 다시 보기
+            </button>
             <div className="drive-eta">
               <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
               <strong>{current.arrivedAt || fmt(row.start)}</strong>

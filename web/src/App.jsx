@@ -1951,6 +1951,7 @@ export default function App() {
             }
             onBack={() => selectStage(availableStage >= 3 ? 3 : availableStage)}
             onUpdate={update}
+            onOpenDocument={openDocument}
           />
         )}
         {tab === "map" && (
