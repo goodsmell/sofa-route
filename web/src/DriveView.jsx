@@ -102,25 +102,31 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
               의뢰서 다시 보기
             </button>
             <div className="drive-eta">
-              <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
-              <strong>{current.arrivedAt || fmt(row.start)}</strong>
-              {(() => {
-                const wish = current.promiseTime
-                  ? current.promiseTime + " 고객 약속"
-                  : current.slot === "am"
-                    ? "오전 희망"
-                    : current.slot === "pm"
-                      ? "오후 희망"
-                      : "";
-                const move = current.arrivedAt
-                  ? ""
-                  : "예상 이동 시간 " +
-                    (leg?.state === "tmap"
-                      ? fmtDuration(leg.min)
-                      : "약 " + fmtDuration(leg?.min || 30));
-                const text = [move, wish].filter(Boolean).join(" · ");
-                return text && <small>{text}</small>;
-              })()}
+              <div className="drive-eta-cols">
+                {!current.arrivedAt && (
+                  <div>
+                    <span>예상 이동 시간</span>
+                    <strong>
+                      {leg?.state === "tmap"
+                        ? fmtDuration(leg.min)
+                        : "약 " + fmtDuration(leg?.min || 30)}
+                    </strong>
+                  </div>
+                )}
+                <div>
+                  <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
+                  <strong>{current.arrivedAt || fmt(row.start)}</strong>
+                </div>
+              </div>
+              {(current.promiseTime || current.slot === "am" || current.slot === "pm") && (
+                <small>
+                  {current.promiseTime
+                    ? current.promiseTime + " 고객 약속"
+                    : current.slot === "am"
+                      ? "오전 희망"
+                      : "오후 희망"}
+                </small>
+              )}
             </div>
             {(current.memo || current.callMemo) && (
               <p className="drive-memo">

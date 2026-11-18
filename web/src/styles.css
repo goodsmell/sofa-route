@@ -435,7 +435,11 @@ nav.tabs button{font-size:12px}
 .drive-eta{display:flex;flex-direction:column;margin:26px 0 14px;padding:20px;border-radius:18px;background:var(--soft)}
 .drive-eta span{font-size:16px;color:var(--muted)}
 .drive-eta strong{font-size:clamp(58px,16vw,92px);font-variant-numeric:tabular-nums;line-height:1.1;letter-spacing:-.04em}
-.drive-eta small{font-size:16px;color:var(--muted)}
+.drive-eta small{font-size:16px;color:var(--muted);margin-top:6px}
+.drive-eta-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:16px}
+.drive-eta-cols>div{display:flex;flex-direction:column;min-width:0}
+.drive-eta-cols>div+div{border-left:1px solid var(--rule);padding-left:16px}
+.drive-eta-cols strong{font-size:clamp(34px,10vw,72px);word-break:keep-all}
 .drive-info{display:flex;flex-wrap:wrap;gap:8px;font-size:16px;font-weight:700}
 .drive-info span{padding:6px 10px;border:1px solid var(--rule);border-radius:9px}
 .drive-memo{margin:14px 0 0;color:var(--warn);font-size:16px}
@@ -619,6 +623,7 @@ nav.tabs button svg{width:21px;height:21px}
 .drive-address{font-size:clamp(16px,4vw,20px)}
 .drive-eta{margin:18px 0 12px;padding:16px;border-radius:13px}
 .drive-eta strong{font-size:clamp(40px,11vw,58px)}
+.drive-eta-cols strong{font-size:clamp(28px,9vw,48px)}
 .drive-eta span,.drive-eta small,.drive-eyebrow,.drive-info,.drive-memo{font-size:14px}
 .drive-products{font-size:16px}
 .drive-big{min-height:58px;font-size:18px}
