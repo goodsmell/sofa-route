@@ -2039,7 +2039,7 @@ export default function App() {
                     <ol>
                       {chosen.list.map((c) => (
                         <li key={c.id} className="calendar-record">
-                          <strong>
+                          <strong className="calendar-name">
                             <button
                               type="button"
                               className="customer-name"
@@ -2047,10 +2047,12 @@ export default function App() {
                               aria-label={c.name + " 의뢰서 보기"}
                             >
                               {c.name}
-                              <small>의뢰서</small>
                             </button>
-                            {c.done && c.doneAt ? " · 완료 " + c.doneAt : ""}
+                            <DocBadge type={c.documentType} />
                           </strong>
+                          {c.done && c.doneAt && (
+                            <p className="calendar-done">완료 {c.doneAt}</p>
+                          )}
                           <div className="info-line">
                             <span>{c.addr}</span>
                             <button
