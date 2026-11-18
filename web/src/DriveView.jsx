@@ -5,6 +5,24 @@ import {documentTypeLabel, documentSpecificFields} from './documentTypes.js';
 
 const tmap = (address) =>
   "tmap://search?name=" + encodeURIComponent(address || "");
+// 좌표가 있으면 T맵 공식 길안내 URL로 목적지를 넘겨 바로 경로 안내를 연다.
+// (https://apis.openapi.sk.com/tmap/app/routes, goalx=경도, goaly=위도)
+const tmapRoute = (stop) => {
+  let key = "";
+  try {
+    key = localStorage.getItem("sofa-route-tmap-key-v1") || "";
+  } catch {}
+  if (!key || !Number.isFinite(stop.lat) || !Number.isFinite(stop.lng))
+    return tmap(stop.addr);
+  const q = new URLSearchParams({
+    appKey: key,
+    goalname: stop.name || stop.addr || "목적지",
+    goalx: String(stop.lng),
+    goaly: String(stop.lat),
+    goaladdr: stop.addr || "",
+  });
+  return "https://apis.openapi.sk.com/tmap/app/routes?" + q.toString().replace(/\+/g, "%20");
+};
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 
 export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpenDocument, onCopy }) {
@@ -147,7 +165,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
           </div>
           <div className="drive-actions">
             <div className="drive-links">
-              <a className="btn" href={tmap(current.addr)}>
+              <a className="btn" href={tmapRoute(current)}>
                 길안내
               </a>
               {phone ? (
