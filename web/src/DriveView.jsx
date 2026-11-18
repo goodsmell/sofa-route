@@ -103,6 +103,10 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
             </button>
             <div className="drive-eta">
               <div className="drive-eta-cols">
+                <div>
+                  <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
+                  <strong>{current.arrivedAt || fmt(row.start)}</strong>
+                </div>
                 {!current.arrivedAt && (
                   <div>
                     <span>예상 이동 시간</span>
@@ -113,10 +117,6 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
                     </strong>
                   </div>
                 )}
-                <div>
-                  <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
-                  <strong>{current.arrivedAt || fmt(row.start)}</strong>
-                </div>
               </div>
               {(current.promiseTime || current.slot === "am" || current.slot === "pm") && (
                 <small>
