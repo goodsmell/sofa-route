@@ -35,7 +35,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
         </div>
       ) : day.phase !== "driving" ? (
         <div className="drive-empty">
-          <h2>확정한 코스로 출발할 준비가 됐나요?</h2>
+          <h2 className="drive-ready-title">확정한 코스로 출발할 준비가 됐나요?</h2>
           <button className="primary big" onClick={onStart}>
             출발 !!!
           </button>

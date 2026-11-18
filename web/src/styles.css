@@ -451,6 +451,7 @@ nav.tabs button{font-size:12px}
 .drive-empty h2{font-size:36px;line-height:1.2}
 .drive-empty p{font-size:18px;color:var(--muted)}
 .drive-empty .btn{width:100%}
+.drive-empty .drive-ready-title{text-align:center}
 @media(max-width:380px){.flow-label{font-size:12px}.modes button{font-size:12px}.modes button small{font-size:10px}}
 .call-slot-actions{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 .call-slot-actions span{grid-column:1/-1;font-size:15px;font-weight:700}
