@@ -450,6 +450,7 @@ nav.tabs button{font-size:12px}
 .drive-actions{width:100%;max-width:620px;margin:0 auto}
 .drive-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:9px}
 .drive-links a:only-child{grid-column:1/-1}
+.drive-no-phone{color:var(--muted);font-weight:600;cursor:default}
 .drive-big{width:100%;min-height:76px;border-radius:15px;font-size:26px}
 .drive-actions p{text-align:center;margin:9px 0 0;font-size:15px;color:var(--muted)}
 .drive-empty{flex:1;display:flex;flex-direction:column;justify-content:center;gap:14px;max-width:620px;width:100%;margin:0 auto}

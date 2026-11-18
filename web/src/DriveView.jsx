@@ -12,7 +12,9 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
   const current = index >= 0 ? day.list[index] : null;
   const row = index >= 0 ? calc.rows[index] : null;
   const next = index >= 0 ? day.list[index + 1] : null;
-  const phone = current && (current.phone || current.safePhone);
+  // 전화 버튼은 안심번호(0508)가 아니라 실제 고객 번호로만 건다.
+  const realPhone = (value) => value && !/^0508/.test(digits(value)) ? value : "";
+  const phone = current && (realPhone(current.phone) || realPhone(current.phone2));
   const leg = index >= 0 ? legInfo(day, index) : null;
   const products = current
     ? (current.productRows?.length ? current.productRows : [current.prod]).filter(Boolean)
@@ -140,10 +142,12 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
               <a className="btn" href={tmap(current.addr)}>
                 길안내
               </a>
-              {phone && (
+              {phone ? (
                 <a className="btn" href={"tel:" + digits(phone)}>
                   전화 {normalizePhone(phone)}
                 </a>
+              ) : (
+                <span className="btn drive-no-phone">고객 번호 없음</span>
               )}
             </div>
             {!current.arrivedAt ? (
