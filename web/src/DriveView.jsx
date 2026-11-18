@@ -7,7 +7,7 @@ const tmap = (address) =>
   "tmap://search?name=" + encodeURIComponent(address || "");
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 
-export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpenDocument }) {
+export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpenDocument, onCopy }) {
   const index = day.list.findIndex((stop) => !stop.done);
   const current = index >= 0 ? day.list[index] : null;
   const row = index >= 0 ? calc.rows[index] : null;
@@ -71,7 +71,18 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
               {current.arrivedAt ? "도착 기록 " + current.arrivedAt : "이동 중"}
             </span>
             <h1>{current.name || "고객"}</h1>
-            <p className="drive-address">{current.addr}</p>
+            <p className="drive-address">
+              {current.addr}{" "}
+              {current.addr && (
+                <button
+                  type="button"
+                  className="text-btn drive-copy"
+                  onClick={() => onCopy(current.addr, "주소")}
+                >
+                  복사
+                </button>
+              )}
+            </p>
             {products.length > 0 && (
               <div className="drive-products">
                 <span>제품</span>
