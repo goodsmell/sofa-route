@@ -104,23 +104,23 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
             <div className="drive-eta">
               <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
               <strong>{current.arrivedAt || fmt(row.start)}</strong>
-              {(current.promiseTime || current.slot === "am" || current.slot === "pm") && (
-                <small>
-                  {current.promiseTime
-                    ? current.promiseTime + " 고객 약속"
-                    : current.slot === "am"
-                      ? "오전 희망"
-                      : "오후 희망"}
-                </small>
-              )}
-            </div>
-            <div className="drive-info">
-              <span>
-                이동{" "}
-                {leg?.state === "tmap"
-                  ? fmtDuration(leg.min)
-                  : "예상 " + fmtDuration(leg?.min || 30)}
-              </span>
+              {(() => {
+                const wish = current.promiseTime
+                  ? current.promiseTime + " 고객 약속"
+                  : current.slot === "am"
+                    ? "오전 희망"
+                    : current.slot === "pm"
+                      ? "오후 희망"
+                      : "";
+                const move = current.arrivedAt
+                  ? ""
+                  : "이동 " +
+                    (leg?.state === "tmap"
+                      ? fmtDuration(leg.min)
+                      : "예상 " + fmtDuration(leg?.min || 30));
+                const text = [move, wish].filter(Boolean).join(" · ");
+                return text && <small>{text}</small>;
+              })()}
             </div>
             {(current.memo || current.callMemo) && (
               <p className="drive-memo">
