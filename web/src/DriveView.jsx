@@ -1,5 +1,5 @@
 import React from "react";
-import { customerPhone, digits, fmt, normalizePhone, shortArea } from "./logic.js";
+import { customerPhone, digits, fmt, normalizePhone, productList, shortArea } from "./logic.js";
 import { legInfo, fmtDuration, tmapNaviUrl } from "./tmapRoute.js";
 import {documentTypeLabel, documentSpecificFields} from './documentTypes.js';
 
@@ -15,9 +15,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
   // 전화 버튼은 안심번호(0508)가 아니라 실제 고객 번호로만 건다.
   const phone = customerPhone(current);
   const leg = index >= 0 ? legInfo(day, index) : null;
-  const products = current
-    ? (current.productRows?.length ? current.productRows : [current.prod]).filter(Boolean)
-    : [];
+  const products = current ? productList(current) : [];
   // 제품·요청 내용·메모를 한 카드에 이름표와 값으로 모은다.
   const facts = current
     ? [

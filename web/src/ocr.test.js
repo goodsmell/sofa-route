@@ -65,7 +65,7 @@ test('출고표의 시공일·두 연락처·사다리차와 여러 제품 행�
   assert.equal(result.phone2,'');
   assert.equal(result.ladderKnown,true);
   assert.equal(result.ladderNeeded,false);
-  assert.deepEqual(result.productRows,['포레 플러스 3인용','→ 포레 1인']);
+  assert.deepEqual(result.productRows,['포레 플러스 3인용']);
   assert.equal(result.weight,'90.2');
   data.words[3]=word('0508-2772-5786',900,220);
   assert.equal(parseFormOCR(data,1000,1000,'출고표.png').phone2,'0508-2772-5786');

@@ -113,7 +113,14 @@ export const normalizePhone = (s) => {
       : d;
 };
 export const normalizeOcrAddress = (value) => String(value || '').replace(/충부대로/g, '중부대로');
+// '→'로 시작하는 줄은 위 제품에 딸린 구성품 표시라 제품 목록에서 뺀다.
+export const isSubProduct = (s) => /^\s*(?:→|->|=>)/.test(String(s || ""));
+export const cleanProductRows = (rows) => (rows || []).filter((s) => s && !isSubProduct(s));
+// 화면에 보일 제품 목록
+export const productList = (c) =>
+  cleanProductRows(c?.productRows?.length ? c.productRows : [c?.prod]);
 export function baseCustomer(x = {}) {
+  const productRows = cleanProductRows(x.productRows);
   return {
     id: crypto.randomUUID(),
     source: x.source || "manual",
@@ -144,8 +151,8 @@ export function baseCustomer(x = {}) {
     single: !!x.single,
     call: !!x.call,
     sorry: !!x.sorry,
-    prod: x.prod || "",
-    productRows: x.productRows || [],
+    prod: (!isSubProduct(x.prod) && x.prod) || productRows[0] || "",
+    productRows,
     weight: x.weight || "",
     mapAddr: x.mapAddr || "",
     memo: x.memo || "",
@@ -410,7 +417,7 @@ export function stopFacts(c) {
     ...documentSpecificFields(c),
   ];
   if (['dispatch','return','incident'].includes(type) && (c.productRows?.length || c.prod || type === 'dispatch'))
-    facts.push(["제품", c.productRows?.length ? c.productRows.join(" · ") : c.prod || "확인 필요"]);
+    facts.push(["제품", productList(c).join(" · ") || "확인 필요"]);
   if (type === 'dispatch') facts.push(
     [
       "엘리베이터",

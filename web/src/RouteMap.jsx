@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { fetchTmapRoute, validTruck, GEO_VERSION, tmapNaviUrl } from "./tmapRoute.js";
 import { documentTypeLabel, documentSpecificFields } from "./documentTypes.js";
 import { loadTmapSdk } from "./tmapSdk.js";
-import { compute, fmt, shortArea, digits, normalizePhone, customerPhone } from "./logic.js";
+import { compute, fmt, shortArea, digits, normalizePhone, customerPhone, productList } from "./logic.js";
 
 const KEY = "sofa-route-tmap-key-v1";
 const PROFILE = "sofa-route-truck-v1";
@@ -309,7 +309,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
   const row = selected != null ? rows[selected] : null;
   const c = row?.c;
   const phone = customerPhone(c);
-  const products = c ? (c.productRows?.length ? c.productRows : [c.prod]).filter(Boolean) : [];
+  const products = c ? productList(c) : [];
   const facts = c
     ? [
         products.length ? ["제품", products.join(" / ")] : null,
