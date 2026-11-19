@@ -64,7 +64,7 @@ export function normalizePhotoResult(result,file,targetDate=''){
       ladderKnown:row.ladderKnown===true,ladderNeeded:row.ladderKnown===true&&row.ladderNeeded===true,
       call:row.call===true,bs:false,memo:value('memo'),
     }),file};
-  }).filter(row=>row.source==='list'?row.name&&row.phone:(!targetDate||row.installDate===targetDate)&&(row.name||row.addr||row.phone||row.safePhone));
+  }).filter(row=>row.source==='list'?row.name&&row.phone:(row.name||row.addr||row.phone||row.safePhone));
 }
 
 function canvasData(canvas){return canvas.toDataURL('image/jpeg',.88).split(',')[1]}
@@ -80,7 +80,7 @@ export async function analyzePhoto(file,canvas,key,fetcher=fetch,targetDate='',w
     'incident는 요청일, 고객 주소, 요청사유, 요청사항을 읽는다. measurement는 요청일, 설치주소(실측 방문지), 요청사항을 읽는다.',
     'move_install과 move_dismantle은 해체/철거주소를 fromAddr, 설치주소를 toAddr에 각각 적는다. move_install의 addr는 설치주소, move_dismantle의 addr는 해체/철거주소다. 두 주소를 합치지 않는다.',
     'installDate에는 문서 유형에 맞는 실제 방문 날짜만 YYYY-MM-DD로 적는다. 출고=시공일, 반품=배송요청일, 사고조치·실측·이동=요청일이다. 원시공일, 작성일, 사진 촬영일은 방문 날짜가 아니다.',
-    targetDate?`선택한 방문 날짜는 ${targetDate}이다. 의뢰서는 방문 날짜가 정확히 이 날짜인 작업만 추출한다. 날짜가 보이지 않거나 다른 날짜면 추출하지 않는다.`:'',
+    targetDate?`선택한 방문 날짜는 ${targetDate}이다. 방문 날짜가 이 날짜와 달라도 의뢰서는 그대로 추출하고, installDate에는 문서에 적힌 실제 날짜를 적는다. 날짜를 읽을 수 없으면 빈 문자열로 둔다.`:'',
     '엑셀 화면은 표의 모든 고객 행을 각각 한 객체로 만든다. 이름과 전화번호가 같은 행인지 확인한다. 표의 주소는 잘릴 수 있으므로 addr는 비운다.',
     '실제 고객 번호(010)는 의뢰서에서 추출하지 않는다. phone은 엑셀 고객 목록의 010 번호만 적는다. safePhone은 의뢰서의 0508 안심번호, phone2는 의뢰서의 두 번째 연락처다.',
     'slot은 오전 am/오후 pm/지정 없음 any다. 제품이 여러 줄이면 productRows에 각각 넣고 prod는 첫 제품이다. 총 무게가 없으면 weight는 빈 문자열이다.',

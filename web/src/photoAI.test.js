@@ -2,14 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {analyzePhoto,normalizePhotoResult,normalizePhotoDate} from './photoAI.js';
 
-test('선택한 배송 날짜의 의뢰서 고객만 추출하고 의뢰서의 010은 고객 번호로 쓰지 않는다',()=>{
+test('선택한 날짜와 다른 의뢰서도 날짜를 그대로 두고 추출하고, 의뢰서의 010은 고객 번호로 쓰지 않는다',()=>{
   assert.equal(normalizePhotoDate('2026년 11월 17일','2026-11-17'),'2026-11-17');
   const rows=normalizePhotoResult({kind:'dispatch',customers:[
     {name:'내일 고객',addr:'서울 강남구 1',installDate:'2026.11.17',phone:'010-1111-2222'},
     {name:'다른 날 고객',addr:'서울 강남구 2',installDate:'2026-11-18'},
     {name:'날짜 없음',addr:'서울 강남구 3',installDate:''},
   ]},'출고.jpg','2026-11-17');
-  assert.deepEqual(rows.map(row=>row.name),['내일 고객']);
+  assert.deepEqual(rows.map(row=>row.name),['내일 고객','다른 날 고객','날짜 없음']);
+  assert.deepEqual(rows.map(row=>row.installDate),['2026-11-17','2026-11-18','']);
   assert.equal(rows[0].phone,'');
 });
 
@@ -35,7 +36,7 @@ test('AI 반품의뢰서는 회수 방문지와 반품 사유를 보관한다',(
   assert.equal(row.elevatorKnown,false);
 });
 
-test('여섯 의뢰서의 제목과 방문 주소를 구분하고 날짜가 다른 건은 제외한다',()=>{
+test('여섯 의뢰서의 제목과 방문 주소를 구분하고 날짜가 다른 건도 그 날짜 그대로 남긴다',()=>{
   const target='2026-11-17';
   const examples=[
     ['dispatch',{addr:'경기 수원시 설치로 1',installDate:'2026-11-17'},'경기 수원시 설치로 1'],
@@ -50,7 +51,7 @@ test('여섯 의뢰서의 제목과 방문 주소를 구분하고 날짜가 다�
     assert.equal(row.documentType,kind);
     assert.equal(row.addr,visit);
     assert.equal(row.installDate,target);
-    assert.equal(normalizePhotoResult({kind,customers:[{name:'홍길동',addr:visit,installDate:'20261118'}]},'다른날.jpg',target).length,0);
+    assert.equal(normalizePhotoResult({kind,customers:[{name:'홍길동',addr:visit,installDate:'20261118'}]},'다른날.jpg',target)[0].installDate,'2026-11-18');
   }
 });
 

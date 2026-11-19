@@ -274,6 +274,12 @@ function FlowSteps({ stage, availableStage, onSelect }) {
   );
 }
 
+// "2026-11-21" → "11월 21일"
+const shortDate = (d) => {
+  const [, m, day] = String(d || "").split("-");
+  return m && day ? `${+m}월 ${+day}일` : d;
+};
+
 export default function App() {
   const initial = useRef(null);
   if (!initial.current) initial.current = init();
@@ -1273,7 +1279,7 @@ export default function App() {
     if (queueRunning.current || !aiKey || !nextQueued(importsRef.current)) return;
     queueRunning.current = true;
     setBusy(true);
-    const done = { photos: 0, forms: 0, contacts: 0, failed: 0 };
+    const done = { photos: 0, forms: 0, contacts: 0, failed: 0, otherDate: 0 };
     let paused = false;
     try {
       for (let next; (next = nextQueued(importsRef.current)); ) {
@@ -1307,6 +1313,7 @@ export default function App() {
         if (!forms.length) deleteDocuments([item.imageId]).catch(() => {});
         done.photos++;
         done.forms += forms.length;
+        done.otherDate += forms.filter((c) => c.installDate !== date).length;
         done.contacts += contacts.length;
         const current = sessionOf(importsRef.current, date);
         let candidates = [...current.phoneCandidates, ...contacts];
@@ -1334,7 +1341,7 @@ export default function App() {
       paused
         ? "앱으로 돌아오면 남은 사진을 이어서 읽어요."
         : done.forms || done.contacts
-          ? `${done.photos}장 AI 분석 · 의뢰서 고객 ${done.forms}건${done.contacts ? ` · 고객 번호 ${done.contacts}건은 이름 매칭에만 사용` : ""}`
+          ? `${done.photos}장 AI 분석 · 의뢰서 고객 ${done.forms}건${done.otherDate ? ` · ${done.otherDate}건은 날짜가 달라요(확인 필요)` : ""}${done.contacts ? ` · 고객 번호 ${done.contacts}건은 이름 매칭에만 사용` : ""}`
           : done.failed
             ? ""
             : "고객 정보를 찾지 못했어요. 더 선명한 사진을 넣거나 직접 입력해 주세요.",
@@ -1613,7 +1620,8 @@ export default function App() {
                         className={
                           "review-item" +
                           (!c.name.trim() ||
-                          (c.source !== "list" && !c.addr.trim())
+                          (c.source !== "list" && !c.addr.trim()) ||
+                          c.installDate !== day.date
                             ? " bad"
                             : "")
                         }
@@ -1631,6 +1639,13 @@ export default function App() {
                               <DocBadge type={c.documentType} />
                             </span>
                             <small>{c.addr || "주소 확인 필요"}</small>
+                            {c.installDate !== day.date && (
+                              <small className="review-date-warn">
+                                {c.installDate
+                                  ? `날짜가 달라요: 의뢰서는 ${shortDate(c.installDate)}, 선택한 날짜는 ${shortDate(day.date)}`
+                                  : "의뢰서에서 날짜를 못 읽었어요. 날짜를 확인해 주세요."}
+                              </small>
+                            )}
                           </span>
                         </summary>
                         <div className="review-fields">
