@@ -114,13 +114,15 @@ export const normalizePhone = (s) => {
 };
 export const normalizeOcrAddress = (value) => String(value || '').replace(/충부대로/g, '중부대로');
 // '→'로 시작하는 줄은 위 제품에 딸린 구성품 표시라 제품 목록에서 뺀다.
-export const isSubProduct = (s) => /^\s*(?:→|->|=>)/.test(String(s || ""));
-export const cleanProductRows = (rows) => (rows || []).filter((s) => s && !isSubProduct(s));
+// 사진마다 화살표 모양이 달라 →, ↳, ➔, ⇒, └, ->, => 를 모두 본다.
+export const isSubProduct = (s) =>
+  /^\s*(?:[→↳↪➔➜➝➞⇒⇨▶└]|->|=>|ㄴ\s)/.test(String(s || ""));
+export const cleanProductRows = (rows) => (rows || []).filter((s) => !isSubProduct(s));
 // 화면에 보일 제품 목록
 export const productList = (c) =>
-  cleanProductRows(c?.productRows?.length ? c.productRows : [c?.prod]);
+  cleanProductRows(c?.productRows?.length ? c.productRows : [c?.prod]).filter(Boolean);
 export function baseCustomer(x = {}) {
-  const productRows = cleanProductRows(x.productRows);
+  const productRows = cleanProductRows(x.productRows).filter(Boolean);
   return {
     id: crypto.randomUUID(),
     source: x.source || "manual",

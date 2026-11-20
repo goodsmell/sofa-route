@@ -237,3 +237,9 @@ test('확인 단계에서 직접 넣은 고객 번호는 확정 후에도 그대
   assert.equal(day.list[0].phone,'010-1111-2222');
   assert.equal(day.imports[0].phone,'010-1111-2222');
 });
+
+test('제품 목록에서 여러 모양의 화살표 줄을 뺀다',()=>{
+  const c=baseCustomer({prod:'→ 포레 1인',productRows:['포레 플러스 3인용','→ 포레 1인','↳ 스툴','-> 쿠션','└ 다리','ㄴ 팔걸이','ㄴ자 소파']});
+  assert.deepEqual(c.productRows,['포레 플러스 3인용','ㄴ자 소파']);
+  assert.equal(c.prod,'포레 플러스 3인용');
+});

@@ -20,6 +20,8 @@ import {
   courseText,
   deleteCustomer,
   deleteDayCustomers,
+  cleanProductRows,
+  productList,
 } from "./logic.js";
 import { imageCanvas } from "./ocr.js";
 import { saveDocument, loadDocument, deleteDocuments } from "./imageStore.js";
@@ -216,10 +218,7 @@ function ConfirmedDocuments({ imports, onOpen }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {(c.productRows?.length
-                    ? c.productRows
-                    : [c.prod || "—"]
-                  ).map((name, j) => (
+                  {(productList(c).length ? productList(c) : ["—"]).map((name, j) => (
                     <tr key={j}>
                       <td>{name || "—"}</td>
                     </tr>
@@ -348,7 +347,7 @@ export default function App() {
       p.map((x, j) => {
         if (j !== i) return x;
         const productRows = fn(
-          x.productRows?.length ? [...x.productRows] : [x.prod || ""],
+          x.productRows?.length ? cleanProductRows(x.productRows) : [x.prod || ""],
         );
         return { ...x, productRows, prod: productRows[0] || "" };
       }),
@@ -1062,7 +1061,7 @@ export default function App() {
           </label>
         );
       case "products": {
-        const rows = c.productRows?.length ? c.productRows : [c.prod || ""];
+        const rows = c.productRows?.length ? cleanProductRows(c.productRows) : [c.prod || ""];
         return (
           <table className="review-product-table" key={k}>
             <thead>
