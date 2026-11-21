@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { fetchTmapRoute, validTruck, GEO_VERSION, tmapNaviUrl } from "./tmapRoute.js";
 import { documentTypeLabel, documentSpecificFields } from "./documentTypes.js";
 import { loadTmapSdk } from "./tmapSdk.js";
+import { groupPins, nearbyStops } from "./mapPins.js";
 import { compute, fmt, shortArea, digits, normalizePhone, customerPhone, productList } from "./logic.js";
 
 const KEY = "sofa-route-tmap-key-v1";
@@ -17,7 +18,12 @@ const DEFAULT_PROFILE = {
 };
 const HOME = [37.32, 126.95]; // 좌표가 하나도 없을 때 보여 줄 곳
 
-const pin = (label, state) => `<div class="pin ${state}"><span>${String(label).replace(/[&<>"']/g, "")}</span></div>`;
+const pin = (label, state, multi) => {
+  const text = String(label).replace(/[&<>"']/g, "");
+  return multi
+    ? `<div class="pin-multi ${state}"><span>${text}</span></div>`
+    : `<div class="pin ${state}"><span>${text}</span></div>`;
+};
 
 const Icon = ({ d }) => (
   <svg
@@ -94,7 +100,8 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
     sdkRef = useRef(null),
     overlaysRef = useRef([]),
     meRef = useRef(null),
-    markersRef = useRef({});
+    markersRef = useRef({}),
+    lastTapRef = useRef(0);
   const [key, setKey] = useState(() => localStorage.getItem(KEY) || "");
   const [draft, setDraft] = useState(key);
   const [profile, setProfile] = useState(() => {
@@ -113,6 +120,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
   const [route, setRoute] = useState(null);
   const [busy, setBusy] = useState(false);
   const [selected, setSelected] = useState(null); // 고객 index
+  const [choices, setChoices] = useState([]); // 핀 하나에 겹친 배송지들
   const [query, setQuery] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [sheet, setSheet] = useState("peek"); // peek | list
@@ -130,6 +138,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
       )
       .filter(Boolean);
   }, [route, day]);
+  const spots = useMemo(() => groupPins(points, day.list.length), [points, day.list.length]);
   const located = new Set(
     points
       .filter((p) => p.index >= 0 && p.index < day.list.length)
@@ -199,35 +208,50 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
       overlaysRef.current.push(new Tmapv2.Polyline({ path, strokeColor: "#ffffff", strokeWeight: 9, map }));
       overlaysRef.current.push(new Tmapv2.Polyline({ path, strokeColor: "#285b6b", strokeWeight: 5, map }));
     }
-    for (const p of points) {
-      const isStop = p.index >= 0 && p.index < day.list.length;
-      const stop = isStop ? day.list[p.index] : null;
-      const state = !isStop
+    // 출발·귀가 → 배송지 → 고른 핀 순으로 그려 고른 핀이 맨 위에 오게 한다.
+    const rank = (spot) => (!spot.stops.length ? 0 : spot.stops.includes(selected) ? 2 : 1);
+    for (const spot of [...spots].sort((a, b) => rank(a) - rank(b))) {
+      const stops = spot.stops.map((i) => day.list[i]);
+      const state = !stops.length
         ? "end"
-        : stop?.done
-          ? "done"
-          : selected === p.index
-            ? "on"
+        : spot.stops.includes(selected)
+          ? "on"
+          : stops.every((stop) => stop?.done)
+            ? "done"
             : "";
       const marker = new Tmapv2.Marker({
-        position: new Tmapv2.LatLng(p.lat, p.lng),
-        iconHTML: pin(p.label, state),
-        title: isStop ? `${p.label}번 ${stop?.name || ""}` : p.label,
+        position: new Tmapv2.LatLng(spot.lat, spot.lng),
+        iconHTML: pin(spot.label, state, spot.stops.length > 1),
+        title: stops.length
+          ? spot.stops.map((i) => `${i + 1}번 ${day.list[i]?.name || ""}`.trim()).join(", ")
+          : spot.label,
         map,
       });
       overlaysRef.current.push(marker);
-      if (isStop) {
+      if (stops.length) {
+        // 같은 자리이거나 화면에서 겹쳐 보이는 배송지는 모두 골라 볼 수 있게 한다.
         // 휴대폰에서는 핀 터치가 click으로 오지 않을 때가 있어 touchend도 받는다.
         const choose = () => {
-          setSelected(p.index);
+          // touchend와 click이 함께 오면 한 번만 (그 사이 핀이 새로 그려져도)
+          const now = Date.now();
+          if (now - lastTapRef.current < 400) return;
+          lastTapRef.current = now;
+          const near = nearbyStops(spots, spot, map.getZoom());
+          const group = near.length ? near : spot.stops;
+          setChoices(group.length > 1 ? group : []);
+          setSelected((current) =>
+            group.includes(current)
+              ? group[(group.indexOf(current) + 1) % group.length]
+              : group.find((i) => !day.list[i]?.done) ?? group[0],
+          );
           setSheet("peek");
         };
         marker.addListener("click", choose);
         marker.addListener("touchend", choose);
-        markersRef.current[p.index] = marker;
+        for (const i of spot.stops) markersRef.current[i] = marker;
       }
     }
-  }, [points, selected, day, route, mapReady]);
+  }, [spots, selected, day, route, mapReady]);
 
   // 처음 그릴 때 모든 핀이 보이게
   const fitted = useRef("");
@@ -240,8 +264,9 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
     }
   }, [points, mapReady]);
 
-  const focus = (i) => {
+  const focus = (i, keepChoices = false) => {
     setSelected(i);
+    if (!keepChoices) setChoices([]);
     setSheet("peek");
     setSearchOpen(false);
     setQuery("");
@@ -467,6 +492,25 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
                   {ICONS.next}
                 </button>
               </div>
+              {choices.length > 1 && choices.includes(selected) && (
+                <div className="sheet-choices" role="group" aria-label="이 핀의 배송지">
+                  <small>이 핀에 배송지 {choices.length}곳</small>
+                  <div>
+                    {choices.map((i) => (
+                      <button
+                        type="button"
+                        key={day.list[i]?.id || i}
+                        className={selected === i ? "on" : ""}
+                        aria-pressed={selected === i}
+                        onClick={() => focus(i, true)}
+                      >
+                        <span className={"stop-no" + (day.list[i]?.done ? " done" : "")}>{i + 1}</span>
+                        {day.list[i]?.name || "고객"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <p className="sheet-addr">{c.addr || "주소 없음"}</p>
               {facts.length > 0 && (
                 <dl className="sheet-facts">
