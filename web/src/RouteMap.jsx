@@ -18,11 +18,12 @@ const DEFAULT_PROFILE = {
 };
 const HOME = [37.32, 126.95]; // 좌표가 하나도 없을 때 보여 줄 곳
 
-const pin = (label, state, multi) => {
+const pin = (label, state, multi, spot = "") => {
   const text = String(label).replace(/[&<>"']/g, "");
+  const data = spot === "" ? "" : ` data-spot="${spot}"`;
   return multi
-    ? `<div class="pin-multi ${state}"><span>${text}</span></div>`
-    : `<div class="pin ${state}"><span>${text}</span></div>`;
+    ? `<div class="pin-multi ${state}"${data}><span>${text}</span></div>`
+    : `<div class="pin ${state}"${data}><span>${text}</span></div>`;
 };
 
 const Icon = ({ d }) => (
@@ -101,7 +102,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
     overlaysRef = useRef([]),
     meRef = useRef(null),
     markersRef = useRef({}),
-    lastTapRef = useRef(0);
+    chooseRef = useRef(null);
   const [key, setKey] = useState(() => localStorage.getItem(KEY) || "");
   const [draft, setDraft] = useState(key);
   const [profile, setProfile] = useState(() => {
@@ -155,7 +156,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
   useEffect(() => {
     if (!key || !node.current) return;
     let cancelled = false;
-    let observer;
+    let observer, unlisten;
     setMapError("");
     setMapReady(false);
     loadTmapSdk().then((Tmapv2) => {
@@ -170,6 +171,30 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
       mapRef.current = map;
       observer = new ResizeObserver(() => map.resize());
       observer.observe(node.current);
+      // T맵 마커의 click은 누르는 사이 지도가 다른 판을 덮어 자주 빠진다.
+      // 그래서 핀을 누른 곳과 뗀 곳을 지도 위에서 직접 보고 고른다.
+      const el = node.current;
+      let down = null;
+      const onDown = (e) => {
+        const spot = e.target.closest?.("[data-spot]")?.dataset.spot;
+        down = spot == null ? null : { spot: Number(spot), x: e.clientX, y: e.clientY, at: Date.now() };
+      };
+      const onUp = (e) => {
+        const tap = down;
+        down = null;
+        if (!tap || Date.now() - tap.at > 800) return;
+        if (Math.hypot(e.clientX - tap.x, e.clientY - tap.y) > 12) return; // 지도를 끈 경우
+        chooseRef.current?.(tap.spot);
+      };
+      el.addEventListener("pointerdown", onDown, true);
+      el.addEventListener("pointerup", onUp, true);
+      const onCancel = () => { down = null; };
+      el.addEventListener("pointercancel", onCancel, true);
+      unlisten = () => {
+        el.removeEventListener("pointerdown", onDown, true);
+        el.removeEventListener("pointerup", onUp, true);
+        el.removeEventListener("pointercancel", onCancel, true);
+      };
       setMapReady(true);
     }).catch((error) => {
       if (!cancelled) setMapError(error.message);
@@ -177,6 +202,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
     return () => {
       cancelled = true;
       observer?.disconnect();
+      unlisten?.();
       overlaysRef.current.forEach((overlay) => overlay.setMap(null));
       overlaysRef.current = [];
       meRef.current?.setMap(null);
@@ -221,7 +247,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
             : "";
       const marker = new Tmapv2.Marker({
         position: new Tmapv2.LatLng(spot.lat, spot.lng),
-        iconHTML: pin(spot.label, state, spot.stops.length > 1),
+        iconHTML: pin(spot.label, state, spot.stops.length > 1, stops.length ? spots.indexOf(spot) : ""),
         title: stops.length
           ? spot.stops.map((i) => `${i + 1}번 ${day.list[i]?.name || ""}`.trim()).join(", ")
           : spot.label,
@@ -229,28 +255,23 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
       });
       overlaysRef.current.push(marker);
       if (stops.length) {
-        // 같은 자리이거나 화면에서 겹쳐 보이는 배송지는 모두 골라 볼 수 있게 한다.
-        // 휴대폰에서는 핀 터치가 click으로 오지 않을 때가 있어 touchend도 받는다.
-        const choose = () => {
-          // touchend와 click이 함께 오면 한 번만 (그 사이 핀이 새로 그려져도)
-          const now = Date.now();
-          if (now - lastTapRef.current < 400) return;
-          lastTapRef.current = now;
-          const near = nearbyStops(spots, spot, map.getZoom());
-          const group = near.length ? near : spot.stops;
-          setChoices(group.length > 1 ? group : []);
-          setSelected((current) =>
-            group.includes(current)
-              ? group[(group.indexOf(current) + 1) % group.length]
-              : group.find((i) => !day.list[i]?.done) ?? group[0],
-          );
-          setSheet("peek");
-        };
-        marker.addListener("click", choose);
-        marker.addListener("touchend", choose);
         for (const i of spot.stops) markersRef.current[i] = marker;
       }
     }
+    // 핀을 누르면: 같은 자리이거나 화면에서 겹쳐 보이는 배송지를 모두 골라 볼 수 있게 한다.
+    chooseRef.current = (spotIndex) => {
+      const spot = spots[spotIndex];
+      if (!spot?.stops.length) return;
+      const near = nearbyStops(spots, spot, map.getZoom());
+      const group = near.length ? near : spot.stops;
+      setChoices(group.length > 1 ? group : []);
+      setSelected((current) =>
+        group.includes(current)
+          ? group[(group.indexOf(current) + 1) % group.length]
+          : group.find((i) => !day.list[i]?.done) ?? group[0],
+      );
+      setSheet("peek");
+    };
   }, [spots, selected, day, route, mapReady]);
 
   // 처음 그릴 때 모든 핀이 보이게
