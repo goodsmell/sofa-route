@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { groupPins, nearbyStops, pinLabel } from "./mapPins.js";
+import { groupPins, pinLabel, clusterSpots } from "./mapPins.js";
 
 test("같은 자리 배송지는 핀 하나로 묶고 번호를 함께 보여 준다", () => {
   const spots = groupPins(
@@ -34,13 +34,17 @@ test("번호가 많으면 줄여서 보여 준다", () => {
   assert.equal(pinLabel(["1", "2", "3", "4", "5"]), "1·2 외 3");
 });
 
-test("화면에서 겹쳐 보이는 배송지를 함께 찾는다", () => {
+test("화면에서 겹치는 핀은 지금 확대 정도에 맞춰 하나로 묶는다", () => {
   const spots = groupPins([
-    { lat: 37.5, lng: 127, index: 0, label: "1" },
-    { lat: 37.5002, lng: 127, index: 1, label: "2" }, // 약 22m
-    { lat: 37.6, lng: 127, index: 2, label: "3" },
-  ], 3);
-  const at = { lat: 37.5, lng: 127 };
-  assert.deepEqual(nearbyStops(spots, at, 12), [0, 1]); // 멀리서 보면 겹침
-  assert.deepEqual(nearbyStops(spots, at, 18), [0]); // 확대하면 따로
+    { lat: 37.5, lng: 127, index: -1, label: "출발" },
+    { lat: 37.3955, lng: 127.1104, index: 2, label: "3" },
+    { lat: 37.3955, lng: 127.1104, index: 3, label: "4" },
+    { lat: 37.3942, lng: 127.11, index: 4, label: "5" }, // 약 150m
+    { lat: 37.2708, lng: 127.4385, index: 5, label: "6" },
+  ], 6);
+  const far = clusterSpots(spots, 11);
+  assert.deepEqual(far.filter((s) => s.stops.length).map((s) => s.label), ["3·4·5", "6"]);
+  assert.equal(far.filter((s) => !s.stops.length).length, 1); // 출발 핀은 그대로
+  const close = clusterSpots(spots, 17);
+  assert.deepEqual(close.filter((s) => s.stops.length).map((s) => s.label), ["3·4", "5", "6"]);
 });

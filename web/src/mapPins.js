@@ -1,4 +1,4 @@
-// 지도 핀 묶기: 같은 자리(같은 주소)의 배송지는 핀 하나로, 겹쳐 보이는 핀은 누를 때 고르게 한다.
+// 지도 핀 묶기: 같은 자리(같은 주소)의 배송지와 화면에서 겹쳐 보이는 배송지를 핀 하나로 묶는다.
 
 const spotKey = (p) => `${p.lat.toFixed(5)},${p.lng.toFixed(5)}`; // 약 1m 안이면 같은 자리
 
@@ -35,12 +35,28 @@ const meters = (a, b) => {
   return Math.hypot(dx, dy);
 };
 
-// 화면에서 radiusPx 안에 겹쳐 보이는 배송지 번호들 (같은 자리 포함)
-export function nearbyStops(spots, at, zoom, radiusPx = 40) {
-  const metersPerPx = (156543.03392 * Math.cos((at.lat * Math.PI) / 180)) / 2 ** zoom;
-  const limit = radiusPx * metersPerPx;
-  return spots
-    .filter((s) => s.stops.length && meters(s, at) <= limit)
-    .flatMap((s) => s.stops)
-    .sort((a, b) => a - b);
+// 지금 확대 정도에서 화면상 radiusPx 안에 겹치는 배송지 핀을 하나로 묶는다.
+// 출발·귀가 핀은 묶지 않는다. 확대하면 다시 따로 보인다.
+export function clusterSpots(spots, zoom, radiusPx = 34) {
+  const ends = spots.filter((s) => !s.stops.length);
+  const clusters = [];
+  for (const spot of spots.filter((s) => s.stops.length).sort((a, b) => a.stops[0] - b.stops[0])) {
+    const metersPerPx = (156543.03392 * Math.cos((spot.lat * Math.PI) / 180)) / 2 ** zoom;
+    const near = clusters.find((c) => c.members.some((m) => meters(m, spot) <= radiusPx * metersPerPx));
+    if (near) near.members.push(spot);
+    else clusters.push({ members: [spot] });
+  }
+  const merged = clusters.map(({ members }) => {
+    const stops = members.flatMap((m) => m.stops).sort((a, b) => a - b);
+    const weight = (m) => m.stops.length;
+    const total = stops.length;
+    return {
+      lat: members.reduce((n, m) => n + m.lat * weight(m), 0) / total,
+      lng: members.reduce((n, m) => n + m.lng * weight(m), 0) / total,
+      stops,
+      ends: [],
+      label: pinLabel(stops.map((i) => String(i + 1))),
+    };
+  });
+  return [...ends, ...merged];
 }

@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { fetchTmapRoute, validTruck, GEO_VERSION, tmapNaviUrl } from "./tmapRoute.js";
 import { documentTypeLabel, documentSpecificFields } from "./documentTypes.js";
 import { loadTmapSdk } from "./tmapSdk.js";
-import { groupPins, nearbyStops } from "./mapPins.js";
+import { groupPins, clusterSpots } from "./mapPins.js";
 import { compute, fmt, shortArea, digits, normalizePhone, customerPhone, productList } from "./logic.js";
 
 const KEY = "sofa-route-tmap-key-v1";
@@ -139,7 +139,12 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
       )
       .filter(Boolean);
   }, [route, day]);
-  const spots = useMemo(() => groupPins(points, day.list.length), [points, day.list.length]);
+  const [zoom, setZoom] = useState(10);
+  // 같은 자리끼리 묶고, 지금 확대 정도에서 화면상 겹치는 핀도 하나로 묶는다.
+  const spots = useMemo(
+    () => clusterSpots(groupPins(points, day.list.length), zoom),
+    [points, day.list.length, zoom],
+  );
   const located = new Set(
     points
       .filter((p) => p.index >= 0 && p.index < day.list.length)
@@ -195,6 +200,10 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
         el.removeEventListener("pointerup", onUp, true);
         el.removeEventListener("pointercancel", onCancel, true);
       };
+      // 확대·축소하면 겹치는 핀을 다시 묶는다.
+      const onZoom = () => { if (mapRef.current === map) setZoom(map.getZoom()); };
+      map.addListener("zoom_changed", onZoom);
+      onZoom();
       setMapReady(true);
     }).catch((error) => {
       if (!cancelled) setMapError(error.message);
@@ -262,8 +271,7 @@ export default function RouteMap({ day, onOpenCourse, onLocated }) {
     chooseRef.current = (spotIndex) => {
       const spot = spots[spotIndex];
       if (!spot?.stops.length) return;
-      const near = nearbyStops(spots, spot, map.getZoom());
-      const group = near.length ? near : spot.stops;
+      const group = spot.stops;
       setChoices(group.length > 1 ? group : []);
       setSelected((current) =>
         group.includes(current)
