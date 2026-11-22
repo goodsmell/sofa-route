@@ -36,10 +36,12 @@ export const shiftDate = (date, days) => {
   d.setDate(d.getDate() + days);
   return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
 };
+// 일정 계산의 출발 시간은 항상 06:40이다. 배송 시작을 누른 시각(startedAt)은 따로 둔다.
+export const DEPART = "06:40";
 export const emptyDay = (date) => ({
   example: false,
   date,
-  depart: "06:40",
+  depart: DEPART,
   start: "그레이박스 (경기 안산시 단원구 해봉로 232)",
   end: "팔곡화물차고지 (경기 안산시 상록구 팔곡산단1길 13)",
   endTravel: 30,
@@ -79,6 +81,11 @@ export function restoreDay(stored, storedHistory = {}, current = shiftDate(today
     contacts: day.contacts || [],
     imports: day.imports || day.list.filter((customer) => customer.source === "form"),
   };
+  // 예전에는 배송 시작을 누르면 출발 시간이 그 시각으로 바뀌었다. 저장된 값도 06:40으로 되돌린다.
+  if (day.depart !== DEPART) {
+    if (day.phase === "driving" && !day.startedAt) day.startedAt = day.depart;
+    day.depart = DEPART;
+  }
   if (day.end === "팔곡화물차고지 (경기 안산시 팔곡산단1길 13)") {
     day.end = "팔곡화물차고지 (경기 안산시 상록구 팔곡산단1길 13)";
     day.plans = null;

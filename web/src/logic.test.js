@@ -249,3 +249,9 @@ test('제품 목록에서 여러 모양의 화살표 줄을 뺀다',()=>{
   assert.deepEqual(c.productRows,['포레 플러스 3인용','ㄴ자 소파']);
   assert.equal(c.prod,'포레 플러스 3인용');
 });
+
+test('저장된 출발 시간은 항상 06:40으로 되돌리고 배송 시작 시각은 따로 둔다', () => {
+  const {d} = restoreDay({date:'2026-11-23',depart:'08:12',phase:'driving',list:[]}, {}, '2026-11-23');
+  assert.equal(d.depart, '06:40');
+  assert.equal(d.startedAt, '08:12');
+});

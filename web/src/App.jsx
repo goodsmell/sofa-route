@@ -1523,12 +1523,6 @@ export default function App() {
                   onChange={(v) => setDay((d) => ({ ...d, start: v }))}
                 />
                 <Field
-                  label="출발 시간"
-                  type="time"
-                  value={day.depart}
-                  onChange={(v) => setDay((d) => ({ ...d, depart: v }))}
-                />
-                <Field
                   label="귀가 장소"
                   value={day.end}
                   onChange={(v) => setDay((d) => ({ ...d, end: v }))}
@@ -1958,7 +1952,7 @@ export default function App() {
               setDay((d) => ({
                 ...d,
                 phase: "driving",
-                depart: new Date().toTimeString().slice(0, 5),
+                startedAt: new Date().toTimeString().slice(0, 5),
               }))
             }
             onBack={() => selectStage(availableStage >= 3 ? 3 : availableStage)}
