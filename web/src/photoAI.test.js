@@ -89,3 +89,13 @@ test('두 모델 모두 막히면 실패를 알리고, 키 오류는 다시 보�
   await assert.rejects(analyzePhoto({name:'a.jpg'},img,'k',bad,'',async()=>{}),/키를 확인/);
   assert.equal(n,1);
 });
+
+test('BS정보 칸이나 버리는·내리는 쇼파 특이사항이 있으면 기존 소파 수거로 표시한다',()=>{
+  const rows=normalizePhotoResult({kind:'dispatch',customers:[
+    {name:'BS칸',addr:'서울 강남구 1',bs:true,memo:''},
+    {name:'버림',addr:'서울 강남구 2',memo:'버리는 쇼파 있음'},
+    {name:'내림',addr:'서울 강남구 3',memo:'내리는 소파 있어요'},
+    {name:'없음',addr:'서울 강남구 4',memo:'전날 연락 부탁'},
+  ]},'출고.jpg');
+  assert.deepEqual(rows.map(row=>row.bs),[true,true,true,false]);
+});

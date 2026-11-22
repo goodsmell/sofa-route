@@ -112,6 +112,9 @@ export const normalizePhone = (s) => {
       ? d.replace(/^(\d{4})(\d{4})(\d{4})$/, "$1-$2-$3")
       : d;
 };
+// 특이사항에 "버리는 쇼파 있음", "내리는 소파 있어요"처럼 적혀 있으면 기존 소파를 수거해야 한다.
+export const mentionsOldSofaPickup = (text) =>
+  /(?:버리|버릴|버려|내리|내릴|내려|폐기)[가-힣]*\s*(?:쇼파|소파)|기존\s*(?:쇼파|소파)\s*(?:수거|폐기|BS)/i.test(String(text || ""));
 export const normalizeOcrAddress = (value) => String(value || '').replace(/충부대로/g, '중부대로');
 // '→'로 시작하는 줄은 위 제품에 딸린 구성품 표시라 제품 목록에서 뺀다.
 // 사진마다 화살표 모양이 달라 →, ↳, ➔, ⇒, └, ->, => 를 모두 본다.

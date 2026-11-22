@@ -1,4 +1,4 @@
-import {baseCustomer, normalizePhone, normalizeOcrAddress} from './logic.js';
+import {baseCustomer, normalizePhone, normalizeOcrAddress, mentionsOldSofaPickup} from './logic.js';
 import {DOCUMENT_TYPES} from './documentTypes.js';
 
 const MODEL='gemini-3.5-flash-lite';
@@ -15,7 +15,7 @@ const schema={
   type:'object',
   properties:{
     kind:{type:'string',enum:[...Object.keys(DOCUMENT_TYPES),'contacts']},
-    customers:{type:'array',items:{type:'object',properties:{...stringProperties,slot:{type:'string',enum:['am','pm','any']},productRows:{type:'array',items:{type:'string'}},elevatorKnown:{type:'boolean'},noelev:{type:'boolean'},ladderKnown:{type:'boolean'},ladderNeeded:{type:'boolean'},call:{type:'boolean'}},required:['name','addr','phone','safePhone','phone2','installDate','slot','prod','weight','elevSize','memo','fromAddr','toAddr','requestReason','requestDetails','orderNo','siteNo','productRows','elevatorKnown','noelev','ladderKnown','ladderNeeded','call']}},
+    customers:{type:'array',items:{type:'object',properties:{...stringProperties,slot:{type:'string',enum:['am','pm','any']},productRows:{type:'array',items:{type:'string'}},elevatorKnown:{type:'boolean'},noelev:{type:'boolean'},ladderKnown:{type:'boolean'},ladderNeeded:{type:'boolean'},call:{type:'boolean'},bs:{type:'boolean'}},required:['name','addr','phone','safePhone','phone2','installDate','slot','prod','weight','elevSize','memo','fromAddr','toAddr','requestReason','requestDetails','orderNo','siteNo','productRows','elevatorKnown','noelev','ladderKnown','ladderNeeded','call','bs']}},
   },
   required:['kind','customers'],
 };
@@ -62,7 +62,7 @@ export function normalizePhotoResult(result,file,targetDate=''){
       prod:value('prod')||productRows[0]||'',productRows,weight:value('weight'),elevSize:value('elevSize'),
       elevatorKnown:row.elevatorKnown===true,noelev:row.elevatorKnown===true&&row.noelev===true,
       ladderKnown:row.ladderKnown===true,ladderNeeded:row.ladderKnown===true&&row.ladderNeeded===true,
-      call:row.call===true,bs:false,memo:value('memo'),
+      call:row.call===true,bs:row.bs===true||mentionsOldSofaPickup(value('memo')),memo:value('memo'),
     }),file};
   }).filter(row=>row.source==='list'?row.name&&row.phone:(row.name||row.addr||row.phone||row.safePhone));
 }
@@ -85,6 +85,7 @@ export async function analyzePhoto(file,canvas,key,fetcher=fetch,targetDate='',w
     '실제 고객 번호(010)는 의뢰서에서 추출하지 않는다. phone은 엑셀 고객 목록의 010 번호만 적는다. safePhone은 의뢰서의 0508 안심번호, phone2는 의뢰서의 두 번째 연락처다.',
     'slot은 오전 am/오후 pm/지정 없음 any다. 제품이 여러 줄이면 productRows에 각각 넣고 prod는 첫 제품이다. 총 무게가 없으면 weight는 빈 문자열이다.',
     '엘리베이터와 사다리차 여부가 보이지 않으면 Known은 false다. 반품사유/사고 요청사유는 requestReason, 조치·실측·이동 요청 내용은 requestDetails, 주문·요청번호는 orderNo, 현장번호는 siteNo, 그 외 특이사항은 memo에 적는다.',
+    'bs는 기존 소파를 수거해야 하는지다. 의뢰서 맨 아래에 BS정보 칸이 있거나, 특이사항에 버리는/내리는 소파(쇼파)가 있다고 적혀 있으면 true, 아니면 false다.',
     '오직 지정된 JSON 형식으로 답한다.',
   ].join('\n');
   const body=JSON.stringify({contents:[{role:'user',parts:[{text:prompt},{inlineData:{mimeType:'image/jpeg',data:canvasData(canvas)}}]}],generationConfig:{responseMimeType:'application/json',responseSchema:schema,temperature:0}});

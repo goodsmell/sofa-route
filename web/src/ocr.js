@@ -1,4 +1,4 @@
-import {baseCustomer,normalizePhone,normalizeOcrAddress} from "./logic.js";
+import {baseCustomer,normalizePhone,normalizeOcrAddress,mentionsOldSofaPickup} from "./logic.js";
 export function loadOCR(){return new Promise((resolve,reject)=>{if(window.Tesseract){resolve(window.Tesseract);return}const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';s.onload=()=>resolve(window.Tesseract);s.onerror=()=>reject(new Error('글자 읽기 도구를 내려받지 못했습니다. 인터넷 연결을 확인해 주세요.'));document.head.appendChild(s)})}
 function wordsIn(words,w,h,x0,y0,x1,y1){return words.filter(q=>{const b=q.bbox||{},x=((b.x0||0)+(b.x1||0))/2/w,y=((b.y0||0)+(b.y1||0))/2/h;return x>=x0&&x<=x1&&y>=y0&&y<=y1}).sort((a,b)=>(a.bbox.y0-b.bbox.y0)>12?(a.bbox.y0-b.bbox.y0):(a.bbox.x0-b.bbox.x0)).map(q=>q.text).join(' ').trim()}
 function decodeSlot(value){const s=String(value||'').replace(/\s/g,'');if(/지정불가|시간무관|09[:시]?00[-~]17[:시]?00/.test(s))return'any';if(/오전|09[:시]?00[-~]13[:시]?00/.test(s))return'am';if(/오후|13[:시]?00[-~]17[:시]?00/.test(s))return'pm';return'any'}
@@ -62,7 +62,7 @@ export function parseFormOCR(data,w,h,file){
   const products=productRows(words,w,h);
   const product=products[0]||readProduct(field(.16,.36,.57,.405));
   const rawNotes=field(.02,.51,.96,.66).replace(/현장\s*특이사항/g,'').trim();
-  const noteKeywords=/전날|연락|해피콜|진입시간|늦게|이르게|직접\s*수령|사다리차|기존\s*소파/;
+  const noteKeywords=/전날|연락|해피콜|진입시간|늦게|이르게|직접\s*수령|사다리차|기존\s*소파|[쇼소]파/;
   const koreanRatio=(rawNotes.match(/[가-힣]/g)||[]).length/Math.max(1,rawNotes.length);
   const notes=rawNotes.length<160&&(noteKeywords.test(rawNotes)||koreanRatio>.48)&&!/중\s*형\s*완\s*제\s*품|테\s*이\s*블.*서\s*랍/.test(rawNotes)?rawNotes:'';
   const elevText=field(.73,.27,.82,.32),rawElevSize=field(.81,.27,.92,.32).replace(/[^0-9인승\s]/g,'').trim();
@@ -74,7 +74,7 @@ export function parseFormOCR(data,w,h,file){
   if(!name){const m=text.match(/(?:고객명|고객\s*성명|성명|수령인|반품자)\s*[:：]?\s*([가-힣]{2,5})/);if(m)name=m[1]}
   if(!addr){const labeled=labeledValue(text,/^(?:회수지|반품지|수거지|방문지|설치주소|고객주소|주소)\s*[:：]?/);const m=(labeled||text).match(/(?:경기(?:도)?|서울(?:특별시)?|인천(?:광역시)?|강원(?:도|특별자치도)?|충청[남북]도|전라[남북]도|경상[남북]도|세종(?:특별자치시)?|대전(?:광역시)?|대구(?:광역시)?|부산(?:광역시)?|광주(?:광역시)?|울산(?:광역시)?|제주(?:특별자치도)?)\s*[^\n]{8,100}/);if(m)addr=m[0].trim()}
   if(isReturn&&!safePhone){safePhone=phoneMatches(labeledValue(text,/^(?:연락처|전화번호|휴대폰|고객\s*연락처)\s*[:：]?/))[0]||''}
-  return {...baseCustomer({source:'form',verified:false,installDate,name,addr:normalizeOcrAddress(addr),safePhone,phone2,slot,prod:product,productRows:products,weight,...elevator,ladderKnown:ladder.known,ladderNeeded:ladder.needed,memo:[isReturn?'반품의뢰서':null,notes,order?'주문 '+order:''].filter(Boolean).join(' · '),call:/전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(rawNotes),bs:isReturn||/기존\s*소파\s*BS|(?:BS|8S|85)\s*정\s*보|완\s*제\s*품/.test(text)}),file};
+  return {...baseCustomer({source:'form',verified:false,installDate,name,addr:normalizeOcrAddress(addr),safePhone,phone2,slot,prod:product,productRows:products,weight,...elevator,ladderKnown:ladder.known,ladderNeeded:ladder.needed,memo:[isReturn?'반품의뢰서':null,notes,order?'주문 '+order:''].filter(Boolean).join(' · '),call:/전날|해피콜|진입시간|설치\s*전날|배송\s*전\s*연락/.test(rawNotes),bs:isReturn||/기존\s*소파\s*BS|(?:B\s*S|8\s*S|85)\s*정\s*보|완\s*제\s*품/.test(text)||mentionsOldSofaPickup(rawNotes)}),file};
 }
 export async function readFormFields(worker,canvas,customer){
   const box=async(x0,y0,x1,y1)=>{
