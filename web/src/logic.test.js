@@ -174,6 +174,12 @@ test('사진에서 충부대로로 읽힌 주소는 중부대로로 고치고 �
   assert.equal(d.list[0].travelKm,undefined);
 });
 
+test('통화로 확정한 시간은 코스 복사에서 앞뒤 30분 폭으로 적는다',async()=>{
+  const {courseText,emptyDay}=await import('./logic.js');
+  const text=courseText({...emptyDay('2026-11-16'),list:[{id:'a',name:'가',addr:'경기 성남시',slot:'any',promiseTime:'08:30',travel:30}]});
+  assert.match(text,/1\. 가 · 예상 08:00 ~ 09:00\n/);
+});
+
 test('T맵으로 받기 전에는 가짜 30분 대신 확인 전으로 적는다',async()=>{
   const {courseText,emptyDay}=await import('./logic.js');
   const text=courseText({...emptyDay('2026-11-16'),list:[{id:'a',name:'가',addr:'경기 성남시',slot:'any',travel:30}]});

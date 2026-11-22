@@ -487,10 +487,10 @@ export function courseText(day) {
         1 +
         ". " +
         (c.name || "이름 확인") +
-        " · " +
-        r.sl.label +
-        " · 예상 " +
-        fmt(r.start),
+        // 통화로 확정한 시간은 앞뒤 30분 폭으로 적는다 (08:30 확정 → 예상 08:00 ~ 09:00)
+        (/^\d{2}:\d{2}$/.test(c.promiseTime || "")
+          ? " · 예상 " + fmt(toMin(c.promiseTime) - 30) + " ~ " + fmt(toMin(c.promiseTime) + 30)
+          : " · " + r.sl.label + " · 예상 " + fmt(r.start)),
       "주소: " + (c.addr || "확인 필요"),
       "전화: " + (phones.join(" / ") || "확인 필요"),
       ...stopFacts(c)
