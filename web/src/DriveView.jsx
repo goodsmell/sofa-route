@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { customerPhone, digits, fmt, normalizePhone, productList, shortArea } from "./logic.js";
 import { legInfo, fmtDuration, tmapNaviUrl } from "./tmapRoute.js";
 import {documentTypeLabel, documentSpecificFields} from './documentTypes.js';
@@ -8,7 +8,22 @@ const tmap = (address) =>
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 
 export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpenDocument, onCopy }) {
-  const index = day.list.findIndex((stop) => !stop.done);
+  const live = day.list.findIndex((stop) => !stop.done);
+  // 지난 집 다시 보기: 완료한 집만 고를 수 있고, 아니면 지금 집을 보여 준다.
+  const [viewIdx, setViewIdx] = useState(null);
+  const reviewing =
+    viewIdx != null &&
+    !!day.list[viewIdx]?.done &&
+    (live < 0 || viewIdx < live);
+  const index = reviewing ? viewIdx : live;
+  const lastDone = live < 0 ? day.list.length - 1 : live - 1;
+  const goPrev = () => setViewIdx(index - 1);
+  const goNext = () => setViewIdx(index + 1 > lastDone ? null : index + 1);
+  const backToLive = () => setViewIdx(null);
+  const undoDone = () => {
+    onUpdate(current.id, { done: false, doneAt: "" });
+    setViewIdx(null);
+  };
   const current = index >= 0 ? day.list[index] : null;
   const row = index >= 0 ? calc.rows[index] : null;
   const next = index >= 0 ? day.list[index + 1] : null;
@@ -61,6 +76,9 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
           <a className="btn primary" href={tmap(day.end)}>
             귀가 길안내
           </a>
+          <button className="big" onClick={() => setViewIdx(day.list.length - 1)}>
+            ‹ 이전 집 다시 보기
+          </button>
           <button className="big" onClick={onBack}>
             전체 기록 보기
           </button>
@@ -71,14 +89,33 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
             {day.list.map((stop, i) => (
               <span
                 key={stop.id}
-                className={stop.done ? "done" : i === index ? "current" : ""}
+                className={
+                  (stop.done ? "done" : i === live ? "current" : "") +
+                  (reviewing && i === index ? " viewing" : "")
+                }
               />
             ))}
           </div>
-          <div className="drive-main">
+          {(index > 0 || reviewing) && (
+            <div className="drive-nav">
+              <button type="button" onClick={goPrev} disabled={index <= 0}>
+                ‹ 이전 집
+              </button>
+              {reviewing && (
+                <button type="button" onClick={goNext}>
+                  {index + 1 > lastDone ? (live < 0 ? "완료 화면 ›" : "지금 집 ›") : "다음 집 ›"}
+                </button>
+              )}
+            </div>
+          )}
+          <div className={"drive-main" + (reviewing ? " reviewing" : "")}>
             <span className="drive-eyebrow">
               {index + 1}번째 방문 · {documentTypeLabel(current.documentType)} ·{" "}
-              {current.arrivedAt ? "도착 기록 " + current.arrivedAt : "이동 중"}
+              {reviewing
+                ? "지난 집 · 완료 " + (current.doneAt || "")
+                : current.arrivedAt
+                  ? "도착 기록 " + current.arrivedAt
+                  : "이동 중"}
             </span>
             <h1>{current.name || "고객"}</h1>
             <p className="drive-address">
@@ -122,7 +159,13 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
                   <span>{current.arrivedAt ? "실제 도착" : "예상 도착"}</span>
                   <strong>{current.arrivedAt || fmt(row.start)}</strong>
                 </div>
-                {!current.arrivedAt && (
+                {reviewing && current.doneAt && (
+                  <div>
+                    <span>완료</span>
+                    <strong>{current.doneAt}</strong>
+                  </div>
+                )}
+                {!current.arrivedAt && !reviewing && (
                   <div>
                     <span>예상 이동 시간</span>
                     <strong>
@@ -157,7 +200,16 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
                 <span className="btn drive-no-phone">고객 번호 없음</span>
               )}
             </div>
-            {!current.arrivedAt ? (
+            {reviewing ? (
+              <>
+                <button className="primary drive-big" onClick={backToLive}>
+                  {live < 0 ? "완료 화면으로" : "지금 집으로 돌아가기"}
+                </button>
+                <button type="button" className="drive-undo" onClick={undoDone}>
+                  이 집 완료 취소
+                </button>
+              </>
+            ) : !current.arrivedAt ? (
               <button
                 className="primary drive-big"
                 onClick={() => onUpdate(current.id, { arrivedAt: nowTime() })}
@@ -174,7 +226,7 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
                 {next ? "다음 집 출발" : "작업 마치기"}
               </button>
             )}
-            {next && (
+            {next && !reviewing && (
               <p>
                 다음: {next.name} · {shortArea(next.addr)} · 예상{" "}
                 {fmt(calc.rows[index + 1].start)}

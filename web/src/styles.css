@@ -444,6 +444,13 @@ nav.tabs button{font-size:12px}
 .drive-progress span{height:7px;flex:1;border-radius:5px;background:var(--rule)}
 .drive-progress span.done{background:var(--ok)}
 .drive-progress span.current{background:var(--accent)}
+.drive-progress span.viewing{outline:2px solid var(--accent);outline-offset:2px}
+.drive-nav{display:flex;justify-content:space-between;gap:8px;max-width:620px;width:100%;margin:8px auto 0}
+.drive-nav button{border:0;background:none;min-height:44px;padding:4px 0;color:var(--accent);font-size:16px;font-weight:700}
+.drive-nav button:disabled{color:var(--muted);opacity:.5}
+.drive-nav button+button{margin-left:auto}
+.drive-main.reviewing .drive-eyebrow{color:var(--ok)}
+.drive-undo{width:100%;min-height:52px;margin-top:8px;border-radius:15px;color:var(--warn);font-weight:700}
 .drive-main{flex:1;display:flex;flex-direction:column;justify-content:center;max-width:620px;width:100%;margin:0 auto;padding:20px 0}
 .drive-eyebrow{color:var(--accent);font-size:16px;font-weight:800}
 .drive-main h1{font-size:clamp(42px,11vw,72px);margin:7px 0 8px;line-height:1.1}
@@ -758,3 +765,5 @@ nav.tabs button svg{width:21px;height:21px}
 .key-field input:focus{outline:none;border-color:var(--accent);background:var(--paper)}
 .key-submit{margin-top:6px;min-height:52px;border:0;border-radius:12px;background:var(--accent);color:var(--accent-ink);font:inherit;font-size:17px;font-weight:700;cursor:pointer}
 .key-submit:disabled{opacity:.35;cursor:default}
+/* 코스 화면의 "이동 시간 계산하기" — 위 "배송 준비 완료!" 묶음과 떨어뜨린다 */
+.leg-calc{width:100%;margin-top:16px}
