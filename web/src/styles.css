@@ -488,6 +488,7 @@ nav.tabs button{font-size:12px}
 .drive-empty .btn{width:100%}
 .drive-ready{max-width:440px;align-items:stretch;text-align:center;gap:12px}
 .drive-ready h2{margin:0 0 14px;word-break:keep-all}
+.drive-cancel{display:block;margin:8px auto 0;border:0;background:none;min-height:44px;padding:4px 12px;color:var(--muted);font-size:15px;font-weight:700;text-decoration:underline}
 .drive-ready-back{border:0;background:none;min-height:48px;color:var(--muted);font-weight:700}
 @media(max-width:380px){.flow-label{font-size:12px}.modes button{font-size:12px}.modes button small{font-size:10px}}
 .call-slot-actions{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}

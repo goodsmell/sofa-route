@@ -1955,6 +1955,14 @@ export default function App() {
                 startedAt: new Date().toTimeString().slice(0, 5),
               }))
             }
+            onCancelStart={() =>
+              setDay((d) => ({
+                ...d,
+                phase: "ready",
+                startedAt: "",
+                list: d.list.map((c) => (c.arrivedAt ? { ...c, arrivedAt: "" } : c)),
+              }))
+            }
             onBack={() => selectStage(availableStage >= 3 ? 3 : availableStage)}
             onUpdate={update}
             onOpenDocument={openDocument}

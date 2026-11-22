@@ -7,7 +7,7 @@ const tmap = (address) =>
   "tmap://search?name=" + encodeURIComponent(address || "");
 const nowTime = () => new Date().toTimeString().slice(0, 5);
 
-export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpenDocument, onCopy }) {
+export default function DriveView({ day, calc, onStart, onCancelStart, onBack, onUpdate, onOpenDocument, onCopy }) {
   const live = day.list.findIndex((stop) => !stop.done);
   // 지난 집 다시 보기: 완료한 집만 고를 수 있고, 아니면 지금 집을 보여 준다.
   const [viewIdx, setViewIdx] = useState(null);
@@ -85,6 +85,18 @@ export default function DriveView({ day, calc, onStart, onBack, onUpdate, onOpen
         </div>
       ) : (
         <>
+          {/* 아직 완료한 집이 없으면 테스트로 누른 출발을 되돌릴 수 있다. */}
+          {!day.list.some((stop) => stop.done) && (
+            <button
+              type="button"
+              className="drive-cancel"
+              onClick={() => {
+                if (confirm("출발을 취소하고 출발 전 화면으로 돌아갈까요?")) onCancelStart();
+              }}
+            >
+              출발 취소
+            </button>
+          )}
           <div className="drive-progress">
             {day.list.map((stop, i) => (
               <span
