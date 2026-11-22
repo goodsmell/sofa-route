@@ -194,7 +194,7 @@ function StopCard({
             type="button"
             className="grip"
             aria-label={
-              (c.name || "고객") + " 순서 옮기기. 누른 채로 위아래로 끄세요"
+              (c.name || "고객") + " 순서 옮기기. 꾹 누른 뒤 위아래로 끄세요"
             }
             {...grip}
           >
@@ -709,28 +709,82 @@ function Timeline({
     clearPaint();
     setDrag(null);
   };
+  // 손가락으로는 잠깐 꾹 눌러야 옮기기가 켜진다(스크롤하다 핸들을 스쳐도 순서가 바뀌지 않게).
+  const HOLD_MS = 400;
+  const pending = useRef(null); // {i, x, y, el, timer}
+  const cancelPending = () => {
+    const p = pending.current;
+    if (!p) return;
+    clearTimeout(p.timer);
+    p.el.classList.remove("pressing");
+    pending.current = null;
+  };
+  useEffect(() => cancelPending, []);
+  const startDrag = (i, el, pointerId, x, y) => {
+    try {
+      el.setPointerCapture(pointerId);
+    } catch {}
+    const items = stopsEl();
+    const tops = items.map((li) => li.getBoundingClientRect().top + window.scrollY);
+    const heights = items.map((li) => li.getBoundingClientRect().height);
+    pointer.current = { x, y };
+    const d = { from: i, to: i, dy: 0, startY: y + window.scrollY, tops, heights };
+    setDrag(d);
+    paint(d);
+    navigator.vibrate?.(10);
+  };
+  // 옮기는 동안에는 화면이 같이 스크롤되지 않게 막는다(자동 스크롤은 tick이 맡는다).
+  useEffect(() => {
+    if (!drag) return;
+    const block = (e) => e.cancelable && e.preventDefault();
+    document.addEventListener("touchmove", block, { passive: false });
+    return () => document.removeEventListener("touchmove", block);
+  }, [!!drag]);
   const grip = (i) => ({
     onPointerDown: (e) => {
-      e.preventDefault();
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {}
-      const items = stopsEl();
-      const tops = items.map((li) => li.getBoundingClientRect().top + window.scrollY);
-      const heights = items.map((li) => li.getBoundingClientRect().height);
-      pointer.current = { x: e.clientX, y: e.clientY };
-      const d = { from: i, to: i, dy: 0, startY: e.clientY + window.scrollY, tops, heights };
-      setDrag(d);
-      paint(d);
-      navigator.vibrate?.(10);
+      if (e.pointerType === "mouse") {
+        e.preventDefault();
+        startDrag(i, e.currentTarget, e.pointerId, e.clientX, e.clientY);
+        return;
+      }
+      cancelPending();
+      const el = e.currentTarget,
+        id = e.pointerId;
+      el.classList.add("pressing");
+      pending.current = {
+        i,
+        el,
+        x: e.clientX,
+        y: e.clientY,
+        timer: setTimeout(() => {
+          const p = pending.current;
+          if (!p) return;
+          el.classList.remove("pressing");
+          pending.current = null;
+          startDrag(i, el, id, p.x, p.y);
+        }, HOLD_MS),
+      };
     },
     onPointerMove: (e) => {
+      const p = pending.current;
+      if (p) {
+        // 누르는 중에 손가락이 움직이면 스크롤로 보고 옮기기를 취소한다.
+        if (Math.hypot(e.clientX - p.x, e.clientY - p.y) > 10) cancelPending();
+        return;
+      }
       if (!dragRef.current) return;
       pointer.current = { x: e.clientX, y: e.clientY };
       follow();
     },
-    onPointerUp: () => finish(true),
-    onPointerCancel: () => finish(false),
+    onPointerUp: () => {
+      if (pending.current) return cancelPending();
+      finish(true);
+    },
+    onPointerCancel: () => {
+      if (pending.current) return cancelPending();
+      finish(false);
+    },
+    onContextMenu: (e) => e.preventDefault(),
     onKeyDown: (e) => {
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         e.preventDefault();

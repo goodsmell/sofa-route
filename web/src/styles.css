@@ -352,7 +352,8 @@ nav.tabs button[aria-selected=true]{border-top-color:transparent;color:var(--ink
 .stop.done.open{opacity:1}
 .stop-text span{word-break:keep-all}
 .big-actions .btn{white-space:nowrap;padding:9px 8px}
-.grip{flex:none;width:52px;min-height:56px;padding:2px 0;border:1px dashed var(--rule);border-radius:12px;background:var(--paper);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:none;cursor:grab;font-weight:600}
+.grip{flex:none;width:52px;min-height:56px;padding:2px 0;border:1px dashed var(--rule);border-radius:12px;background:var(--paper);color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;touch-action:pan-y;-webkit-touch-callout:none;user-select:none;-webkit-user-select:none;cursor:grab;font-weight:600}
+.grip.pressing,.stop-head .grip.pressing{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--paper));transition:background .4s linear,color .15s,border-color .15s}
 .grip svg{width:22px;height:22px}
 .grip small{font-size:11px;line-height:1.1}
 .stop.dragging{opacity:.45;border-style:dashed}
