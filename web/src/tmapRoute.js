@@ -3,6 +3,8 @@ export const GEO_VERSION = 2;
 const GEO_CACHE = 'sofa-route-geo-v2';
 // v3: 출발→1번 구간을 0km로 잘못 나누던 결과를 버린다
 const LEG_CACHE = 'sofa-route-legs-v3';
+// 구간별(출발 시각 반영) 결과. 같은 두 장소·같은 출발 시각·같은 차량이면 T맵에 다시 묻지 않는다.
+const SEG_CACHE = 'sofa-route-segs-v1';
 
 export function mapAddress(value) {
   const raw = String(value || '').trim();
@@ -313,14 +315,20 @@ function clockAt(date, min) {
 
 // 구간 하나(from→to)를 주어진 출발 시각으로 T맵에 묻는다. T맵은 경유지가 1개 이상 필요해서 도착 지점을 경유지로도 넣는다.
 async function segmentLeg(day, from, to, atMin, profile, key, fetcher) {
+  const when = clockAt(day.date, atMin);
+  const id = JSON.stringify([when.date, when.depart, validTruck(profile) ? [profile.height, profile.width, profile.length, profile.weight, profile.totalWeight] : 0, [from, to].map(p => [p.lat.toFixed(5), p.lng.toFixed(5)])]);
+  const hasStorage = typeof localStorage !== 'undefined';
+  if (hasStorage) {const hit = storage.get(SEG_CACHE)[id]; if (hit) return hit}
   const response = await request(`${API}/routes/routeSequential30?version=1`, {
     method: 'POST', headers: {appKey: key, Accept: 'application/json', 'Content-Type': 'application/json'},
-    body: JSON.stringify(routeBody({...day, ...clockAt(day.date, atMin)}, [from, to, to], profile)),
+    body: JSON.stringify(routeBody({...day, ...when}, [from, to, to], profile)),
   }, fetcher);
   if (!response.ok) return null;
   const total = (await response.json().catch(() => null))?.properties;
   const time = +total?.totalTime, distance = +total?.totalDistance;
-  return time > 0 ? toLeg(distance || 0, time) : null;
+  const leg = time > 0 ? toLeg(distance || 0, time) : null;
+  if (leg && hasStorage) {const all = storage.get(SEG_CACHE); all[id] = leg; storage.set(SEG_CACHE, all, 400)}
+  return leg;
 }
 
 // 첫 계산 결과로 하루 일정을 짜 보고, 구간마다 그 출발 시각의 교통으로 다시 계산한다. 실패한 구간은 첫 결과를 그대로 둔다.

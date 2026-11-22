@@ -956,6 +956,11 @@ export default function RouteView(props) {
             })}
           </div>
           {lateView && <LateSheet {...lateView} onClose={() => setLateView(null)} />}
+          {tmapReady && RECOMMENDATIONS.some(([kind]) => day.plans[kind] && !legsReadyOf(planDay(day, day.plans[kind]))) && (
+            <button type="button" className="btn" disabled={legBusy || aiBusy} onClick={actions.fetchAllPlanLegs}>
+              {legBusy ? "이동 시간 계산 중…" : "이동 시간 계산하기 (T맵)"}
+            </button>
+          )}
           <button type="button" className="btn primary recommendation-continue" onClick={() => {
             actions.usePlan(selectedPlan);
             setMode("fixed");
@@ -1087,7 +1092,7 @@ export default function RouteView(props) {
                 )}
                 {plan?.timeError && (
                   <p className="note warn">
-                    {plan.timeError} ‘시간 계산하기’를 눌러 다시 받을 수 있어요.
+                    {plan.timeError} ‘이동 시간 계산하기’를 눌러 다시 받을 수 있어요.
                   </p>
                 )}
 
@@ -1102,6 +1107,16 @@ export default function RouteView(props) {
                       연결하기
                     </button>
                   </p>
+                )}
+                {tmapReady && !ready && (
+                  <button
+                    type="button"
+                    className="btn leg-calc"
+                    disabled={legBusy}
+                    onClick={() => (plan ? actions.fetchPlanLegs(mode) : actions.fetchLegs())}
+                  >
+                    {legBusy ? "이동 시간 계산 중…" : "이동 시간 계산하기 (T맵)"}
+                  </button>
                 )}
                 <Timeline
                   key={mode}

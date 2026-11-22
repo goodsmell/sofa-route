@@ -510,15 +510,15 @@ export default function App() {
         c.done,
       ]),
     });
-  // 처음 추천을 만들 때 세 코스의 도로 구간 시간도 함께 계산한다.
-  // 의뢰서 확정 뒤 추천 선택 화면이 열리면, 그때의 최신 코스로 추천을 한 번 만든다.
+  // "추천 코스 만들기"를 누르면 세 코스의 도로 구간 시간도 함께 계산한다.
+  // 의뢰서 확정 뒤 추천 선택 화면이 열리면 추천 순서만 만들고, T맵 경로(무료 하루 100건)는 버튼을 눌러야 받는다.
   const [autoPlan, setAutoPlan] = useState(null);
   useEffect(() => {
     if (!autoPlan || aiBusy || tab !== "order") return;
     setAutoPlan(null);
-    if (autoPlan === day.date) makePlans(day);
+    if (autoPlan === day.date) makePlans(day, false, false);
   }, [autoPlan, tab, day, aiBusy]);
-  async function makePlans(baseDay = day, quiet = false) {
+  async function makePlans(baseDay = day, quiet = false, withLegs = true) {
     const rest = baseDay.list.filter((c) => !c.done);
     if (rest.length < 2) {
       if (!quiet) flash("배송지가 2곳 이상일 때 추천 코스를 만들 수 있어요.");
@@ -620,7 +620,7 @@ export default function App() {
       };
       let located = {};
       let failed = 0;
-      if (key) {
+      if (key && withLegs) {
         let profile = { height: "340", weight: "3500" };
         try {
           profile = {
@@ -632,7 +632,7 @@ export default function App() {
         try {
           const result = await calculateRecommendedLegs(next, (ordered) =>
             fetchTmapRoute(ordered, key, profile, fetch, {
-              useCache: false,
+              useCache: true,
               schedule: legSchedule,
             }),
           );
@@ -669,7 +669,9 @@ export default function App() {
         flash(
           !geo
             ? "세 코스를 만들었어요. 빠른 이동과 균형 추천은 지역 기준의 대략 순서예요."
-            : failed
+            : !withLegs
+              ? "세 코스를 만들었어요. 이동 시간은 ‘이동 시간 계산하기’를 누르면 받아요."
+              : failed
               ? `추천은 만들었지만 ${failed}개 코스의 구간 시간을 받지 못했어요.`
               : "세 코스의 추천과 구간 시간을 만들었어요.",
         );
@@ -694,12 +696,12 @@ export default function App() {
     setLegBusy(true);
     try {
       const route = await fetchTmapRoute(ordered, key, profile, fetch, {
-        useCache: false,
+        useCache: true,
         schedule: legSchedule,
       });
       if (!route.legs)
         throw new Error(
-          'T맵 구간 시간을 읽지 못했어요. "다시 받기"를 눌러 주세요.',
+          'T맵 구간 시간을 읽지 못했어요. "이동 시간 계산하기"를 다시 눌러 주세요.',
         );
       setDay((d) => {
         if (routeSig(d) !== routeSig(baseDay)) return d;
@@ -759,12 +761,12 @@ export default function App() {
     setLegBusy(true);
     try {
       const route = await fetchTmapRoute(baseDay, key, profile, fetch, {
-        useCache: false,
+        useCache: true,
         schedule: legSchedule,
       });
       if (!route.legs)
         throw new Error(
-          'T맵 구간 시간을 읽지 못했어요. "다시 받기"를 눌러 주세요.',
+          'T맵 구간 시간을 읽지 못했어요. "이동 시간 계산하기"를 다시 눌러 주세요.',
         );
       setDay((d) => {
         const next = { ...d, list: markLocated(d.list, route) };
@@ -788,19 +790,6 @@ export default function App() {
         (_, i) => legInfo(day, i).state,
       ).every((x) => x === "tmap"),
     tmapReady = !!localStorage.getItem(TMAP_KEY);
-  // 코스 화면에서 이동 시간이 비면(순서를 옮겼거나 주소를 고쳤을 때) 잠깐 기다렸다가 T맵에 자동으로 다시 묻는다.
-  // 연달아 여러 번 바꾸면 마지막에 한 번만, 같은 코스는 한 번만 시도한다(실패해도 무한 반복하지 않게).
-  const autoLegSig = useRef(""),
-    daySig = routeSig(day);
-  useEffect(() => {
-    if (tab !== "order" || legsReady || legBusy || !tmapReady || !day.list.length) return;
-    if (autoLegSig.current === daySig) return;
-    const id = setTimeout(() => {
-      autoLegSig.current = daySig;
-      fetchLegs(dayRef.current, true);
-    }, 1200);
-    return () => clearTimeout(id);
-  }, [tab, legsReady, legBusy, tmapReady, daySig]);
   const [tmapKey, setTmapKey] = useState(
     () => localStorage.getItem(TMAP_KEY) || "",
   );
@@ -1943,6 +1932,11 @@ export default function App() {
               movePlan: (kind, from, to) =>
                 setDay((d) => movePlan(d, kind, from, to)),
               fetchPlanLegs: (kind) => fetchPlanLegs(kind),
+              // 추천 세 코스의 이동 시간을 차례로 받는다. 이미 받은 코스는 저장해 둔 결과를 써서 T맵을 다시 부르지 않는다.
+              fetchAllPlanLegs: async () => {
+                for (const kind of ["customer", "driver", "balanced"])
+                  if (dayRef.current.plans?.[kind]) await fetchPlanLegs(kind);
+              },
               update,
               move,
               edit,

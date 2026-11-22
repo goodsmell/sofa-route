@@ -165,3 +165,23 @@ test('구간마다 실제 출발 예정 시각으로 T맵에 다시 묻고, 실�
   assert.deepEqual(sent.sort(),['202611180640','202611180930','202611182350']);
   assert.deepEqual(legs,[{km:20,min:60},{km:20,min:60},{km:14,min:30}]);
 });
+
+test('같은 구간·같은 출발 시각은 저장해 둔 결과를 써서 T맵을 다시 부르지 않는다',async()=>{
+  const store={};
+  globalThis.localStorage={getItem:k=>store[k]??null,setItem:(k,v)=>{store[k]=String(v)}};
+  try {
+    const {timedLegs}=await import('./tmapRoute.js');
+    const day={date:'2026-11-19',depart:'07:00',start:'출발',end:'귀가',list:[{id:'a'}]};
+    const points=[{lat:37,lng:127,index:-1},{lat:37.1,lng:127.1,index:0},{lat:37.3,lng:127.3,index:1}];
+    const first=[{km:10,min:20},{km:12,min:25}];
+    let calls=0;
+    const fetcher=async()=>{calls++; return {ok:true,status:200,json:async()=>({properties:{totalTime:'1800',totalDistance:'15000'}})}};
+    const schedule=()=>[420,500];
+    const a=await timedLegs(day,points,first,{},'k',fetcher,schedule);
+    const b=await timedLegs(day,points,first,{},'k',fetcher,schedule);
+    assert.equal(calls,2);
+    assert.deepEqual(a,b);
+    await timedLegs(day,points,first,{},'k',fetcher,()=>[430,500]);
+    assert.equal(calls,3);
+  } finally {delete globalThis.localStorage}
+});
